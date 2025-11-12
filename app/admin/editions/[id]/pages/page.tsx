@@ -177,18 +177,13 @@ export default function EditionPagesPage() {
                   if (file) {
                     setLoading(true);
                     try {
-                      const formData = new FormData();
-                      formData.append('pdf', file);
-
-                      const response = await fetch(`/api/editions/${editionId}/upload-pdf`, {
-                        method: 'POST',
-                        body: formData,
-                      });
-
-                      const result = await response.json();
+                      // Direct upload to Supabase to bypass Vercel 4.5MB limit
+                      const { uploadPDFToSupabase } = await import('@/lib/upload-helpers');
+                      const result = await uploadPDFToSupabase(file, editionId);
+                      
                       if (result.success) {
                         setUploadedPDF(file);
-                        setPdfUrl(result.data.pdf_url);
+                        setPdfUrl(result.url!);
                         alert('PDF uploaded successfully!');
                       } else {
                         alert('Error: ' + result.error);
