@@ -131,9 +131,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Configure body parser for file uploads
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+// Configure for file uploads - Next.js 14 syntax
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
