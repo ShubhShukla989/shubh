@@ -3,6 +3,9 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+
 export default function HomePage() {
   const router = useRouter();
 
