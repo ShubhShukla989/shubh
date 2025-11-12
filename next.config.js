@@ -18,8 +18,10 @@ const nextConfig = {
     }
     return config;
   },
-  // Ensure proper output for Vercel
-  output: 'standalone',
+  experimental: {
+    // Ensure proper client reference manifest generation
+    optimizePackageImports: ['@heroicons/react', 'lucide-react'],
+  },
 }
 
 module.exports = nextConfig
