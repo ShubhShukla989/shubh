@@ -1,0 +1,249 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase';
+import { PDFDocument } from 'pdf-lib';
+import gm from 'gm';
+import { writeFile, unlink, readFile } from 'fs/promises';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import { promisify } from 'util';
+
+/**
+ * POST /api/editions/:id/extract-pages
+ * Extract pages from uploaded PDF as PNG images
+ * Uses pdf-lib to get page count and GraphicsMagick to convert to images
+ * 
+ * REQUIREMENTS:
+ * - npm install pdf-lib gm
+ * - GraphicsMagick or ImageMagick installed on system
+ * - Supabase Storage bucket: 'page-assets' (public)
+ * - Database table: 'edition_pages'
+ */
+// Increase timeout for PDF processing
+export const maxDuration = 60; // 60 seconds
+export const dynamic = 'force-dynamic';
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  console.log('=== PDF EXTRACTION STARTED ===');
+  try {
+    const { id } = params;
+    console.log('Edition ID:', id);
+    
+    const body = await request.json();
+    const { 
+      startPage = 1, 
+      endPage = 1, 
+      extractAll = true,
+      resolution = 150 // DPI for image quality
+    } = body;
+    console.log('Extraction settings:', { startPage, endPage, extractAll, resolution });
+
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Get edition with PDF URL
+    const { data: edition, error: editionError } = await supabaseAdmin
+      .from('editions')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (editionError || !edition) {
+      return NextResponse.json(
+        { success: false, error: 'Edition not found' },
+        { status: 404 }
+      );
+    }
+
+    if (!edition.pdf_url) {
+      return NextResponse.json(
+        { success: false, error: 'No PDF uploaded for this edition' },
+        { status: 400 }
+      );
+    }
+
+    // Download PDF from URL with timeout
+    console.log('Downloading PDF from:', edition.pdf_url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    let pdfDoc;
+    let totalPages;
+    
+    try {
+      const pdfResponse = await fetch(edition.pdf_url, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      
+      if (!pdfResponse.ok) {
+        return NextResponse.json(
+          { success: false, error: 'Failed to download PDF' },
+          { status: 500 }
+        );
+      }
+
+      const pdfBuffer = await pdfResponse.arrayBuffer();
+      console.log('PDF downloaded, size:', pdfBuffer.byteLength);
+
+      // Load PDF with pdf-lib
+      console.log('Loading PDF document...');
+      pdfDoc = await PDFDocument.load(pdfBuffer);
+      totalPages = pdfDoc.getPageCount();
+      console.log('PDF loaded successfully, total pages:', totalPages);
+    } catch (fetchError) {
+      clearTimeout(timeout);
+      console.error('PDF download error:', fetchError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to download or load PDF: ' + (fetchError instanceof Error ? fetchError.message : 'Unknown error') },
+        { status: 500 }
+      );
+    }
+    
+    // Delete existing pages for this edition to allow re-extraction
+    console.log('Deleting existing pages for edition:', id);
+    const { error: deleteError } = await supabaseAdmin
+      .from('edition_pages')
+      .delete()
+      .eq('edition_id', id);
+    
+    if (deleteError) {
+      console.error('Failed to delete existing pages:', deleteError);
+      // Continue anyway - might be first extraction
+    } else {
+      console.log('Existing pages deleted successfully');
+    }
+    
+    const pagesToExtract = extractAll ? totalPages : Math.min(endPage, totalPages) - startPage + 1;
+    const maxPages = Math.min(pagesToExtract, 30); // Limit to 30 pages
+
+    const extractedPages = [];
+
+    // Save PDF to temp file
+    const tempPdfPath = join(tmpdir(), `temp-pdf-${id}-${Date.now()}.pdf`);
+    const pdfBuffer = await pdfDoc.save();
+    await writeFile(tempPdfPath, Buffer.from(pdfBuffer));
+    console.log('Temp PDF saved to:', tempPdfPath);
+
+    // Use ImageMagick (gm uses ImageMagick by default on macOS with homebrew)
+    const imageMagick = gm.subClass({ imageMagick: true });
+
+    // Extract each page as PNG image
+    for (let pageNum = startPage; pageNum <= Math.min(startPage + maxPages - 1, totalPages); pageNum++) {
+      const tempImagePath = join(tmpdir(), `temp-page-${id}-${pageNum}-${Date.now()}.png`);
+      
+      try {
+        console.log(`Processing page ${pageNum}...`);
+        
+        // Convert PDF page to PNG using GraphicsMagick/ImageMagick
+        // Format: input.pdf[page-1] means extract specific page (0-indexed)
+        await new Promise<void>((resolve, reject) => {
+          imageMagick(`${tempPdfPath}[${pageNum - 1}]`)
+            .density(resolution, resolution)
+            .quality(90)
+            .write(tempImagePath, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+        });
+        
+        // Read the generated image
+        const imageBuffer = await readFile(tempImagePath);
+        console.log(`Page ${pageNum} converted to PNG, size: ${imageBuffer.byteLength} bytes`);
+        
+        // Clean up temp image file
+        await unlink(tempImagePath).catch(() => {});
+        
+        // Upload PNG image to storage
+        const fileName = `edition-${id}-page-${pageNum}.png`;
+        const { error: uploadError } = await supabaseAdmin.storage
+          .from('page-assets')
+          .upload(fileName, imageBuffer, {
+            contentType: 'image/png',
+            upsert: true,
+          });
+
+        if (uploadError) {
+          console.error(`Failed to upload page ${pageNum}:`, uploadError);
+          continue;
+        }
+
+        // Get public URL
+        const { data: urlData } = supabaseAdmin.storage
+          .from('page-assets')
+          .getPublicUrl(fileName);
+
+        const imageUrl = urlData.publicUrl;
+
+        // Create page record with image URL
+        console.log(`Inserting page ${pageNum} into database...`);
+        const { data: pageData, error: pageError } = await supabaseAdmin
+          .from('edition_pages')
+          .insert({
+            edition_id: parseInt(id),
+            page_number: pageNum,
+            image_url: imageUrl,
+          })
+          .select()
+          .single();
+
+        if (pageError) {
+          console.error(`Failed to insert page ${pageNum} into database:`, pageError);
+          continue;
+        }
+
+        if (pageData) {
+          console.log(`Page ${pageNum} inserted successfully, ID: ${pageData.id}`);
+          extractedPages.push(pageData);
+        }
+        
+        console.log(`Page ${pageNum} processed successfully`);
+      } catch (pageError) {
+        console.error(`Error processing page ${pageNum}:`, pageError);
+      }
+    }
+
+    // Clean up temp file
+    try {
+      await unlink(tempPdfPath);
+      console.log('Temp PDF file deleted');
+    } catch (cleanupError) {
+      console.error('Failed to delete temp PDF:', cleanupError);
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        totalPages,
+        extractedPages: extractedPages.length,
+        pages: extractedPages,
+      },
+    });
+
+  } catch (error) {
+    console.error('Extract pages error:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : '';
+    
+    console.error('Detailed error:', {
+      message: errorMessage,
+      stack: errorStack,
+    });
+
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Failed to extract pages: ' + errorMessage,
+        details: errorStack?.split('\n').slice(0, 3).join('\n'),
+      },
+      { status: 500 }
+    );
+  }
+}
