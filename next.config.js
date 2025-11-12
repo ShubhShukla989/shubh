@@ -9,14 +9,17 @@ const nextConfig = {
       },
     ],
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.alias.canvas = false;
-    // Fix OneDrive symlink issues on Windows
-    config.resolve.symlinks = false;
-    // Disable webpack cache for OneDrive compatibility
-    config.cache = false;
+    // Only disable cache and symlinks for local dev (OneDrive compatibility)
+    if (process.env.NODE_ENV === 'development') {
+      config.resolve.symlinks = false;
+      config.cache = false;
+    }
     return config;
   },
+  // Ensure proper output for Vercel
+  output: 'standalone',
 }
 
 module.exports = nextConfig
