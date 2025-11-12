@@ -113,7 +113,7 @@ export default function Sidebar() {
               <ChevronRight className="w-4 h-4" />
             )}
           </button>
-          {isExpanded && (
+          {isExpanded && item.children && (
             <div className="bg-gray-800/50">
               {item.children.map((child) => renderMenuItem(child, level + 1))}
             </div>

@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 
 export default async function DebugPages() {
-  let pages = [];
+  let pages: any[] = [];
   let error = null;
   let supabaseConfigured = !!supabaseAdmin;
 

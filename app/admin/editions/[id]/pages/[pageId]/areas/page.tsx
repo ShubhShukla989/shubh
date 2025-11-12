@@ -19,6 +19,8 @@ export default function AreaMappingPage() {
   const stageRef = useRef<any>(null);
 
   useEffect(() => {
+    if (!params) return;
+    
     // Load the actual page image from edition_pages, else fallback
     const load = async () => {
       if (!supabase) {

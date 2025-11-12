@@ -29,7 +29,7 @@ export default function LoginPage() {
 
       if (data.success) {
         // Get redirect URL from query params or default to /admin
-        const redirectTo = searchParams.get('redirect') || '/admin';
+        const redirectTo = searchParams?.get('redirect') || '/admin';
         router.push(redirectTo);
       } else {
         setError(data.error || 'Invalid credentials');

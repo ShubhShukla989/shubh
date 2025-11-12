@@ -9,7 +9,7 @@ import SEOSection from '@/components/page-manager/SEOSection';
 import MediaBrowser from '@/components/page-manager/MediaBrowser';
 import dynamic from 'next/dynamic';
 
-const Editor = dynamic(() => import('@tinymce/tinymce-react').then((mod) => mod.Editor) as any, {
+const Editor = dynamic(() => import('@tinymce/tinymce-react').then((mod) => mod.Editor), {
   ssr: false,
   loading: () => (
     <div className="w-full h-96 border border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">

@@ -229,14 +229,14 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
       {/* Column Properties Modal */}
       {showColumnProperties && (
         <ColumnPropertiesModal
-          properties={column.properties || {
-            extraSmallWidth: '12',
-            smallWidth: '12',
-            mediumWidth: '12',
-            largeWidth: '12',
-            extraLargeWidth: '12',
-            cssClass: '',
-            customStyle: '',
+          properties={{
+            extraSmallWidth: column.properties?.extraSmallWidth || '12',
+            smallWidth: column.properties?.smallWidth || '12',
+            mediumWidth: column.properties?.mediumWidth || '12',
+            largeWidth: column.properties?.largeWidth || '12',
+            extraLargeWidth: column.properties?.extraLargeWidth || '12',
+            cssClass: column.properties?.cssClass || '',
+            customStyle: column.properties?.customStyle || '',
           }}
           onSave={handleColumnPropertiesSave}
           onClose={() => setShowColumnProperties(false)}
