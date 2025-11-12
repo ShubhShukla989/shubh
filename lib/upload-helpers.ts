@@ -32,7 +32,7 @@ export async function uploadPDFToSupabase(
 
     // Update edition record via API
     const response = await fetch(`/api/editions/${editionId}`, {
-      method: 'PATCH',
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pdf_url: pdfUrl }),
     });
