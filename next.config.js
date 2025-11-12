@@ -22,6 +22,10 @@ const nextConfig = {
     // Ensure proper client reference manifest generation
     optimizePackageImports: ['@heroicons/react', 'lucide-react'],
   },
+  // Disable static optimization for route groups with client components
+  outputFileTracingIncludes: {
+    '/(public)': [],
+  },
 }
 
 module.exports = nextConfig
