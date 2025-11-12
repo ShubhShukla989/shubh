@@ -1,38 +1,22 @@
-import { redirect } from 'next/navigation';
-import { supabaseAdmin } from '@/lib/supabase';
+'use client';
 
-export const dynamic = 'force-dynamic';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-async function getLatestEdition() {
-  if (!supabaseAdmin) return null;
+export default function HomePage() {
+  const router = useRouter();
 
-  try {
-    const { data } = await supabaseAdmin
-      .from('editions')
-      .select('id, title, date, status')
-      .eq('status', 'Published')
-      .order('date', { ascending: false })
-      .limit(1)
-      .single();
+  useEffect(() => {
+    // Redirect to epaper on client side
+    router.push('/epaper');
+  }, [router]);
 
-    return data;
-  } catch (error) {
-    console.error('Error fetching latest edition:', error);
-    return null;
-  }
-}
-
-export default async function HomePage() {
-  const latestEdition = await getLatestEdition();
-  
-  // Redirect to latest edition viewer
-  if (latestEdition) {
-    redirect(`/epaper/view/${latestEdition.id}`);
-  }
-  
-  // If no edition, redirect to epaper home
-  redirect('/epaper');
-
-  // This will never render because of the redirects above
-  return null;
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="text-center">
+        <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    </div>
+  );
 }
