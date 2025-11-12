@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 async function getLatestEdition() {
   if (!supabaseAdmin) return null;
 

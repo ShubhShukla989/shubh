@@ -65,7 +65,7 @@ export default function AreaMappingPage() {
       }
     };
     load();
-  }, [params.pageId]);
+  }, [params?.pageId]);
 
   const onMouseDown = (e: any) => {
     if (!drawing) return;
@@ -106,6 +106,7 @@ export default function AreaMappingPage() {
   };
 
   const nextPage = () => {
+    if (!params) return;
     const next = Number(params.pageId) + 1;
     window.location.href = `/admin/editions/${params.id}/pages/${next}/areas`;
   };
@@ -143,7 +144,7 @@ export default function AreaMappingPage() {
         <div className="bg-white border border-gray-200 rounded-lg p-3 mb-4 flex items-center gap-2">
           <Link href="/admin/editions" className="px-4 py-2 text-gray-600 text-sm font-medium rounded hover:bg-gray-100">All Editions »</Link>
           <button className="px-4 py-2 text-gray-600 text-sm font-medium rounded hover:bg-gray-100">Edit Edition »</button>
-          <Link href={`/admin/editions/${params.id}/pages`} className="px-4 py-2 text-gray-600 text-sm font-medium rounded hover:bg-gray-100">Upload/Manage Pages »</Link>
+          <Link href={`/admin/editions/${params?.id}/pages`} className="px-4 py-2 text-gray-600 text-sm font-medium rounded hover:bg-gray-100">Upload/Manage Pages »</Link>
           <button className="px-4 py-2 bg-purple-100 text-purple-700 text-sm font-medium rounded">Edit Area Maps »</button>
           <button className="px-4 py-2 text-gray-600 text-sm font-medium rounded hover:bg-gray-100">View</button>
         </div>

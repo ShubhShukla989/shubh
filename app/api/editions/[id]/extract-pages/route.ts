@@ -1,31 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import { PDFDocument } from 'pdf-lib';
-import gm from 'gm';
-import { writeFile, unlink, readFile } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
-import { promisify } from 'util';
 
 /**
  * POST /api/editions/:id/extract-pages
- * Extract pages from uploaded PDF as PNG images
- * Uses pdf-lib to get page count and GraphicsMagick to convert to images
  * 
- * REQUIREMENTS:
- * - npm install pdf-lib gm
- * - GraphicsMagick or ImageMagick installed on system
- * - Supabase Storage bucket: 'page-assets' (public)
- * - Database table: 'edition_pages'
+ * NOTE: This route is disabled for Vercel deployment as it requires GraphicsMagick
+ * which is a system dependency not available on Vercel.
+ * 
+ * For production, use one of these alternatives:
+ * 1. Upload pages manually through the admin panel
+ * 2. Use a separate service/worker for PDF processing
+ * 3. Use a cloud-based PDF processing service
  */
-// Increase timeout for PDF processing
-export const maxDuration = 60; // 60 seconds
+
 export const dynamic = 'force-dynamic';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  return NextResponse.json(
+    { 
+      success: false, 
+      error: 'PDF extraction is not available on this deployment. Please upload pages manually or use a local development environment.' 
+    },
+    { status: 501 }
+  );
+  
+  /* ORIGINAL CODE - Disabled for Vercel
   console.log('=== PDF EXTRACTION STARTED ===');
   try {
     const { id } = params;
@@ -246,4 +247,5 @@ export async function POST(
       { status: 500 }
     );
   }
+  */
 }

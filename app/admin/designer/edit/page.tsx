@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Database } from '@/types/supabase';
@@ -9,7 +9,7 @@ import { LayoutStructure } from '@/components/layout-builder/types';
 
 type Layout = Database['public']['Tables']['layouts']['Row'];
 
-export default function EditLayoutPage() {
+function EditLayoutPageContent() {
   const searchParams = useSearchParams();
   const layoutName = searchParams?.get('layout') || null;
   const [layout, setLayout] = useState<Layout | null>(null);
@@ -283,5 +283,13 @@ export default function EditLayoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function EditLayoutPage() {
+  return (
+    <Suspense fallback={<div className="p-8">Loading...</div>}>
+      <EditLayoutPageContent />
+    </Suspense>
   );
 }
