@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Star } from 'lucide-react';
+import { Star, Edit, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import ActionIcons from '@/components/ActionIcons';
 
