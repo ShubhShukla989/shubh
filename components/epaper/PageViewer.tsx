@@ -50,7 +50,7 @@ export default function PageViewer({
   const [hoveredArea, setHoveredArea] = useState<AreaMap | null>(null);
   const [selectedArea, setSelectedArea] = useState<AreaMap | null>(null);
   const [imageScale, setImageScale] = useState(1);
-  const [showAreaActions, setShowAreaActions] = useState(false);
+
   const [editionData, setEditionData] = useState<any>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
@@ -127,11 +127,16 @@ export default function PageViewer({
     createClip();
   };
 
-  const handleAreaClick = (e: React.MouseEvent, area: AreaMap) => {
+  const handleAreaClick = async (e: React.MouseEvent, area: AreaMap) => {
     e.preventDefault();
     e.stopPropagation();
     setSelectedArea(area);
-    setShowAreaActions(true);
+    
+    // Directly create clip and show share modal
+    const imageData = await createClipFromArea(area);
+    if (imageData) {
+      onClipComplete(imageData);
+    }
   };
 
   const createClipFromArea = async (area: AreaMap) => {
@@ -254,31 +259,9 @@ export default function PageViewer({
     return dataUrl;
   };
 
-  const handleShareArea = async () => {
-    if (!selectedArea) return;
-    const imageData = await createClipFromArea(selectedArea);
-    if (imageData) {
-      onClipComplete(imageData);
-      setShowAreaActions(false);
-      setSelectedArea(null);
-    }
-  };
 
-  const handleDownloadArea = async () => {
-    if (!selectedArea) return;
-    const imageData = await createClipFromArea(selectedArea);
-    if (imageData) {
-      // Download the image
-      const link = document.createElement('a');
-      link.href = imageData;
-      link.download = `${editionData?.title || 'epaper'}-page-${page?.number}-${selectedArea.title.replace(/\s+/g, '-')}.png`;
-      link.click();
-      setShowAreaActions(false);
-      setSelectedArea(null);
-    }
-  };
 
-  const createClip = () => {
+  const createClip = async () => {
     if (!clipStart || !clipEnd || !imageRef.current || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
@@ -294,27 +277,98 @@ export default function PageViewer({
     const width = Math.abs(clipEnd.x - clipStart.x) * scaleX;
     const height = Math.abs(clipEnd.y - clipStart.y) * scaleY;
 
-    const headerHeight = 60;
+    const headerHeight = 200;
     canvas.width = width;
     canvas.height = height + headerHeight;
 
-    // Draw header background (red)
-    ctx.fillStyle = '#dc2626';
+    // Draw header background (white)
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, headerHeight);
 
-    // Draw website URL
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 18px Arial';
-    ctx.fillText('epaper.dobajedopahar.com', 15, 25);
+    // Try to load and draw logo from media manager
+    let logoLoaded = false;
+    try {
+      // Fetch all media files to find logo
+      const mediaResponse = await fetch('/api/media');
+      const mediaData = await mediaResponse.json();
+      
+      if (mediaData.success && mediaData.data && Array.isArray(mediaData.data)) {
+        // Find the logo file (check title or name)
+        const logoFile = mediaData.data.find((file: any) => {
+          const title = file.title?.toLowerCase() || '';
+          const name = file.name?.toLowerCase() || '';
+          const altText = file.alt_text?.toLowerCase() || '';
+          return title === 'logo' || name.includes('logo') || altText === 'logo';
+        });
+        
+        if (logoFile?.url) {
+          const logo = new Image();
+          logo.crossOrigin = 'anonymous';
+          
+          await new Promise<void>((resolve) => {
+            const timeout = setTimeout(() => {
+              console.error('Logo load timeout');
+              resolve();
+            }, 3000);
+            
+            logo.onload = () => {
+              clearTimeout(timeout);
+              // Draw logo centered at top, taking 70% of header height
+              const logoHeight = headerHeight * 0.65;
+              const logoWidth = (logo.width / logo.height) * logoHeight;
+              const logoX = (width - logoWidth) / 2;
+              const logoY = 10;
+              ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
+              logoLoaded = true;
+              resolve();
+            };
+            logo.onerror = (err) => {
+              clearTimeout(timeout);
+              console.error('Logo load error:', err);
+              resolve(); // Continue even if logo fails
+            };
+            logo.src = logoFile.url;
+          });
+        } else {
+          console.warn('No logo file found in media');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load logo:', error);
+    }
 
-    // Draw page number
-    ctx.font = '14px Arial';
-    ctx.fillText(`Page ${page?.number}`, 15, 45);
+    // Draw text info in center below logo
+    ctx.fillStyle = '#000000';
+    ctx.textAlign = 'center';
+    const centerX = width / 2;
+
+    // Draw dynamic URL (current page URL)
+    ctx.font = '16px Arial';
+    const currentUrl = `${window.location.origin}/epaper/view/${editionId}`;
+    ctx.fillText(currentUrl, centerX, headerHeight - 45);
+
+    // Draw date and page number in one line
+    if (editionData?.date) {
+      ctx.font = '14px Arial';
+      const date = new Date(editionData.date).toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+      const datePageText = `${date} - Page ${page?.number}`;
+      ctx.fillText(datePageText, centerX, headerHeight - 20);
+    } else {
+      ctx.font = '14px Arial';
+      ctx.fillText(`Page ${page?.number}`, centerX, headerHeight - 20);
+    }
+
+    // Reset text align
+    ctx.textAlign = 'left';
 
     // Draw clipped portion below header
     ctx.drawImage(img, x, y, width, height, 0, headerHeight, width, height);
 
-    const dataUrl = canvas.toDataURL('image/png');
+    const dataUrl = canvas.toDataURL('image/png', 0.95);
     onClipComplete(dataUrl);
   };
 
@@ -326,33 +380,33 @@ export default function PageViewer({
   } : null;
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-white relative overflow-auto p-2">
-      {/* Navigation Buttons */}
+    <div className="flex-1 flex items-center justify-center bg-white relative overflow-auto p-1 md:p-2">
+      {/* Navigation Buttons - Responsive */}
       <button
         onClick={onPrevPage}
-        className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white p-3 rounded-full shadow-lg transition-all z-10"
+        className="absolute left-1 md:left-4 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white p-2 md:p-3 rounded-full shadow-lg transition-all z-10"
         title="Previous Page (←)"
       >
-        <ChevronLeft className="w-6 h-6 text-gray-900" />
+        <ChevronLeft className="w-4 h-4 md:w-6 md:h-6 text-gray-900" />
       </button>
 
       <button
         onClick={onNextPage}
-        className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white p-3 rounded-full shadow-lg transition-all z-10"
+        className="absolute right-1 md:right-4 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white p-2 md:p-3 rounded-full shadow-lg transition-all z-10"
         title="Next Page (→)"
       >
-        <ChevronRight className="w-6 h-6 text-gray-900" />
+        <ChevronRight className="w-4 h-4 md:w-6 md:h-6 text-gray-900" />
       </button>
 
-      {/* Clipping Mode Indicator */}
+      {/* Clipping Mode Indicator - Responsive */}
       {isClipping && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg z-20 flex items-center gap-3">
-          <span className="font-medium">Click and drag to select area</span>
+        <div className="absolute top-2 md:top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-3 md:px-6 py-2 md:py-3 rounded-lg shadow-lg z-20 flex items-center gap-2 md:gap-3">
+          <span className="font-medium text-xs md:text-base">Click and drag to select area</span>
           <button
             onClick={onClipCancel}
             className="p-1 hover:bg-blue-700 rounded"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3 h-3 md:w-4 md:h-4" />
           </button>
         </div>
       )}
@@ -393,23 +447,24 @@ export default function PageViewer({
                 />
               </div>
             ) : (
-              <img
-                ref={imageRef}
-                src={page.imageUrl}
-                alt={`Page ${page.number}`}
-                className="h-auto select-none"
-                style={{ maxWidth: '900px', width: 'auto' }}
-                draggable={false}
-                crossOrigin="anonymous"
-                onLoad={(e) => {
-                  const img = e.target as HTMLImageElement;
-                  setImageScale(img.clientWidth / img.naturalWidth);
-                }}
-                onError={(e) => {
-                  // Fallback placeholder
-                  e.currentTarget.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='1100'%3E%3Crect fill='%23f3f4f6' width='800' height='1100'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%239ca3af' font-size='24' font-family='Arial'%3EPage ${page.number}%3C/text%3E%3C/svg%3E`;
-                }}
-              />
+              <div className="w-full md:w-auto" style={{ maxWidth: '900px' }}>
+                <img
+                  ref={imageRef}
+                  src={page.imageUrl}
+                  alt={`Page ${page.number}`}
+                  className="h-auto select-none w-full"
+                  draggable={false}
+                  crossOrigin="anonymous"
+                  onLoad={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    setImageScale(img.clientWidth / img.naturalWidth);
+                  }}
+                  onError={(e) => {
+                    // Fallback placeholder
+                    e.currentTarget.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='1100'%3E%3Crect fill='%23f3f4f6' width='800' height='1100'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%239ca3af' font-size='24' font-family='Arial'%3EPage ${page.number}%3C/text%3E%3C/svg%3E`;
+                  }}
+                />
+              </div>
             )}
             
             {/* Area Maps - Interactive Regions */}
@@ -422,14 +477,10 @@ export default function PageViewer({
                   top: `${area.y * imageScale}px`,
                   width: `${area.width * imageScale}px`,
                   height: `${area.height * imageScale}px`,
-                  border: selectedArea?.id === area.id 
-                    ? '4px solid #3b82f6' 
-                    : hoveredArea?.id === area.id 
+                  border: hoveredArea?.id === area.id 
                     ? '3px solid #ef4444' 
                     : '3px solid transparent',
-                  backgroundColor: selectedArea?.id === area.id
-                    ? 'rgba(59, 130, 246, 0.2)'
-                    : hoveredArea?.id === area.id 
+                  backgroundColor: hoveredArea?.id === area.id 
                     ? 'rgba(239, 68, 68, 0.1)' 
                     : 'transparent',
                   cursor: 'pointer',
@@ -438,54 +489,7 @@ export default function PageViewer({
                 onMouseLeave={() => setHoveredArea(null)}
                 onClick={(e) => handleAreaClick(e, area)}
                 title={area.title}
-              >
-                {/* Action buttons when area is selected */}
-                {selectedArea?.id === area.id && showAreaActions && (
-                  <div 
-                    className="absolute flex gap-2 z-50"
-                    style={{
-                      left: 0,
-                      top: `${area.height * imageScale + 10}px`
-                    }}
-                  >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleShareArea();
-                      }}
-                      className="px-4 py-2 bg-green-600 text-white rounded shadow-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                      </svg>
-                      Share
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownloadArea();
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded shadow-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowAreaActions(false);
-                        setSelectedArea(null);
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded shadow-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancel
-                    </button>
-                  </div>
-                )}
-              </div>
+              />
             ))}
           </>
         ) : null}

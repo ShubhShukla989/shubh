@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Home, ZoomIn, ZoomOut, Scissors, Menu, Calendar } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import CalendarModal from './CalendarModal';
 
 interface EpaperHeaderProps {
   editionId: string;
@@ -37,6 +38,7 @@ export default function EpaperHeader({
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [headerBgUrl, setHeaderBgUrl] = useState<string>('');
   const [logoUrl, setLogoUrl] = useState<string>('');
+  const [showCalendar, setShowCalendar] = useState(false);
 
   useEffect(() => {
     fetchMenuItems();
@@ -101,13 +103,13 @@ export default function EpaperHeader({
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+    <header className="bg-white border-b border-gray-200 shadow-sm">
       {/* Orange line at top */}
       <div className="h-1 bg-orange-500"></div>
       
-      {/* Top Bar with Background Image and Logo */}
+      {/* Top Bar with Background Image and Logo - Responsive */}
       <div 
-        className="relative py-8 bg-cover bg-center"
+        className="relative py-3 md:py-8 bg-cover bg-center"
         style={{ 
           backgroundImage: headerBgUrl ? `url(${headerBgUrl})` : 'none',
           backgroundColor: headerBgUrl ? 'transparent' : '#f5f5f5'
@@ -119,10 +121,10 @@ export default function EpaperHeader({
               <img 
                 src={logoUrl} 
                 alt="DBID दो बजे दोपहर" 
-                className="h-28 md:h-32 w-auto"
+                className="h-16 md:h-28 lg:h-32 w-auto"
               />
             ) : (
-              <div className="text-2xl font-bold text-red-600">
+              <div className="text-lg md:text-2xl font-bold text-red-600">
                 DBID दो बजे दोपहर
               </div>
             )}
@@ -168,23 +170,23 @@ export default function EpaperHeader({
         </div>
       </div>
 
-      {/* Viewer Controls */}
+      {/* Viewer Controls - Responsive */}
       <div className="bg-white border-t border-gray-200">
-        <div className="px-4">
-          <div className="flex items-center justify-between py-3">
+        <div className="px-2 md:px-4">
+          <div className="flex items-center justify-between py-2 md:py-3">
             {/* Left: Page Dropdown */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1 md:gap-4">
               <Link
                 href="/epaper"
-                className="p-2 hover:bg-gray-100 rounded transition-colors"
+                className="p-1 md:p-2 hover:bg-gray-100 rounded transition-colors"
                 title="Back to Home"
               >
-                <Home className="w-5 h-5 text-gray-700" />
+                <Home className="w-4 h-4 md:w-5 md:h-5 text-gray-700" />
               </Link>
               <select
                 value={currentPage}
                 onChange={(e) => onPageChange?.(Number(e.target.value))}
-                className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="px-2 md:px-3 py-1 md:py-1.5 border border-gray-300 rounded text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
               >
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                   <option key={page} value={page}>
@@ -194,8 +196,8 @@ export default function EpaperHeader({
               </select>
             </div>
 
-            {/* Center: Page Navigation */}
-            <div className="flex items-center gap-1">
+            {/* Center: Page Navigation - Hidden on mobile */}
+            <div className="hidden md:flex items-center gap-1">
               {/* First page */}
               <button
                 onClick={() => onPageChange?.(1)}
@@ -283,29 +285,36 @@ export default function EpaperHeader({
               </button>
             </div>
 
-            {/* Right: Action Buttons */}
-            <div className="flex items-center gap-2">
+            {/* Right: Action Buttons - Responsive */}
+            <div className="flex items-center gap-1 md:gap-2">
               <button
                 onClick={onDownloadPDF}
-                className="px-4 py-1.5 bg-orange-500 text-white hover:bg-orange-600 transition-colors text-sm font-medium"
+                className="px-2 md:px-4 py-1 md:py-1.5 bg-orange-500 text-white hover:bg-orange-600 transition-colors text-xs md:text-sm font-medium rounded"
                 title="Download PDF"
               >
                 PDF
               </button>
               <button
                 onClick={onClipStart}
-                className="px-4 py-1.5 bg-blue-500 text-white hover:bg-blue-600 transition-colors text-sm font-medium"
+                className="px-2 md:px-4 py-1 md:py-1.5 bg-blue-500 text-white hover:bg-blue-600 transition-colors text-xs md:text-sm font-medium rounded"
                 title="Clip Article"
               >
                 Clip
               </button>
-              <Link
-                href="/epaper/archive"
-                className="px-4 py-1.5 bg-red-600 text-white hover:bg-red-700 transition-colors text-sm font-medium"
-                title="Archive"
-              >
-                Archive
-              </Link>
+              <div className="relative">
+                <button
+                  onClick={() => setShowCalendar(!showCalendar)}
+                  className="px-2 md:px-4 py-1 md:py-1.5 bg-red-600 text-white hover:bg-red-700 transition-colors text-xs md:text-sm font-medium rounded"
+                  title="Archive"
+                >
+                  Archive
+                </button>
+                
+                {/* Calendar Modal */}
+                {showCalendar && (
+                  <CalendarModal onClose={() => setShowCalendar(false)} />
+                )}
+              </div>
             </div>
           </div>
         </div>

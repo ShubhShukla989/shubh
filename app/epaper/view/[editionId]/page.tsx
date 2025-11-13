@@ -188,19 +188,21 @@ export default function EpaperViewer() {
         />
 
         <div className="flex-1 flex overflow-hidden">
-          {/* Thumbnail Sidebar */}
-          <PageThumbnails
-            pages={pages}
-            currentPage={currentPage}
-            onPageSelect={setCurrentPage}
-          />
+          {/* Thumbnail Sidebar - Hidden on mobile */}
+          <div className="hidden md:block">
+            <PageThumbnails
+              pages={pages}
+              currentPage={currentPage}
+              onPageSelect={setCurrentPage}
+            />
+          </div>
 
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Edition Title */}
+            {/* Edition Title - Responsive */}
             {edition && (
-              <div className="bg-white border-b border-gray-200 py-4 px-4">
-                <h1 className="text-2xl font-semibold text-gray-800">
+              <div className="bg-white border-b border-gray-200 py-2 md:py-4 px-2 md:px-4">
+                <h1 className="text-sm md:text-2xl font-semibold text-gray-800 truncate">
                   {edition.title} - {formatDate(edition.date)} - Page {currentPage}
                 </h1>
               </div>
