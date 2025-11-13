@@ -107,6 +107,7 @@ export default function PageViewer({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
     });
+    setClipEnd(null); // Reset clip end
     setIsDragging(true);
   };
 
@@ -121,7 +122,70 @@ export default function PageViewer({
   };
 
   const handleMouseUp = () => {
-    if (!isClipping || !clipStart || !clipEnd) return;
+    if (!isClipping || !clipStart || !clipEnd) {
+      setIsDragging(false);
+      return;
+    }
+    
+    // Check minimum drag distance (at least 20px in any direction)
+    const width = Math.abs(clipEnd.x - clipStart.x);
+    const height = Math.abs(clipEnd.y - clipStart.y);
+    
+    if (width < 20 || height < 20) {
+      // Too small, reset
+      setClipStart(null);
+      setClipEnd(null);
+      setIsDragging(false);
+      return;
+    }
+    
+    setIsDragging(false);
+    createClip();
+  };
+
+  // Touch event handlers for mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!isClipping || !containerRef.current) return;
+    
+    const touch = e.touches[0];
+    const rect = containerRef.current.getBoundingClientRect();
+    setClipStart({
+      x: touch.clientX - rect.left,
+      y: touch.clientY - rect.top
+    });
+    setClipEnd(null); // Reset clip end
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isClipping || !isDragging || !clipStart || !containerRef.current) return;
+    
+    e.preventDefault(); // Prevent scrolling while dragging
+    const touch = e.touches[0];
+    const rect = containerRef.current.getBoundingClientRect();
+    setClipEnd({
+      x: touch.clientX - rect.left,
+      y: touch.clientY - rect.top
+    });
+  };
+
+  const handleTouchEnd = () => {
+    if (!isClipping || !clipStart || !clipEnd) {
+      setIsDragging(false);
+      return;
+    }
+    
+    // Check minimum drag distance (at least 20px in any direction)
+    const width = Math.abs(clipEnd.x - clipStart.x);
+    const height = Math.abs(clipEnd.y - clipStart.y);
+    
+    if (width < 20 || height < 20) {
+      // Too small, reset
+      setClipStart(null);
+      setClipEnd(null);
+      setIsDragging(false);
+      return;
+    }
     
     setIsDragging(false);
     createClip();
@@ -418,12 +482,16 @@ export default function PageViewer({
         style={{
           transform: `scale(${zoom})`,
           transition: 'transform 0.2s ease-out',
-          transformOrigin: 'center center'
+          transformOrigin: 'center center',
+          touchAction: isClipping ? 'none' : 'auto'
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={() => setIsDragging(false)}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {loading ? (
           <div className="w-[800px] h-[1100px] flex items-center justify-center bg-gray-100">
