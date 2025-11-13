@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Download, Copy, Check } from 'lucide-react';
+import { X, Download } from 'lucide-react';
 
 interface ShareModalProps {
   clippedImage: string | null;
@@ -16,9 +16,7 @@ export default function ShareModal({
   pageNumber,
   onClose
 }: ShareModalProps) {
-  const [copySuccess, setCopySuccess] = useState(false);
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
 
   const handleDownload = () => {
     if (!clippedImage) return;
@@ -31,30 +29,99 @@ export default function ShareModal({
     showToast('Clip downloaded successfully!');
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
-    showToast('Link copied to clipboard!');
+  // Convert base64 to blob for sharing
+  const dataURLtoBlob = (dataurl: string) => {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
   };
 
-  const handleShareWhatsApp = () => {
-    const text = `Check out this article from Do Boje Dopahar - ${editionId}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + shareUrl)}`, '_blank');
+  const handleShareImage = async () => {
+    if (!clippedImage) {
+      showToast('No image to share');
+      return;
+    }
+
+    try {
+      // Check if Web Share API is supported
+      if (navigator.share && navigator.canShare) {
+        const blob = dataURLtoBlob(clippedImage);
+        const file = new File([blob], `dbd-${editionId}-page-${pageNumber}.png`, { type: 'image/png' });
+        
+        const shareData = {
+          files: [file],
+          title: 'Do Boje Dopahar',
+          text: 'Check out this article from Do Boje Dopahar'
+        };
+
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          showToast('Shared successfully!');
+          return;
+        }
+      }
+      
+      // Fallback: Download the image
+      handleDownload();
+      showToast('Image downloaded! You can now share it manually.');
+    } catch (error) {
+      console.error('Error sharing:', error);
+      // If user cancels, don't show error
+      if ((error as Error).name !== 'AbortError') {
+        handleDownload();
+        showToast('Image downloaded! You can now share it manually.');
+      }
+    }
   };
 
-  const handleShareFacebook = () => {
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+  // Generic share function that uses Web Share API
+  const shareImage = async () => {
+    if (!clippedImage) return;
+    
+    try {
+      const blob = dataURLtoBlob(clippedImage);
+      const file = new File([blob], `dbd-${editionId}-page-${pageNumber}.png`, { type: 'image/png' });
+      
+      // Check if Web Share API is supported
+      if (navigator.share && navigator.canShare) {
+        const shareData = {
+          files: [file],
+          title: 'Do Boje Dopahar',
+          text: 'Check out this article from Do Boje Dopahar'
+        };
+
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          showToast('Shared successfully!');
+          return true;
+        }
+      }
+      
+      // Fallback: Download the image
+      handleDownload();
+      showToast('Image downloaded! Please share it manually.');
+      return false;
+    } catch (error) {
+      console.error('Error sharing:', error);
+      // If user cancels, don't show error
+      if ((error as Error).name !== 'AbortError') {
+        handleDownload();
+        showToast('Image downloaded! Please share it manually.');
+      }
+      return false;
+    }
   };
 
-  const handleShareTwitter = () => {
-    const text = `Reading Do Boje Dopahar - ${editionId}`;
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
-  };
-
-  const handleShareLinkedIn = () => {
-    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank');
-  };
+  const handleShareWhatsApp = () => shareImage();
+  const handleShareFacebook = () => shareImage();
+  const handleShareTwitter = () => shareImage();
+  const handleShareLinkedIn = () => shareImage();
 
   const showToast = (message: string) => {
     // Simple toast notification
@@ -143,24 +210,6 @@ export default function ShareModal({
                 LinkedIn
               </button>
             </div>
-
-            {/* Copy Link - Responsive */}
-            <button
-              onClick={handleCopyLink}
-              className="w-full flex items-center justify-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium text-xs md:text-base"
-            >
-              {copySuccess ? (
-                <>
-                  <Check className="w-5 h-5" />
-                  Link Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-5 h-5" />
-                  Copy Link
-                </>
-              )}
-            </button>
 
             {/* Download - Responsive */}
             {clippedImage && (
