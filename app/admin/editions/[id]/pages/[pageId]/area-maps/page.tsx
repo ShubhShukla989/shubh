@@ -318,18 +318,22 @@ export default function AreaMapsPage() {
     originalArea: null
   });
 
-  const handleResizeStart = (e: React.MouseEvent, index: number, handle: string) => {
+  const handleResizeStart = (e: React.MouseEvent | React.TouchEvent, index: number, handle: string) => {
     e.stopPropagation();
     e.preventDefault();
     
     console.log('🔧 Resize handle clicked:', handle, 'for area', index);
     
+    // Get client coordinates from either mouse or touch event
+    const clientX = 'clientX' in e ? e.clientX : e.touches[0].clientX;
+    const clientY = 'clientY' in e ? e.clientY : e.touches[0].clientY;
+    
     const area = areaMaps[index];
     resizeStateRef.current = {
       index,
       handle,
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: clientX,
+      startY: clientY,
       originalArea: { ...area }
     };
     
