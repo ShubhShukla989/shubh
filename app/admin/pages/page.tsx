@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Eye, Edit, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, ExternalLink } from 'lucide-react';
 import { pageService } from '@/lib/services/pageService';
 import { Page } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import ActionIcons from '@/components/ActionIcons';
 
 export default function PageManager() {
   const router = useRouter();
@@ -185,29 +186,20 @@ export default function PageManager() {
                     )}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <button
+                      <ActionIcons.Group>
+                        <ActionIcons.View
                           onClick={() => handleView(page.alias)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
                           title="View page"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </button>
-                        <button
+                        />
+                        <ActionIcons.Edit
                           onClick={() => router.push(`/admin/pages/edit/${page.id}`)}
-                          className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors"
                           title="Edit page"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
+                        />
+                        <ActionIcons.Delete
                           onClick={() => setDeleteConfirm(page.id)}
-                          className="p-1.5 text-red-600 hover:bg-red-100 rounded transition-colors"
                           title="Delete page"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                        />
+                      </ActionIcons.Group>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900">{page.title}</div>

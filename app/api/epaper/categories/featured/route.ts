@@ -1,31 +1,30 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin, requireSupabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
+    console.log('Featured categories API called');
+    const configError = requireSupabaseAdmin();
+    if (configError) {
+      console.log('Supabase admin config error');
+      return configError;
     }
 
-    const { data, error } = await supabaseAdmin
+    console.log('Querying featured categories...');
+    const { data, error } = await supabaseAdmin!
       .from('epaper_categories')
       .select('*')
       .eq('is_featured', true)
       .order('display_order', { ascending: true });
 
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
+    console.log('Query result:', { data, error });
 
-    return NextResponse.json({ success: true, data });
+    if (error) throw error;
+
+    console.log('Returning data:', data);
+    return NextResponse.json({ success: true, data: data || [] });
   } catch (error) {
-    console.error('Get featured categories error:', error);
+    console.error('[GET /api/epaper/categories/featured] Error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch featured categories' },
       { status: 500 }

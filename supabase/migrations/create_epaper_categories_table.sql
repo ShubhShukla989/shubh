@@ -24,10 +24,10 @@ CREATE TABLE IF NOT EXISTS epaper_categories (
 );
 
 -- Create index for faster queries
-CREATE INDEX idx_epaper_categories_alias ON epaper_categories(alias);
-CREATE INDEX idx_epaper_categories_parent ON epaper_categories(parent_id);
-CREATE INDEX idx_epaper_categories_active ON epaper_categories(is_active);
-CREATE INDEX idx_epaper_categories_featured ON epaper_categories(is_featured);
+CREATE INDEX IF NOT EXISTS idx_epaper_categories_alias ON epaper_categories(alias);
+CREATE INDEX IF NOT EXISTS idx_epaper_categories_parent ON epaper_categories(parent_id);
+CREATE INDEX IF NOT EXISTS idx_epaper_categories_active ON epaper_categories(is_active);
+CREATE INDEX IF NOT EXISTS idx_epaper_categories_featured ON epaper_categories(is_featured);
 
 -- Add category_id to editions table to link editions with categories
 ALTER TABLE editions 

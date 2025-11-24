@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Minus, Star, Edit, Trash2 } from 'lucide-react';
+import { Plus, Minus, Star, Edit, Trash2, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 interface Category {
@@ -148,6 +148,15 @@ export default function CategoriesPage() {
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+
+                  {/* Watermark Settings Button */}
+                  <Link
+                    href={`/admin/epaper/categories/${category.id}/watermark-settings`}
+                    className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    title="Watermark Settings"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </Link>
 
                   {/* Toggle Featured Button */}
                   <button

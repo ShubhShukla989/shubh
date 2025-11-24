@@ -77,6 +77,14 @@ export async function POST(request: NextRequest) {
         .getPublicUrl(filePath);
 
       // Save to database
+      console.log('🔄 Attempting database insert:', {
+        filename: fileName,
+        original_name: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        mime_type: file.type,
+      });
+
       const { data: dbFile, error: dbError } = await supabaseAdmin
         .from('media_files')
         .insert({
@@ -92,9 +100,51 @@ export async function POST(request: NextRequest) {
         .select()
         .single();
 
+      console.log('📊 Database insert result:', { 
+        success: !!dbFile,
+        hasError: !!dbError,
+        dbFile, 
+        dbError 
+      });
+      
       if (dbError) {
-        console.error('Database error:', dbError);
+        console.error('❌ DATABASE ERROR:', {
+          error: dbError,
+          message: dbError.message,
+          details: dbError.details,
+          hint: dbError.hint,
+          code: dbError.code,
+          file: file.name
+        });
+        
+        // Delete uploaded file from storage if database insert fails
+        await supabaseAdmin.storage
+          .from('page-assets')
+          .remove([filePath]);
+        
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `Failed to save ${file.name} to database: ${dbError.message}`,
+            details: dbError.details || dbError.hint || 'Check server console for more info'
+          },
+          { status: 500 }
+        );
       }
+      
+      if (!dbFile) {
+        console.error('❌ NO DATABASE RECORD: No error but no data returned');
+        await supabaseAdmin.storage
+          .from('page-assets')
+          .remove([filePath]);
+        
+        return NextResponse.json(
+          { success: false, error: `Failed to create database record for ${file.name}` },
+          { status: 500 }
+        );
+      }
+      
+      console.log('✅ Database record created:', dbFile.id);
 
       // Add tags if provided
       if (dbFile && tagIds) {

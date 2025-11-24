@@ -105,19 +105,6 @@ export default function EpaperArchive() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="bg-red-600 text-white py-3">
-          <div className="container mx-auto px-4 flex items-center justify-between">
-            <Link href="/epaper" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <div className="bg-white text-red-600 px-3 py-1 font-bold text-xl rounded">
-                DBD
-              </div>
-              <span className="font-bold text-lg">दो बजे दोपहर</span>
-            </Link>
-          </div>
-        </div>
-      </header>
 
       {/* Page Header */}
       <div className="bg-gradient-to-r from-red-600 to-red-700 text-white py-12">
@@ -274,12 +261,6 @@ export default function EpaperArchive() {
         )}
       </div>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8 mt-12">
-        <div className="container mx-auto px-4 text-center text-gray-400">
-          <p>&copy; 2025 Do Boje Dopahar. All rights reserved.</p>
-        </div>
-      </footer>
     </div>
   );
 }

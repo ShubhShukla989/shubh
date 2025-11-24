@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, requireSupabaseAdmin } from '@/lib/supabase';
 
+// Force dynamic rendering - no caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // GET /api/layouts/[name] - Fetch latest published layout by name
 export async function GET(
   request: NextRequest,

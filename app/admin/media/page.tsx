@@ -53,11 +53,16 @@ export default function MediaManagerPage() {
         url += `?searchBy=${search.searchBy || 'title'}&query=${encodeURIComponent(search.query)}`;
       }
       
+      console.log('Fetching media from:', url);
       const response = await fetch(url);
       const result = await response.json();
+      console.log('Fetch media result:', result);
       
       if (result.success) {
+        console.log('Setting media files:', result.data);
         setMediaFiles(result.data || []);
+      } else {
+        console.error('Fetch failed:', result.error);
       }
     } catch (error) {
       console.error('Failed to fetch media:', error);
@@ -103,12 +108,18 @@ export default function MediaManagerPage() {
       });
 
       const result = await response.json();
+      
+      console.log('Upload response:', result);
 
       if (result.success) {
         alert(`${result.data.length} file(s) uploaded successfully!`);
-        fetchMedia();
+        await fetchMedia(); // Wait for fetch to complete
       } else {
-        alert('Upload failed: ' + result.error);
+        const errorMsg = result.details 
+          ? `Upload failed: ${result.error}\n\nDetails: ${result.details}`
+          : `Upload failed: ${result.error}`;
+        alert(errorMsg);
+        console.error('Upload error details:', result);
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -121,11 +132,11 @@ export default function MediaManagerPage() {
     }
   };
 
-  const handleDeleteMedia = async (filename: string, name: string) => {
+  const handleDeleteMedia = async (fileId: string | number, name: string) => {
     if (!confirm(`Delete "${name}"?`)) return;
 
     try {
-      const response = await fetch(`/api/media?filename=${encodeURIComponent(filename)}`, {
+      const response = await fetch(`/api/media/${fileId}`, {
         method: 'DELETE',
       });
 
@@ -389,7 +400,7 @@ export default function MediaManagerPage() {
     if (!confirm(`Delete "${selectedMedia.title || selectedMedia.name}"?`)) return;
 
     try {
-      const response = await fetch(`/api/media?filename=${encodeURIComponent(selectedMedia.name)}`, {
+      const response = await fetch(`/api/media/${selectedMedia.id}`, {
         method: 'DELETE',
       });
 
@@ -530,7 +541,7 @@ export default function MediaManagerPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteMedia(file.name, file.title || file.name);
+                        handleDeleteMedia(file.id, file.title || file.name);
                       }}
                       className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
                       title="Delete"

@@ -21,6 +21,8 @@ function EditLayoutPageContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'designer' | 'backups'>('designer');
   const [previewMode, setPreviewMode] = useState(false);
+  const [connectedPages, setConnectedPages] = useState<any[]>([]);
+  const [showConnectedPages, setShowConnectedPages] = useState(false);
   const supabase = createClientComponentClient<Database>();
   const router = useRouter();
 
@@ -31,10 +33,26 @@ function EditLayoutPageContent() {
   useEffect(() => {
     if (layoutName) {
       fetchLayout();
+      fetchConnectedPages();
     } else {
       setIsLoading(false);
     }
   }, [layoutName]);
+
+  const fetchConnectedPages = async () => {
+    if (!layoutName) return;
+    
+    try {
+      const response = await fetch(`/api/layouts/${encodeURIComponent(layoutName)}/pages`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setConnectedPages(result.data.pages || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch connected pages:', error);
+    }
+  };
 
   const fetchAllLayouts = async () => {
     try {
@@ -166,9 +184,90 @@ function EditLayoutPageContent() {
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-semibold text-gray-800 mb-6">
-          Edit Layout: {layout.name}
-        </h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-semibold text-gray-800">
+            Edit Layout: {layout.name}
+          </h1>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowConnectedPages(!showConnectedPages)}
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center gap-2 font-medium shadow-md transition-all relative"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Connected Pages
+              {connectedPages.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                  {connectedPages.length}
+                </span>
+              )}
+            </button>
+
+          </div>
+        </div>
+
+        {/* Connected Pages Panel */}
+        {showConnectedPages && (
+          <div className="bg-white border border-gray-300 rounded-lg p-4 mb-4 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800">
+                Pages Using This Layout: {layout.name}
+              </h3>
+              <button
+                onClick={() => setShowConnectedPages(false)}
+                className="p-2 hover:bg-gray-100 rounded transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {connectedPages.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p className="text-lg font-medium mb-2">No pages connected yet</p>
+                <p className="text-sm">This layout is not being used by any pages</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {connectedPages.map((page) => (
+                  <div
+                    key={page.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">{page.title}</h4>
+                      <p className="text-sm text-gray-600">/{page.alias}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 text-xs font-medium rounded ${
+                        page.status === 'published' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {page.status}
+                      </span>
+                      <button
+                        onClick={() => window.open(`/epaper/page/${page.alias}`, '_blank')}
+                        className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                        title="View Page"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="bg-white rounded-t-lg border border-gray-300">

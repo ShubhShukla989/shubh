@@ -27,10 +27,15 @@ function LoginPageContent() {
 
       const data = await response.json();
 
-      if (data.success) {
+      if (data.success && data.user) {
+        // Store user in localStorage for AuthContext
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
         // Get redirect URL from query params or default to /admin
         const redirectTo = searchParams?.get('redirect') || '/admin';
-        router.push(redirectTo);
+        
+        // Force page reload to initialize AuthContext
+        window.location.href = redirectTo;
       } else {
         setError(data.error || 'Invalid credentials');
       }

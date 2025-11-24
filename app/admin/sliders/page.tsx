@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { sliderService } from '@/lib/services/sliderService';
 import { Slider } from '@/lib/types';
+import ActionIcons from '@/components/ActionIcons';
+import { Image } from 'lucide-react';
 
 /**
  * Slideshows Manager - Main page for managing all slideshows
@@ -206,29 +208,23 @@ export default function SlideshowsManager() {
                 filteredSlideshows.map((slideshow) => (
                   <tr key={slideshow.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
-                      <div className="flex gap-2">
+                      <ActionIcons.Group>
                         <button
                           onClick={() => handleManageSlides(slideshow.id)}
-                          className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                          className="p-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors"
                           title="Manage Slides"
                         >
-                          🖼️
+                          <Image className="w-5 h-5" />
                         </button>
-                        <button
+                        <ActionIcons.Edit
                           onClick={() => handleEditSlideshow(slideshow.id)}
-                          className="p-2 bg-green-500 text-white rounded hover:bg-green-600"
                           title="Edit Slideshow"
-                        >
-                          ✏️
-                        </button>
-                        <button
+                        />
+                        <ActionIcons.Delete
                           onClick={() => handleDeleteSlideshow(slideshow.id, slideshow.title)}
-                          className="p-2 bg-red-500 text-white rounded hover:bg-red-600"
                           title="Delete Slideshow"
-                        >
-                          🗑️
-                        </button>
-                      </div>
+                        />
+                      </ActionIcons.Group>
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900">{slideshow.title}</div>

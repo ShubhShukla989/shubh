@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { PDFDocument } from 'pdf-lib';
+import gm from 'gm';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { writeFile, readFile, unlink } from 'fs/promises';
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * POST /api/editions/:id/extract-pages
  * 
- * NOTE: This route is disabled for Vercel deployment as it requires GraphicsMagick
- * which is a system dependency not available on Vercel.
+ * Extracts pages from PDF using GraphicsMagick/ImageMagick
  * 
- * For production, use one of these alternatives:
- * 1. Upload pages manually through the admin panel
- * 2. Use a separate service/worker for PDF processing
- * 3. Use a cloud-based PDF processing service
+ * REQUIREMENTS:
+ * - ImageMagick must be installed on the system
+ * - macOS: brew install imagemagick
+ * - Linux: apt-get install imagemagick
  */
+
+// Initialize Supabase admin client
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export const dynamic = 'force-dynamic';
 
@@ -18,15 +29,6 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  return NextResponse.json(
-    { 
-      success: false, 
-      error: 'PDF extraction is not available on this deployment. Please upload pages manually or use a local development environment.' 
-    },
-    { status: 501 }
-  );
-  
-  /* ORIGINAL CODE - Disabled for Vercel
   console.log('=== PDF EXTRACTION STARTED ===');
   try {
     const { id } = params;
@@ -148,7 +150,7 @@ export async function POST(
           imageMagick(`${tempPdfPath}[${pageNum - 1}]`)
             .density(resolution, resolution)
             .quality(90)
-            .write(tempImagePath, (err) => {
+            .write(tempImagePath, (err: Error | null) => {
               if (err) reject(err);
               else resolve();
             });
@@ -247,5 +249,4 @@ export async function POST(
       { status: 500 }
     );
   }
-  */
 }

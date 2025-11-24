@@ -55,7 +55,7 @@ export default function Navigation({ menuAlias = 'main-menu', className = '' }: 
       return item.url;
     } else if (item.type === 'page' && (item.page || item.pages)) {
       const pageData = item.page || item.pages;
-      return `/page/${pageData.alias}`;
+      return `/epaper/page/${pageData.alias}`;
     } else if (item.type === 'epaper_category' && item.category_id) {
       return `/epaper/category/${item.category_id}`;
     } else if (item.type === 'epaper_archive') {

@@ -15,71 +15,88 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MenuItem {
   label: string;
   href?: string;
   icon: React.ReactNode;
   children?: MenuItem[];
+  permission?: string;
+  superAdminOnly?: boolean;
 }
 
-const menuItems: MenuItem[] = [
+interface MenuItemWithPermission extends MenuItem {
+  permission?: string;
+  superAdminOnly?: boolean;
+}
+
+const menuItems: MenuItemWithPermission[] = [
   {
     label: 'Dashboard',
     href: '/admin',
     icon: <LayoutDashboard className="w-5 h-5" />,
+    permission: 'view_dashboard',
   },
   {
     label: 'Epaper',
     icon: <Newspaper className="w-5 h-5" />,
+    permission: 'view_editions',
     children: [
-      { label: 'All Editions', href: '/admin/editions', icon: null },
-      { label: 'Categories', href: '/admin/epaper/categories', icon: null },
-      { label: 'Featured Categories', href: '/admin/epaper/featured-categories', icon: null },
-      { label: 'Featured Editions', href: '/admin/epaper/featured-editions', icon: null },
+      { label: 'All Editions', href: '/admin/editions', icon: null, permission: 'view_editions' },
+      { label: 'Categories', href: '/admin/epaper/categories', icon: null, permission: 'view_categories' },
+      { label: 'Featured Categories', href: '/admin/epaper/featured-categories', icon: null, permission: 'view_categories' },
+      { label: 'Featured Editions', href: '/admin/epaper/featured-editions', icon: null, permission: 'view_editions' },
     ],
   },
   {
     label: 'Pages',
     href: '/admin/pages',
     icon: <FileText className="w-5 h-5" />,
+    permission: 'view_pages',
   },
   {
     label: 'Slider',
     href: '/admin/sliders',
     icon: <SlidersIcon className="w-5 h-5" />,
+    permission: 'view_sliders',
   },
   {
     label: 'Media',
     href: '/admin/media',
     icon: <Image className="w-5 h-5" />,
+    permission: 'view_media',
   },
   {
     label: 'Users',
     href: '/admin/users',
     icon: <Users className="w-5 h-5" />,
+    permission: 'view_users',
   },
   {
     label: 'System',
     icon: <Settings className="w-5 h-5" />,
+    permission: 'view_settings',
     children: [
-      { label: 'Page Designer', href: '/admin/designer', icon: null },
-      { label: 'Menus', href: '/admin/menus', icon: null },
-      { label: 'Settings', href: '/admin/system/settings', icon: null },
-      { label: 'Redirects', href: '/admin/system/redirects', icon: null },
+      { label: 'Page Designer', href: '/admin/designer', icon: null, permission: 'view_designer' },
+      { label: 'Menus', href: '/admin/menus', icon: null, permission: 'view_menus' },
+      { label: 'Settings', href: '/admin/system/settings', icon: null, permission: 'view_settings' },
+      { label: 'Redirects', href: '/admin/system/redirects', icon: null, permission: 'view_settings' },
     ],
   },
   {
     label: 'Super Admin',
     icon: <Settings className="w-5 h-5" />,
+    superAdminOnly: true,
     children: [
-      { label: 'Audit Logs', href: '/admin/super-admin/logs', icon: null },
+      { label: 'Audit Logs', href: '/admin/super-admin/logs', icon: null, superAdminOnly: true },
     ],
   },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { hasPermission, isSuperAdmin } = useAuth();
   const [expandedItems, setExpandedItems] = useState<string[]>(['Epaper', 'System', 'Super Admin']);
 
   const toggleExpand = (label: string) => {
@@ -88,7 +105,37 @@ export default function Sidebar() {
     );
   };
 
-  const renderMenuItem = (item: MenuItem, level = 0) => {
+  const canAccessMenuItem = (item: MenuItemWithPermission): boolean => {
+    // Super Admin can access everything
+    if (isSuperAdmin()) return true;
+    
+    // Check if item is Super Admin only
+    if (item.superAdminOnly) return false;
+    
+    // Check permission
+    if (item.permission && !hasPermission(item.permission)) return false;
+    
+    return true;
+  };
+
+  const filterMenuItems = (items: MenuItemWithPermission[]): MenuItemWithPermission[] => {
+    return items
+      .filter(canAccessMenuItem)
+      .map(item => {
+        if (item.children) {
+          return {
+            ...item,
+            children: item.children.filter(canAccessMenuItem),
+          };
+        }
+        return item;
+      })
+      .filter(item => !item.children || item.children.length > 0);
+  };
+
+  const filteredMenuItems = filterMenuItems(menuItems);
+
+  const renderMenuItem = (item: MenuItemWithPermission, level = 0) => {
     const isExpanded = expandedItems.includes(item.label);
     const isActive = item.href === pathname;
     const hasChildren = item.children && item.children.length > 0;
@@ -145,7 +192,7 @@ export default function Sidebar() {
         <p className="text-xs text-gray-400 mt-1">Admin Panel</p>
       </div>
       <nav className="flex-1 py-4 overflow-y-auto">
-        {menuItems.map((item) => renderMenuItem(item))}
+        {filteredMenuItems.map((item) => renderMenuItem(item))}
       </nav>
       <div className="p-4 border-t border-gray-800 text-xs text-gray-500">
         Version 1.0.0

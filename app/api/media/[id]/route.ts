@@ -1,89 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
-// GET single media file
-export async function GET(
+export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
-
     if (!supabaseAdmin) {
       return NextResponse.json(
-        { success: false, error: 'Database not configured' },
+        { success: false, error: 'Supabase not configured' },
         { status: 500 }
       );
     }
 
-    const { data, error } = await supabaseAdmin
+    const fileId = params.id;
+
+    console.log('🗑️ Deleting media file:', fileId);
+
+    // Get file info first
+    const { data: fileInfo, error: fetchError } = await supabaseAdmin
       .from('media_files')
-      .select('*, media_file_tags(media_tag_id, media_tags(id, name))')
-      .eq('id', id)
+      .select('file_path')
+      .eq('id', fileId)
       .single();
 
-    if (error) {
+    if (fetchError || !fileInfo) {
+      console.error('File not found:', fetchError);
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: 'File not found' },
+        { status: 404 }
+      );
+    }
+
+    // Delete from storage
+    const { error: storageError } = await supabaseAdmin.storage
+      .from('page-assets')
+      .remove([fileInfo.file_path]);
+
+    if (storageError) {
+      console.error('Storage delete error:', storageError);
+      // Continue anyway - database record is more important
+    }
+
+    // Delete from database (this will cascade delete tags via foreign key)
+    const { error: dbError } = await supabaseAdmin
+      .from('media_files')
+      .delete()
+      .eq('id', fileId);
+
+    if (dbError) {
+      console.error('Database delete error:', dbError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to delete from database' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ success: true, data });
+    console.log('✅ Media file deleted:', fileId);
+
+    return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error('Get media error:', error);
+    console.error('Delete API error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch media' },
+      { success: false, error: 'Internal server error' },
       { status: 500 }
     );
   }
 }
 
-// PUT update media file
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const { id } = params;
-    const body = await request.json();
-    const { title, alt_text } = body;
-
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('media_files')
-      .update({
-        title,
-        alt_text,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data,
-      message: 'Media updated successfully',
-    });
-  } catch (error) {
-    console.error('Update media error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to update media' },
-      { status: 500 }
-    );
-  }
-}
+export const dynamic = 'force-dynamic';

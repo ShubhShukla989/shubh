@@ -130,76 +130,77 @@ export function LayoutBuilder({
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="bg-blue-600 p-3 rounded flex items-center justify-between">
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 rounded flex items-center justify-between shadow-lg">
         <div className="flex gap-2">
           <button
             onClick={addRow}
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center gap-2"
+            className="px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 flex items-center gap-2 font-medium shadow-md transition-all hover:shadow-lg"
           >
-            <span>+</span> Add Row
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Row
           </button>
           <button
             onClick={() => setShowCustomCode(true)}
-            className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 flex items-center gap-2"
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center gap-2 font-medium shadow-md transition-all hover:shadow-lg"
           >
-            <span>&lt;/&gt;</span> Custom CSS/JS
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+            </svg>
+            Custom CSS/JS
           </button>
         </div>
         
-        <div className="flex gap-2">
-          {Object.entries(screenSizes).map(([key, { label }]) => (
-            <button
-              key={key}
-              onClick={() => setScreenSize(key as any)}
-              className={`px-3 py-1 rounded text-sm ${
-                screenSize === key
-                  ? 'bg-yellow-400 text-black font-semibold'
-                  : 'bg-gray-700 text-white hover:bg-gray-600'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <button
+          onClick={() => setScreenSize(screenSize === 'xl' ? 'lg' : 'xl')}
+          className={`px-4 py-2 rounded font-medium shadow-md transition-all hover:shadow-lg flex items-center gap-2 ${
+            screenSize === 'xl'
+              ? 'bg-yellow-400 text-black hover:bg-yellow-500'
+              : 'bg-gray-700 text-white hover:bg-gray-600'
+          }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          </svg>
+          {screenSize === 'xl' ? 'Extra Large' : 'Large'}
+        </button>
       </div>
 
-      {/* Canvas */}
+      {/* Canvas - Scrollable Container */}
       <div 
-        className="bg-gray-100 p-4 rounded min-h-[400px]"
+        className="bg-white border-2 border-gray-300 p-6 rounded min-h-[400px] shadow-inner overflow-auto"
         style={{ 
-          maxWidth: screenSizes[screenSize].width,
+          maxWidth: '100%',
+          maxHeight: 'none',
           margin: '0 auto',
           transition: 'max-width 0.3s ease'
         }}
       >
+        <div
+          className="relative border-4 border-blue-500 rounded-lg p-4"
+          style={{
+            width: screenSizes[screenSize].width,
+            minHeight: structure.rows.length === 0 ? '600px' : 'auto',
+            height: 'auto',
+            boxSizing: 'border-box',
+            overflow: 'visible',
+          }}
+        >
         {structure.rows.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <p className="text-lg mb-2">No rows yet</p>
             <p className="text-sm">Click "Add Row" to start building your layout</p>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-3 items-start">
+          <div className="space-y-4">
             {structure.rows.map((row, index) => (
-              <div 
+              <div
                 key={row.id}
-                className="relative"
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setDropTargetIndex(index);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleDrop(e, index);
-                }}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                className={dropTargetIndex === index ? 'border-t-4 border-green-500' : ''}
               >
-                {/* Drop indicator overlay */}
-                {dropTargetIndex === index && draggedRowId !== row.id && (
-                  <div className="absolute inset-0 border-4 border-blue-500 rounded bg-blue-100 bg-opacity-30 pointer-events-none z-50 animate-pulse" />
-                )}
-
-                {/* The actual row */}
                 <LayoutRow
                   row={row}
                   onUpdate={(updatedRow) => updateRow(row.id, updatedRow)}
@@ -212,32 +213,9 @@ export function LayoutBuilder({
                 />
               </div>
             ))}
-
-            {/* Drop zone at the end */}
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setDropTargetIndex(structure.rows.length);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleDrop(e, structure.rows.length);
-              }}
-              className={`transition-all flex-shrink-0 ${
-                dropTargetIndex === structure.rows.length ? 'w-32 border-4 border-dashed border-blue-500 bg-blue-50' : 'w-8'
-              }`}
-              style={{ minHeight: '100px' }}
-            >
-              {dropTargetIndex === structure.rows.length && (
-                <div className="flex items-center justify-center h-full text-blue-600 font-semibold text-sm">
-                  Drop Here
-                </div>
-              )}
-            </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* Custom Code Modal */}

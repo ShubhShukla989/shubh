@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin, requireSupabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,6 +12,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const searchBy = searchParams.get('searchBy') || 'title';
     const query = searchParams.get('query');
+
+    console.log('🔍 Fetching media files from database...');
 
     // Fetch all media files from database
     let dbQuery = supabaseAdmin!
@@ -27,6 +30,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, error } = await dbQuery;
+
+    console.log('📊 GET /api/media - Database returned:', data?.length, 'records');
+    console.log('IDs:', data?.map((f: any) => f.id));
 
     if (error) {
       console.error('Database error:', error);
@@ -47,6 +53,8 @@ export async function GET(request: NextRequest) {
       type: file.mime_type,
       createdAt: file.created_at,
     }));
+
+    console.log('✅ Returning', mappedData.length, 'media files');
 
     return NextResponse.json({
       success: true,

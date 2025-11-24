@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { X, Upload, Image as ImageIcon, Search, Grid3x3, List } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, Search, Grid3x3, List, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MediaFile {
@@ -27,6 +27,7 @@ export default function MediaBrowser({ isOpen, onClose, onSelect, accept = 'imag
   const [searchQuery, setSearchQuery] = useState('');
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   // Load existing files when modal opens
   useEffect(() => {
@@ -40,8 +41,8 @@ export default function MediaBrowser({ isOpen, onClose, onSelect, accept = 'imag
     try {
       const response = await fetch('/api/media');
       if (response.ok) {
-        const data = await response.json();
-        setFiles(data);
+        const result = await response.json();
+        setFiles(result.data || []);
       }
     } catch (error) {
       console.error('Failed to load files:', error);
@@ -68,7 +69,8 @@ export default function MediaBrowser({ isOpen, onClose, onSelect, accept = 'imag
 
       if (!response.ok) throw new Error('Upload failed');
 
-      const newFiles = await response.json();
+      const result = await response.json();
+      const newFiles = result.data || [];
       setFiles((prev) => [...newFiles, ...prev]);
     } catch (error) {
       console.error('Upload error:', error);
@@ -82,6 +84,31 @@ export default function MediaBrowser({ isOpen, onClose, onSelect, accept = 'imag
     if (selectedFile) {
       onSelect(selectedFile);
       onClose();
+    }
+  };
+
+  const handleDelete = async (fileId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!confirm('Are you sure you want to delete this file?')) return;
+
+    setDeleting(fileId);
+    try {
+      const response = await fetch(`/api/media/${fileId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Delete failed');
+
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+      if (selectedFile === files.find(f => f.id === fileId)?.url) {
+        setSelectedFile(null);
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Failed to delete file');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -183,31 +210,44 @@ export default function MediaBrowser({ isOpen, onClose, onSelect, accept = 'imag
           {viewMode === 'grid' && (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {filteredFiles.map((file) => (
-                <button
-                  key={file.id}
-                  onClick={() => setSelectedFile(file.url)}
-                  className={cn(
-                    'relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:shadow-lg',
-                    selectedFile === file.url
-                      ? 'border-purple-600 ring-2 ring-purple-200'
-                      : 'border-gray-200 hover:border-purple-300'
-                  )}
-                >
-                  <img
-                    src={file.url}
-                    alt={file.name}
-                    className="w-full h-full object-cover"
-                  />
-                  {selectedFile === file.url && (
-                    <div className="absolute inset-0 bg-purple-600/20 flex items-center justify-center">
-                      <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
-                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
+                <div key={file.id} className="relative group">
+                  <button
+                    onClick={() => setSelectedFile(file.url)}
+                    className={cn(
+                      'relative aspect-square rounded-lg overflow-hidden border-2 transition-all hover:shadow-lg w-full',
+                      selectedFile === file.url
+                        ? 'border-purple-600 ring-2 ring-purple-200'
+                        : 'border-gray-200 hover:border-purple-300'
+                    )}
+                  >
+                    <img
+                      src={file.url}
+                      alt={file.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {selectedFile === file.url && (
+                      <div className="absolute inset-0 bg-purple-600/20 flex items-center justify-center">
+                        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
+                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </button>
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(file.id, e)}
+                    disabled={deleting === file.id}
+                    className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 disabled:opacity-50"
+                    title="Delete"
+                  >
+                    {deleting === file.id ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -215,28 +255,41 @@ export default function MediaBrowser({ isOpen, onClose, onSelect, accept = 'imag
           {viewMode === 'list' && (
             <div className="space-y-2">
               {filteredFiles.map((file) => (
-                <button
-                  key={file.id}
-                  onClick={() => setSelectedFile(file.url)}
-                  className={cn(
-                    'w-full flex items-center gap-4 p-3 rounded-lg border transition-all hover:shadow-md',
-                    selectedFile === file.url
-                      ? 'border-purple-600 bg-purple-50'
-                      : 'border-gray-200 hover:border-purple-300'
-                  )}
-                >
-                  <img
-                    src={file.url}
-                    alt={file.name}
-                    className="w-16 h-16 object-cover rounded"
-                  />
-                  <div className="flex-1 text-left">
-                    <p className="font-medium text-gray-900">{file.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {(file.size / 1024).toFixed(2)} KB
-                    </p>
-                  </div>
-                </button>
+                <div key={file.id} className="relative group">
+                  <button
+                    onClick={() => setSelectedFile(file.url)}
+                    className={cn(
+                      'w-full flex items-center gap-4 p-3 rounded-lg border transition-all hover:shadow-md',
+                      selectedFile === file.url
+                        ? 'border-purple-600 bg-purple-50'
+                        : 'border-gray-200 hover:border-purple-300'
+                    )}
+                  >
+                    <img
+                      src={file.url}
+                      alt={file.name}
+                      className="w-16 h-16 object-cover rounded"
+                    />
+                    <div className="flex-1 text-left">
+                      <p className="font-medium text-gray-900">{file.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {(file.size / 1024).toFixed(2)} KB
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => handleDelete(file.id, e)}
+                      disabled={deleting === file.id}
+                      className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                      title="Delete"
+                    >
+                      {deleting === file.id ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
+                  </button>
+                </div>
               ))}
             </div>
           )}

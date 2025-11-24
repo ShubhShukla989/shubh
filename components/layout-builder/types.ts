@@ -1,6 +1,6 @@
 export interface Widget {
   id: string;
-  type: 'ticker' | 'social' | 'image' | 'text' | 'button' | 'menu' | 'embed' | 'navigation' | 'slideshow' | 'html' | 'tinymce' | 'page-content' | 'infobox' | 'cards' | 'heading' | 'video' | 'audio' | 'datetime' | 'reusable' | 'epaper-category' | 'epaper-gallery' | 'epaper-featured' | 'pwa-install' | 'youtube' | 'rss';
+  type: 'ticker' | 'social' | 'image' | 'text' | 'button' | 'menu' | 'embed' | 'navigation' | 'slideshow' | 'html' | 'tinymce' | 'page-content' | 'infobox' | 'cards' | 'heading' | 'video' | 'audio' | 'datetime' | 'reusable' | 'epaper-category' | 'epaper-gallery' | 'epaper-featured' | 'pwa-install' | 'youtube' | 'rss' | 'epaper-archive' | 'epaper-calendar' | 'epaper-pagination' | 'epaper-pdf-download' | 'epaper-thumb-navigation' | 'epaper-clip-share' | 'epaper-display';
   config: any;
 }
 

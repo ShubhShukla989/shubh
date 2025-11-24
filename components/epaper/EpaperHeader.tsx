@@ -89,7 +89,7 @@ export default function EpaperHeader({
       return item.url;
     } else if (item.type === 'page' && (item.page || item.pages)) {
       const pageData = item.page || item.pages;
-      return `/page/${pageData.alias}`;
+      return `/epaper/page/${pageData.alias}`;
     } else if (item.type === 'epaper_category' && item.category_id) {
       return `/epaper/category/${item.category_id}`;
     } else if (item.type === 'epaper_archive') {
@@ -106,31 +106,6 @@ export default function EpaperHeader({
     <header className="bg-white border-b border-gray-200 shadow-sm">
       {/* Orange line at top */}
       <div className="h-1 bg-orange-500"></div>
-      
-      {/* Top Bar with Background Image and Logo - Responsive */}
-      <div 
-        className="relative py-3 md:py-8 bg-cover bg-center"
-        style={{ 
-          backgroundImage: headerBgUrl ? `url(${headerBgUrl})` : 'none',
-          backgroundColor: headerBgUrl ? 'transparent' : '#f5f5f5'
-        }}
-      >
-        <div className="px-2 flex items-center justify-center">
-          <Link href="/epaper" className="hover:opacity-90 transition-opacity">
-            {logoUrl ? (
-              <img 
-                src={logoUrl} 
-                alt="DBID दो बजे दोपहर" 
-                className="h-16 md:h-28 lg:h-32 w-auto"
-              />
-            ) : (
-              <div className="text-lg md:text-2xl font-bold text-red-600">
-                DBID दो बजे दोपहर
-              </div>
-            )}
-          </Link>
-        </div>
-      </div>
 
       {/* Navigation Menu */}
       <div className="bg-gray-800 text-white">
@@ -144,6 +119,18 @@ export default function EpaperHeader({
             </button>
             
             <nav className="hidden md:flex items-center gap-6 text-sm">
+              {/* Home Icon */}
+              <Link
+                href="/epaper"
+                className="hover:text-red-400 transition-colors flex items-center"
+                title="Home"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                </svg>
+              </Link>
+              
+              {/* Menu Items */}
               {menuItems.map((item) => (
                 isExternalLink(item) ? (
                   <a
@@ -176,13 +163,6 @@ export default function EpaperHeader({
           <div className="flex items-center justify-between py-2 md:py-3">
             {/* Left: Page Dropdown */}
             <div className="flex items-center gap-1 md:gap-4">
-              <Link
-                href="/epaper"
-                className="p-1 md:p-2 hover:bg-gray-100 rounded transition-colors"
-                title="Back to Home"
-              >
-                <Home className="w-4 h-4 md:w-5 md:h-5 text-gray-700" />
-              </Link>
               <select
                 value={currentPage}
                 onChange={(e) => onPageChange?.(Number(e.target.value))}
@@ -324,6 +304,19 @@ export default function EpaperHeader({
       {showMenu && (
         <div className="md:hidden bg-white border-t border-gray-200 shadow-lg">
           <nav className="px-4 py-4 space-y-2">
+            {/* Home Icon - Mobile */}
+            <Link
+              href="/epaper"
+              className="flex items-center gap-2 py-2 text-gray-700 hover:text-red-600 transition-colors font-medium"
+              onClick={() => setShowMenu(false)}
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+              </svg>
+              Home
+            </Link>
+            
+            {/* Menu Items - Mobile */}
             {menuItems.map((item) => (
               isExternalLink(item) ? (
                 <a

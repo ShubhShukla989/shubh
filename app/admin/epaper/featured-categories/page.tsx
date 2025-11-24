@@ -24,10 +24,16 @@ export default function FeaturedCategoriesPage() {
 
   const fetchFeaturedCategories = async () => {
     try {
+      console.log('Fetching featured categories...');
       const response = await fetch('/api/epaper/categories/featured');
+      console.log('Response status:', response.status);
       const result = await response.json();
+      console.log('API Response:', result);
       if (result.success) {
+        console.log('Setting categories:', result.data);
         setCategories(result.data || []);
+      } else {
+        console.error('API returned error:', result.error);
       }
     } catch (error) {
       console.error('Failed to fetch featured categories:', error);

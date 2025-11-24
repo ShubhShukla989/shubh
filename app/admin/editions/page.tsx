@@ -10,8 +10,10 @@ import {
 } from 'lucide-react';
 import { Edition } from '@/lib/types';
 import ActionIcons from '@/components/ActionIcons';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function EditionsPage() {
+  const { hasPermission, isSuperAdmin } = useAuth();
   const [editions, setEditions] = useState<Edition[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +49,7 @@ export default function EditionsPage() {
     alias: '',
     description: '',
     date: new Date().toISOString().split('T')[0],
+    category_id: '',
     categories: '',
     status: 'draft',
     pdfFile: null,
@@ -102,12 +105,14 @@ export default function EditionsPage() {
   };
 
   const handleEditClick = (edition: Edition) => {
+    fetchCategories(); // Refresh categories before opening modal
     setEditingEdition(edition);
     setFormData({
       title: edition.title || '',
       alias: edition.alias || '',
       description: edition.description || '',
       date: edition.date || new Date().toISOString().split('T')[0],
+      category_id: edition.category_id || '',
       status: edition.status || 'draft',
       categories: '',
       seo_h1: edition.seo_h1 || '',
@@ -227,20 +232,29 @@ export default function EditionsPage() {
               </svg>
               View Public E-Paper
             </Link>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 bg-black text-white text-sm font-medium rounded hover:bg-gray-900 transition-colors flex items-center gap-2"
-            >
-              <ActionIcons.Add className="!p-0 !bg-transparent" /> New Edition
-            </button>
+            {(isSuperAdmin() || hasPermission('create_editions')) && (
+              <button
+                onClick={() => {
+                  fetchCategories(); // Refresh categories before opening modal
+                  setShowCreateModal(true);
+                }}
+                className="px-4 py-2 bg-black text-white text-sm font-medium rounded hover:bg-gray-900 transition-colors flex items-center gap-2"
+              >
+                <ActionIcons.Add className="!p-0 !bg-transparent" /> New Edition
+              </button>
+            )}
 
-            <select className="px-3 py-2 border border-gray-300 rounded text-sm">
-              <option>-- Bulk Actions --</option>
-              <option>Publish</option>
-              <option>Unpublish</option>
-              <option>Delete</option>
-            </select>
-            <button className="px-3 py-2 bg-purple-600 text-white rounded text-sm">Apply</button>
+            {(isSuperAdmin() || hasPermission('delete_editions')) && (
+              <>
+                <select className="px-3 py-2 border border-gray-300 rounded text-sm">
+                  <option>-- Bulk Actions --</option>
+                  <option>Publish</option>
+                  <option>Unpublish</option>
+                  <option>Delete</option>
+                </select>
+                <button className="px-3 py-2 bg-purple-600 text-white rounded text-sm">Apply</button>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -375,17 +389,21 @@ export default function EditionsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <ActionIcons.Group>
-                        <ActionIcons.Edit
-                          onClick={() => handleEditClick(edition)}
-                          title="Edit"
-                        />
+                        {(isSuperAdmin() || hasPermission('edit_editions')) && (
+                          <ActionIcons.Edit
+                            onClick={() => handleEditClick(edition)}
+                            title="Edit"
+                          />
+                        )}
                         <Link href={`/admin/editions/${edition.id}/pages`}>
                           <ActionIcons.Upload title="Upload/Manage Pages" />
                         </Link>
-                        <ActionIcons.Delete
-                          onClick={() => handleDelete(edition.id)}
-                          title="Delete"
-                        />
+                        {(isSuperAdmin() || hasPermission('delete_editions')) && (
+                          <ActionIcons.Delete
+                            onClick={() => handleDelete(edition.id)}
+                            title="Delete"
+                          />
+                        )}
                         {edition.is_featured ? (
                           <ActionIcons.Remove
                             onClick={() => toggleFeatured(edition.id, edition.is_featured || false, edition.title)}
@@ -409,7 +427,9 @@ export default function EditionsPage() {
                       <td className="px-4 py-3 text-sm text-gray-600">{new Date(edition.date).toLocaleDateString()}</td>
                     )}
                     {cols.categories && (
-                      <td className="px-4 py-3 text-sm text-gray-600">{edition.category_id || 'Uncategorized'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {categories.find(c => c.id === edition.category_id)?.title || 'Uncategorized'}
+                      </td>
                     )}
                     {cols.pdf && (
                       <td className="px-4 py-3">
@@ -837,7 +857,7 @@ export default function EditionsPage() {
                         alias: formData.alias,
                         date: formData.date,
                         description: formData.description,
-                        category_id: formData.category_id || null,
+                        category_id: formData.category_id && formData.category_id !== '' ? parseInt(formData.category_id, 10) : null,
                         seo_h1: formData.seo_h1,
                         seo_meta_description: formData.seo_meta_description,
                         status: 'draft',
@@ -870,6 +890,64 @@ export default function EditionsPage() {
                 className="px-6 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 flex items-center gap-2"
               >
                 🔒 Save Privately
+              </button>
+              
+              {/* Publish Button */}
+              <button
+                onClick={async () => {
+                  if (!formData.title) {
+                    alert('Please enter a title');
+                    return;
+                  }
+                  try {
+                    const payload = {
+                      title: formData.title,
+                      alias: formData.alias,
+                      date: formData.date,
+                      description: formData.description,
+                      category_id: formData.category_id && formData.category_id !== '' ? parseInt(formData.category_id, 10) : null,
+                      seo_h1: formData.seo_h1,
+                      seo_meta_description: formData.seo_meta_description,
+                      status: 'published',
+                    };
+                    console.log('Publishing edition with payload:', payload);
+                    console.log('Selected category_id:', formData.category_id);
+                    console.log('Parsed category_id:', payload.category_id);
+                    
+                    const response = await fetch('/api/editions', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(payload),
+                    });
+                    const result = await response.json();
+                    console.log('Publish response:', result);
+                    if (result.success) {
+                      alert('Edition published successfully!');
+                      setShowCreateModal(false);
+                      setFormData({
+                        title: '',
+                        alias: '',
+                        description: '',
+                        date: new Date().toISOString().split('T')[0],
+                        category_id: '',
+                        status: 'draft',
+                        pdfFile: null,
+                        seo_h1: '',
+                        seo_meta_description: '',
+                      });
+                      fetchEditions();
+                    } else {
+                      console.error('API Error:', result.error);
+                      alert('Error: ' + result.error);
+                    }
+                  } catch (error) {
+                    console.error('Error publishing edition:', error);
+                    alert('Failed to publish edition: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                  }
+                }}
+                className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-2"
+              >
+                ✓ Publish
               </button>
             </div>
           </div>
@@ -975,13 +1053,18 @@ export default function EditionsPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Categories
                       </label>
-                      <input
-                        type="text"
-                        value={formData.categories}
-                        onChange={(e) => setFormData({ ...formData, categories: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded"
-                        placeholder="Select Categories"
-                      />
+                      <select
+                        value={formData.category_id || ''}
+                        onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value="">Select Categories</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.title}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                   <div>
@@ -1300,6 +1383,45 @@ export default function EditionsPage() {
               >
                 💾 Save Privately
               </button>
+              
+              {/* Publish Button */}
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`/api/editions/${editingEdition.id}`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        title: formData.title,
+                        alias: formData.alias,
+                        date: formData.date,
+                        description: formData.description,
+                        category_id: formData.category_id || null,
+                        seo_h1: formData.seo_h1,
+                        seo_meta_description: formData.seo_meta_description,
+                        status: 'published',
+                        scheduled_date: null,
+                      }),
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                      alert('Edition published successfully!');
+                      setShowEditModal(false);
+                      setEditingEdition(null);
+                      fetchEditions();
+                    } else {
+                      alert('Error: ' + result.error);
+                    }
+                  } catch (error) {
+                    console.error('Error publishing edition:', error);
+                    alert('Failed to publish edition');
+                  }
+                }}
+                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                ✓ Publish
+              </button>
+              
               <button
                 onClick={async () => {
                   try {

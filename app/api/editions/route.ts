@@ -6,14 +6,43 @@ export async function GET(request: NextRequest) {
     const configError = requireSupabaseAdmin();
     if (configError) return configError;
 
-    const { data, error } = await supabaseAdmin!
+    // Get query parameters
+    const searchParams = request.nextUrl.searchParams;
+    const status = searchParams.get('status');
+    const categoryId = searchParams.get('category_id');
+
+    // Build query
+    let query = supabaseAdmin!
       .from('editions')
-      .select('*')
+      .select(`
+        *,
+        pages:edition_pages(
+          id,
+          page_number,
+          image_url
+        )
+      `)
       .order('date', { ascending: false });
+
+    // Apply filters
+    if (status) {
+      query = query.eq('status', status);
+    }
+    if (categoryId) {
+      query = query.eq('category_id', parseInt(categoryId));
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, data });
+    // Sort pages by page_number for each edition
+    const processedData = data?.map(edition => ({
+      ...edition,
+      pages: edition.pages?.sort((a: any, b: any) => a.page_number - b.page_number) || []
+    }));
+
+    return NextResponse.json({ success: true, data: processedData });
   } catch (error) {
     if (error instanceof Error) {
       console.error('[GET /api/editions] Error:', error.message);
@@ -65,13 +94,18 @@ export async function POST(request: NextRequest) {
       seo_meta_description,
     } as const;
 
+    console.log('[POST /api/editions] Insert payload:', insertPayload);
+
     const { data, error } = await supabaseAdmin!
       .from('editions')
       .insert([insertPayload])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[POST /api/editions] Database error:', error);
+      throw error;
+    }
 
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error) {
