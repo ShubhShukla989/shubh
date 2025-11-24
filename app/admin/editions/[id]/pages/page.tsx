@@ -634,10 +634,39 @@ export default function EditionPagesPage() {
                       }
                     }}
                     disabled={loading || !pdfUrl}
-                    className="w-full px-4 py-3 bg-pink-500 text-white rounded hover:bg-pink-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-3 bg-pink-500 text-white rounded hover:bg-pink-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {loading ? 'Extracting...' : 'Extract Pages'}
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Extracting Pages...</span>
+                      </>
+                    ) : (
+                      'Extract Pages'
+                    )}
                   </button>
+                  
+                  {/* Loading Progress Indicator */}
+                  {loading && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-center gap-3 mb-2">
+                        <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="text-sm font-semibold text-blue-900">Processing PDF...</span>
+                      </div>
+                      <p className="text-xs text-blue-700">
+                        Extracting pages from PDF. This may take a few moments depending on the number of pages and resolution.
+                      </p>
+                      <div className="mt-3 w-full bg-blue-200 rounded-full h-2 overflow-hidden">
+                        <div className="bg-blue-600 h-full rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Right Column - Preview */}

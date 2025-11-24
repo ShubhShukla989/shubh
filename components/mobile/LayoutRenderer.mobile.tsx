@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useDeviceDetection } from '../../hooks/useDeviceDetection';
-import { LayoutRendererMobile } from '../mobile/LayoutRenderer.mobile';
 import { EpaperArchiveWidget } from '../epaper/EpaperArchiveWidget';
 import { EpaperCalendarWidget } from '../epaper/EpaperCalendarWidget';
 import { EpaperPaginationWidget } from '../epaper/EpaperPaginationWidget';
@@ -10,16 +8,15 @@ import { EpaperPdfDownloadWidget } from '../epaper/EpaperPdfDownloadWidget';
 import { EpaperThumbNavigationWidget } from '../epaper/EpaperThumbNavigationWidget';
 import { EpaperDisplayWidget } from '../epaper/EpaperDisplayWidget';
 import { EpaperClipShareWidget } from '../epaper/EpaperClipShareWidget';
-import { EpaperFeaturedWidget } from '../epaper/EpaperFeaturedWidget';
-import { NavigationWidget } from '../navigation/NavigationWidget';
+import { EpaperFeaturedWidgetMobile } from './EpaperFeaturedWidget.mobile';
+import { NavigationWidgetMobile } from './NavigationWidget.mobile';
 
-interface LayoutRendererProps {
+interface LayoutRendererMobileProps {
   layoutName: string;
   pageName?: string;
 }
 
-export function LayoutRenderer({ layoutName, pageName }: LayoutRendererProps) {
-  const { isMobile, isLoaded } = useDeviceDetection();
+export function LayoutRendererMobile({ layoutName, pageName }: LayoutRendererMobileProps) {
   const [layoutData, setLayoutData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +31,6 @@ export function LayoutRenderer({ layoutName, pageName }: LayoutRendererProps) {
         ? `/api/layouts/${encodeURIComponent(layoutName)}/pages?pageName=${encodeURIComponent(pageName)}`
         : `/api/layouts/${encodeURIComponent(layoutName)}`;
       
-      // Add cache busting and no-cache headers
       const response = await fetch(url, {
         cache: 'no-store',
         headers: {
@@ -45,10 +41,7 @@ export function LayoutRenderer({ layoutName, pageName }: LayoutRendererProps) {
       const data = await response.json();
       
       if (data.success) {
-        console.log('Layout data fetched:', data.data);
         setLayoutData(data.data);
-      } else {
-        console.error('Failed to fetch layout:', data);
       }
     } catch (error) {
       console.error('Error fetching layout:', error);
@@ -57,17 +50,12 @@ export function LayoutRenderer({ layoutName, pageName }: LayoutRendererProps) {
     }
   };
 
-  // Use mobile renderer for mobile devices
-  if (isLoaded && isMobile) {
-    return <LayoutRendererMobile layoutName={layoutName} pageName={pageName} />;
-  }
-
   if (loading) {
-    return null; // Silent loading
+    return null;
   }
 
   if (!layoutData) {
-    return null; // Silent fail
+    return null;
   }
 
   return (
@@ -80,29 +68,28 @@ export function LayoutRenderer({ layoutName, pageName }: LayoutRendererProps) {
         />
       )}
 
-      {/* Render Layout Structure */}
-      <div className="layout-renderer" data-layout={layoutName}>
+      {/* Render Layout Structure - Mobile Optimized */}
+      <div className="layout-renderer-mobile m-0 p-0" data-layout={layoutName}>
         {layoutData.structure?.rows?.map((row: any) => (
           <div 
             key={row.id} 
-            className={`layout-row ${row.properties?.cssClass || row.cssClass || ''}`}
-            style={parseInlineStyle(row.properties?.customCss || row.properties?.customStyle || row.customStyle)}
+            className={`layout-row-mobile m-0 p-0 ${row.properties?.cssClass || row.cssClass || ''}`}
+            style={{ margin: 0, padding: 0, ...parseInlineStyle(row.properties?.customCss || row.properties?.customStyle || row.customStyle) }}
           >
-            <div className="flex flex-wrap">
+            <div className="flex flex-col m-0 p-0">
               {row.columns?.map((column: any) => (
                 <div
                   key={column.id}
-                  className={`layout-column ${column.properties?.cssClass || column.cssClass || ''}`}
+                  className={`layout-column-mobile w-full m-0 p-0 ${column.properties?.cssClass || column.cssClass || ''}`}
                   style={{
-                    flex: `0 0 ${((column.width || 6) / 12) * 100}%`,
-                    maxWidth: `${((column.width || 6) / 12) * 100}%`,
-                    boxSizing: 'border-box',
+                    margin: 0,
+                    padding: 0,
                     ...parseInlineStyle(column.properties?.customCss || column.properties?.customStyle || column.customStyle),
                   }}
                 >
                   {/* Render Widgets */}
                   {column.widgets?.map((widget: any) => (
-                    <div key={widget.id} className={`widget ${widget.config?.cssClasses || ''}`}>
+                    <div key={widget.id} className={`widget-mobile-compact m-0 p-0 ${widget.config?.cssClasses || ''}`}>
                       {renderWidget(widget)}
                     </div>
                   ))}
@@ -135,18 +122,17 @@ function renderWidget(widget: any) {
           alt={widget.config.alt || ''}
           title={widget.config.title || ''}
           loading={widget.config.lazyload !== false ? 'lazy' : 'eager'}
-          className={widget.config.cssClasses || ''}
-          style={imgStyle}
+          className={`w-full h-auto max-w-full object-contain ${widget.config.cssClasses || ''}`}
+          style={{ ...imgStyle, maxHeight: '200px' }}
         />
       );
       
-      // If there's a link, wrap in anchor tag
       if (widget.config.link) {
         return (
           <a 
             href={widget.config.link} 
             target={widget.config.target || '_self'}
-            className={widget.config.cssClasses || ''}
+            className={`block ${widget.config.cssClasses || ''}`}
           >
             {imgElement}
           </a>
@@ -159,7 +145,7 @@ function renderWidget(widget: any) {
     case 'html':
       return (
         <div 
-          className={widget.config.cssClasses || ''}
+          className={`mobile-text ${widget.config.cssClasses || ''}`}
           style={parseInlineStyle(widget.config.style)}
           dangerouslySetInnerHTML={{ __html: widget.config.content || widget.config.html }} 
         />
@@ -172,7 +158,7 @@ function renderWidget(widget: any) {
       
       return (
         <HeadingTag 
-          className={`${formatClass} ${widget.config.cssClasses || ''}`}
+          className={`${formatClass} text-center ${widget.config.cssClasses || ''}`}
           style={parseInlineStyle(widget.config.style)}
         >
           {headingText}
@@ -181,16 +167,22 @@ function renderWidget(widget: any) {
 
     case 'button':
       return (
-        <a
-          href={widget.config.link || '#'}
-          className={`btn btn-${widget.config.style || 'primary'}`}
-        >
-          {widget.config.text}
-        </a>
+        <div className="text-center py-2">
+          <a
+            href={widget.config.link || '#'}
+            className={`inline-block px-6 py-3 rounded-lg text-center btn btn-${widget.config.style || 'primary'}`}
+          >
+            {widget.config.text}
+          </a>
+        </div>
       );
 
     case 'epaper-archive':
-      return <EpaperArchiveWidget config={widget.config} />;
+      return (
+        <div className="mobile-archive-widget">
+          <EpaperArchiveWidget config={widget.config} />
+        </div>
+      );
 
     case 'epaper-calendar':
       return <EpaperCalendarWidget config={widget.config} />;
@@ -211,13 +203,13 @@ function renderWidget(widget: any) {
       return <EpaperDisplayWidget config={widget.config} />;
 
     case 'epaper-featured':
-      return <EpaperFeaturedWidget config={widget.config} />;
+      return <EpaperFeaturedWidgetMobile config={widget.config} />;
 
     case 'epaper-category':
-      return <EpaperFeaturedWidget config={widget.config} />;
+      return <EpaperFeaturedWidgetMobile config={widget.config} />;
 
     case 'navigation':
-      return <NavigationWidget config={widget.config} />;
+      return <NavigationWidgetMobile config={widget.config} />;
 
     default:
       return null;

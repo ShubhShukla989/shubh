@@ -107,55 +107,7 @@ export default function EpaperHeader({
       {/* Orange line at top */}
       <div className="h-1 bg-orange-500"></div>
 
-      {/* Navigation Menu */}
-      <div className="bg-gray-800 text-white">
-        <div className="px-4">
-          <div className="flex items-center justify-between h-12">
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="md:hidden p-2 hover:bg-gray-700 rounded"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            
-            <nav className="hidden md:flex items-center gap-6 text-sm">
-              {/* Home Icon */}
-              <Link
-                href="/epaper"
-                className="hover:text-red-400 transition-colors flex items-center"
-                title="Home"
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-                </svg>
-              </Link>
-              
-              {/* Menu Items */}
-              {menuItems.map((item) => (
-                isExternalLink(item) ? (
-                  <a
-                    key={item.id}
-                    href={getMenuItemUrl(item)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-red-400 transition-colors whitespace-nowrap"
-                  >
-                    {item.title}
-                  </a>
-                ) : (
-                  <Link
-                    key={item.id}
-                    href={getMenuItemUrl(item)}
-                    className="hover:text-red-400 transition-colors whitespace-nowrap"
-                  >
-                    {item.title}
-                  </Link>
-                )
-              ))}
-            </nav>
-          </div>
-        </div>
-      </div>
+
 
       {/* Viewer Controls - Responsive */}
       <div className="bg-white border-t border-gray-200">
@@ -300,49 +252,7 @@ export default function EpaperHeader({
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      {showMenu && (
-        <div className="md:hidden bg-white border-t border-gray-200 shadow-lg">
-          <nav className="px-4 py-4 space-y-2">
-            {/* Home Icon - Mobile */}
-            <Link
-              href="/epaper"
-              className="flex items-center gap-2 py-2 text-gray-700 hover:text-red-600 transition-colors font-medium"
-              onClick={() => setShowMenu(false)}
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-              </svg>
-              Home
-            </Link>
-            
-            {/* Menu Items - Mobile */}
-            {menuItems.map((item) => (
-              isExternalLink(item) ? (
-                <a
-                  key={item.id}
-                  href={getMenuItemUrl(item)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block py-2 text-gray-700 hover:text-red-600 transition-colors"
-                  onClick={() => setShowMenu(false)}
-                >
-                  {item.title}
-                </a>
-              ) : (
-                <Link
-                  key={item.id}
-                  href={getMenuItemUrl(item)}
-                  className="block py-2 text-gray-700 hover:text-red-600 transition-colors"
-                  onClick={() => setShowMenu(false)}
-                >
-                  {item.title}
-                </Link>
-              )
-            ))}
-          </nav>
-        </div>
-      )}
+
     </header>
   );
 }

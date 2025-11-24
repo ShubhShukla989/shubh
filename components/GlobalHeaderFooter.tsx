@@ -65,19 +65,19 @@ export function GlobalHeaderFooter({ children }: { children: React.ReactNode }) 
     <>
       {/* Global Site Header */}
       {headerLayout && (
-        <header className="site-header">
+        <header className="site-header w-full">
           <LayoutRenderer layoutName={headerLayout} />
         </header>
       )}
 
       {/* Main Content */}
-      <main className="site-content">
+      <main className="site-content w-full">
         {children}
       </main>
 
       {/* Global Site Footer */}
       {footerLayout && (
-        <footer className="site-footer">
+        <footer className="site-footer w-full">
           <LayoutRenderer layoutName={footerLayout} />
         </footer>
       )}

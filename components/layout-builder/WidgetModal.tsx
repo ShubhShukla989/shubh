@@ -8,7 +8,15 @@ import { MediaBrowserModal } from './MediaBrowserModal';
 interface TreeNode {
   id: number;
   title: string;
-  children: TreeNode[];
+  children?: TreeNode[];
+}
+
+// Menu item interface for navigation
+interface MenuItem {
+  id: string;
+  title: string;
+  url: string;
+  children: MenuItem[];
 }
 
 // Epaper Clip and Share Form Component
@@ -571,10 +579,10 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
       const addToNode = (nodes: TreeNode[]): TreeNode[] => {
         return nodes.map(node => {
           if (node.id === selectedNodeId) {
-            return { ...node, children: [...node.children, newNode] };
+            return { ...node, children: [...(node.children || []), newNode] };
           }
-          if (node.children.length > 0) {
-            return { ...node, children: addToNode(node.children) };
+          if (node.children && node.children.length > 0) {
+            return { ...node, children: addToNode(node.children || []) };
           }
           return node;
         });
@@ -587,7 +595,7 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
     const removeFromTree = (nodes: TreeNode[]): TreeNode[] => {
       return nodes.filter(node => node.id !== nodeId).map(node => ({
         ...node,
-        children: removeFromTree(node.children)
+        children: removeFromTree(node.children || [])
       }));
     };
     setCategoryTree(removeFromTree(categoryTree));
@@ -607,7 +615,7 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
     const removeNode = (nodes: TreeNode[]): TreeNode[] => {
       return nodes.filter(n => n.id !== draggedNode.id).map(n => ({
         ...n,
-        children: removeNode(n.children)
+        children: removeNode(n.children || [])
       }));
     };
 
@@ -617,10 +625,10 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
     const addToTarget = (nodes: TreeNode[]): TreeNode[] => {
       return nodes.map(node => {
         if (node.id === targetNode.id) {
-          return { ...node, children: [...node.children, draggedNode] };
+          return { ...node, children: [...(node.children || []), draggedNode] };
         }
-        if (node.children.length > 0) {
-          return { ...node, children: addToTarget(node.children) };
+        if (node.children && node.children.length > 0) {
+          return { ...node, children: addToTarget(node.children || []) };
         }
         return node;
       });
@@ -638,7 +646,7 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
     const removeNode = (nodes: TreeNode[]): TreeNode[] => {
       return nodes.filter(n => n.id !== draggedNode.id).map(n => ({
         ...n,
-        children: removeNode(n.children)
+        children: removeNode(n.children || [])
       }));
     };
 
@@ -654,7 +662,7 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
         } else {
           result.push({
             ...node,
-            children: insertBefore(node.children)
+            children: insertBefore(node.children || [])
           });
         }
       }
@@ -679,7 +687,7 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
     const removeNode = (nodes: TreeNode[]): TreeNode[] => {
       return nodes.filter(n => n.id !== draggedNode.id).map(n => ({
         ...n,
-        children: removeNode(n.children)
+        children: removeNode(n.children || [])
       }));
     };
 
@@ -691,20 +699,26 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
   };
 
   const getAllNodeIds = (nodes: TreeNode[]): number[] => {
+    if (!Array.isArray(nodes)) {
+      return [];
+    }
     let ids: number[] = [];
     nodes.forEach(node => {
       ids.push(node.id);
-      if (node.children.length > 0) {
+      if (node.children && node.children.length > 0) {
         ids = [...ids, ...getAllNodeIds(node.children)];
       }
     });
     return ids;
   };
 
-  const selectedIds = getAllNodeIds(categoryTree);
+  const selectedIds = getAllNodeIds(categoryTree || []);
   const availableCategories = categories.filter(c => !selectedIds.includes(c.id));
 
   const renderTree = (nodes: TreeNode[], level: number = 0): JSX.Element[] => {
+    if (!Array.isArray(nodes)) {
+      return [];
+    }
     const elements: JSX.Element[] = [];
     
     nodes.forEach((node, index) => {
@@ -731,7 +745,7 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
               }`}
             >
               <div className="flex items-center gap-2">
-                {node.children.length > 0 && <span className="text-gray-500 text-xs">▼</span>}
+                {node.children && node.children.length > 0 && <span className="text-gray-500 text-xs">▼</span>}
                 <span className="text-sm">{node.title}</span>
               </div>
               <button
@@ -772,7 +786,7 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
           </div>
           
           {/* Render children */}
-          {node.children.length > 0 && (
+          {node.children && node.children.length > 0 && (
             <div className="mt-1">
               {renderTree(node.children, level + 1)}
             </div>
@@ -847,7 +861,7 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
             </div>
           ) : (
             <>
-              {renderTree(categoryTree)}
+              {renderTree(categoryTree || [])}
               {/* Drop zone at the end */}
               <div
                 onDragOver={(e) => e.preventDefault()}
@@ -1016,6 +1030,128 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
   );
 }
 
+// Navigation Bar Form Component
+function NavigationForm({ config, onChange }: { config: any; onChange: (config: any) => void }) {
+  const [menus, setMenus] = useState<any[]>([]);
+  const [loadingMenus, setLoadingMenus] = useState(false);
+
+  useEffect(() => {
+    fetchMenus();
+  }, []);
+
+  const fetchMenus = async () => {
+    try {
+      setLoadingMenus(true);
+      const response = await fetch('/api/menu');
+      const data = await response.json();
+      // API returns data directly, not wrapped in success/data
+      setMenus(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch menus:', error);
+      setMenus([]);
+    } finally {
+      setLoadingMenus(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Logo */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
+        <input
+          type="text"
+          value={config.logoUrl || ''}
+          onChange={(e) => onChange({ ...config, logoUrl: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="https://example.com/logo.png"
+        />
+      </div>
+
+      {/* Logo Status */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Logo Status</label>
+        <select
+          value={config.logoStatus || 'display-both'}
+          onChange={(e) => onChange({ ...config, logoStatus: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="hide-desktop">Hide on Desktop</option>
+          <option value="hide-mobile">Hide on Mobile</option>
+          <option value="display-both">Display On Both</option>
+        </select>
+      </div>
+
+      {/* Colors */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
+          <input
+            type="color"
+            value={config.backgroundColor || '#ffffff'}
+            onChange={(e) => onChange({ ...config, backgroundColor: e.target.value })}
+            className="w-full h-10 border border-gray-300 rounded"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Text Color</label>
+          <input
+            type="color"
+            value={config.textColor || '#000000'}
+            onChange={(e) => onChange({ ...config, textColor: e.target.value })}
+            className="w-full h-10 border border-gray-300 rounded"
+          />
+        </div>
+      </div>
+
+      {/* Menu Selection */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Menu</label>
+        {loadingMenus ? (
+          <div className="text-gray-500 py-2">Loading menus...</div>
+        ) : (
+          <select
+            value={config.menuId || ''}
+            onChange={(e) => onChange({ ...config, menuId: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">-- Select Menu --</option>
+            {menus.map((menu) => (
+              <option key={menu.id} value={menu.id}>
+                {menu.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* CSS Classes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">CSS Classes</label>
+        <input
+          type="text"
+          value={config.cssClasses || ''}
+          onChange={(e) => onChange({ ...config, cssClasses: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="navbar-dark bg-primary"
+        />
+      </div>
+
+      {/* Style */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Style</label>
+        <input
+          type="text"
+          value={config.style || ''}
+          onChange={(e) => onChange({ ...config, style: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="padding: 10px; margin-bottom: 20px;"
+        />
+      </div>
+    </div>
+  );
+}
+
 interface WidgetModalProps {
   widget?: Widget;
   onSelect?: (type: Widget['type']) => void;
@@ -1059,6 +1195,7 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
     { type: 'text', label: 'Text Widget', icon: '📝', color: 'bg-purple-500' },
     { type: 'button', label: 'Button Widget', icon: '🔘', color: 'bg-green-500' },
     { type: 'menu', label: 'Menu Widget', icon: '☰', color: 'bg-orange-500' },
+    { type: 'navigation', label: 'Navigation Bar Widget', icon: '🧭', color: 'bg-slate-600' },
     { type: 'embed', label: 'Embed Widget', icon: '🔗', color: 'bg-pink-500' },
     { type: 'heading', label: 'Heading Widget', icon: '📌', color: 'bg-red-500' },
     { type: 'html', label: 'HTML Widget', icon: '💻', color: 'bg-indigo-500' },
@@ -1441,6 +1578,11 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
                 />
               ) : editedWidget.type === 'epaper-featured' ? (
                 <EpaperFeaturedCategoriesForm
+                  config={editedWidget.config}
+                  onChange={(config) => setEditedWidget({ ...editedWidget, config })}
+                />
+              ) : editedWidget.type === 'navigation' ? (
+                <NavigationForm
                   config={editedWidget.config}
                   onChange={(config) => setEditedWidget({ ...editedWidget, config })}
                 />

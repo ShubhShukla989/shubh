@@ -168,7 +168,7 @@ export default async function HomePage() {
 
   // Default: render website homepage with layout
   return (
-    <div className="homepage">
+    <div className="homepage w-full">
       <LayoutRenderer layoutName={settings.layout} />
     </div>
   );

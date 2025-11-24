@@ -97,9 +97,10 @@ export default function PageViewer({
     const containerRect = containerRef.current.getBoundingClientRect();
     const imgRect = imageRef.current.getBoundingClientRect();
     
-    // Default box size (600x400)
-    const defaultWidth = 600;
-    const defaultHeight = 400;
+    // Responsive box size - smaller on mobile
+    const isMobile = window.innerWidth <= 768;
+    const defaultWidth = isMobile ? Math.min(280, imgRect.width * 0.8) : 600;
+    const defaultHeight = isMobile ? Math.min(350, imgRect.height * 0.5) : 400;
     
     // Calculate center position relative to container
     const centerX = (imgRect.width - defaultWidth) / 2;
@@ -176,23 +177,28 @@ export default function PageViewer({
   };
 
   // Handle moving the clip box
-  const handleClipMoveStart = (e: React.MouseEvent) => {
+  const handleClipMoveStart = (e: React.MouseEvent | React.TouchEvent) => {
     if (!clipStart || !clipEnd) return;
     e.stopPropagation();
     e.preventDefault();
     
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
     clipMoveStateRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: clientX,
+      startY: clientY,
       originalStart: { ...clipStart },
       originalEnd: { ...clipEnd }
     };
     
     setIsMovingClip(true);
     
-    // Add global mouse move and up listeners
+    // Add global mouse/touch move and up listeners
     document.addEventListener('mousemove', handleClipMoveMove);
     document.addEventListener('mouseup', handleClipMoveEnd);
+    document.addEventListener('touchmove', handleClipMoveTouchMove);
+    document.addEventListener('touchend', handleClipMoveEnd);
   };
 
   const handleClipMoveMove = (e: MouseEvent) => {
@@ -201,6 +207,23 @@ export default function PageViewer({
     
     const deltaX = e.clientX - state.startX;
     const deltaY = e.clientY - state.startY;
+    
+    setClipStart({
+      x: state.originalStart.x + deltaX,
+      y: state.originalStart.y + deltaY
+    });
+    setClipEnd({
+      x: state.originalEnd.x + deltaX,
+      y: state.originalEnd.y + deltaY
+    });
+  };
+
+  const handleClipMoveTouchMove = (e: TouchEvent) => {
+    const state = clipMoveStateRef.current;
+    if (!state.originalStart || !state.originalEnd) return;
+    
+    const deltaX = e.touches[0].clientX - state.startX;
+    const deltaY = e.touches[0].clientY - state.startY;
     
     setClipStart({
       x: state.originalStart.x + deltaX,
@@ -225,6 +248,8 @@ export default function PageViewer({
     // Remove global listeners
     document.removeEventListener('mousemove', handleClipMoveMove);
     document.removeEventListener('mouseup', handleClipMoveEnd);
+    document.removeEventListener('touchmove', handleClipMoveTouchMove);
+    document.removeEventListener('touchend', handleClipMoveEnd);
   };
 
   const handleAreaClick = async (e: React.MouseEvent, area: AreaMap) => {
@@ -272,7 +297,7 @@ export default function PageViewer({
     originalEnd: null
   });
 
-  const handleClipResizeStart = (e: React.MouseEvent, handle: string) => {
+  const handleClipResizeStart = (e: React.MouseEvent | React.TouchEvent, handle: string) => {
     if (!clipStart || !clipEnd) {
       console.log('❌ No clip coordinates found');
       return;
@@ -282,10 +307,13 @@ export default function PageViewer({
     
     console.log('🔧 Clip resize handle clicked:', handle);
     
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
     clipResizeStateRef.current = {
       handle,
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: clientX,
+      startY: clientY,
       originalStart: { ...clipStart },
       originalEnd: { ...clipEnd }
     };
@@ -293,9 +321,21 @@ export default function PageViewer({
     setIsResizingClip(true);
     setClipResizeHandle(handle);
     
-    // Add global mouse move and up listeners
+    // Add global mouse/touch move and up listeners
     document.addEventListener('mousemove', handleClipResizeMove);
     document.addEventListener('mouseup', handleClipResizeEnd);
+    document.addEventListener('touchmove', handleClipResizeTouchMove);
+    document.addEventListener('touchend', handleClipResizeEnd);
+  };
+
+  const handleClipResizeTouchMove = (e: TouchEvent) => {
+    const state = clipResizeStateRef.current;
+    if (!state.handle || !state.originalStart || !state.originalEnd) return;
+    
+    const deltaX = e.touches[0].clientX - state.startX;
+    const deltaY = e.touches[0].clientY - state.startY;
+    
+    applyClipResize(deltaX, deltaY, state);
   };
 
   const handleClipResizeMove = (e: MouseEvent) => {
@@ -304,6 +344,12 @@ export default function PageViewer({
     
     const deltaX = e.clientX - state.startX;
     const deltaY = e.clientY - state.startY;
+    
+    applyClipResize(deltaX, deltaY, state);
+  };
+
+  const applyClipResize = (deltaX: number, deltaY: number, state: typeof clipResizeStateRef.current) => {
+    if (!state.handle || !state.originalStart || !state.originalEnd) return;
     
     // Calculate current rect from original coordinates
     const origLeft = Math.min(state.originalStart.x, state.originalEnd.x);
@@ -392,6 +438,8 @@ export default function PageViewer({
     // Remove global listeners
     document.removeEventListener('mousemove', handleClipResizeMove);
     document.removeEventListener('mouseup', handleClipResizeEnd);
+    document.removeEventListener('touchmove', handleClipResizeTouchMove);
+    document.removeEventListener('touchend', handleClipResizeEnd);
   };
 
   const createCombinedClipFromLinkedAreas = async (mainArea: AreaMap) => {
@@ -931,9 +979,11 @@ export default function PageViewer({
                 transition: isMovingClip ? 'none' : 'box-shadow 0.2s ease',
                 cursor: 'move', // Move cursor on entire box
                 pointerEvents: 'auto',
+                touchAction: 'none', // Prevent default touch behaviors
                 zIndex: 20
               }}
               onMouseDown={handleClipMoveStart}
+              onTouchStart={handleClipMoveStart}
             />
             
             {/* Resize Handles - positioned individually to not block drag area */}
@@ -981,14 +1031,15 @@ export default function PageViewer({
         )}
       </div>
 
-      {/* Cancel and Share buttons - OUTSIDE container to avoid mouse event conflicts */}
-      {clipRect && containerRef.current && (
+      {/* Cancel and Share buttons - Fixed at bottom on mobile, positioned near clip on desktop */}
+      {clipRect && (
         <div 
-          className="absolute flex gap-2 pointer-events-auto"
+          className="fixed md:absolute bottom-4 md:bottom-auto left-1/2 md:left-auto transform -translate-x-1/2 md:translate-x-0 flex gap-2 md:gap-2 pointer-events-auto z-[100]"
           style={{
-            left: `${containerRef.current.getBoundingClientRect().left - containerRef.current.parentElement!.getBoundingClientRect().left + clipRect.left * zoom}px`,
-            top: `${containerRef.current.getBoundingClientRect().top - containerRef.current.parentElement!.getBoundingClientRect().top + (clipRect.top + clipRect.height + 10) * zoom}px`,
-            zIndex: 100
+            ...(containerRef.current && window.innerWidth > 768 ? {
+              left: `${containerRef.current.getBoundingClientRect().left - containerRef.current.parentElement!.getBoundingClientRect().left + clipRect.left * zoom}px`,
+              top: `${containerRef.current.getBoundingClientRect().top - containerRef.current.parentElement!.getBoundingClientRect().top + (clipRect.top + clipRect.height + 10) * zoom}px`,
+            } : {})
           }}
         >
           <button
@@ -997,9 +1048,9 @@ export default function PageViewer({
               console.log('❌ Cancel button clicked');
               onClipCancel();
             }}
-            className="px-4 py-2 bg-red-600 text-white rounded shadow-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2"
+            className="px-4 md:px-4 py-3 md:py-2 bg-red-600 text-white rounded-lg md:rounded shadow-lg hover:bg-red-700 active:bg-red-800 transition-colors font-medium flex items-center gap-2 text-sm md:text-base min-w-[120px] justify-center"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5 md:w-4 md:h-4" />
             Cancel
           </button>
           <button
@@ -1008,9 +1059,9 @@ export default function PageViewer({
               console.log('📤 Share button clicked - opening clipped image');
               createClip();
             }}
-            className="px-4 py-2 bg-green-600 text-white rounded shadow-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+            className="px-4 md:px-4 py-3 md:py-2 bg-green-600 text-white rounded-lg md:rounded shadow-lg hover:bg-green-700 active:bg-green-800 transition-colors font-medium flex items-center gap-2 text-sm md:text-base min-w-[120px] justify-center"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
             Share

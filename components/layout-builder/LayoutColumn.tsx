@@ -488,7 +488,15 @@ function getDefaultConfig(type: Widget['type']) {
     case 'html':
       return { html: '' };
     case 'navigation':
-      return { menuId: null };
+      return { 
+        logoUrl: '', 
+        logoStatus: 'display-both',
+        backgroundColor: '#ffffff',
+        textColor: '#000000',
+        menuId: '',
+        cssClasses: 'navbar navbar-expand-lg',
+        style: ''
+      };
     case 'slideshow':
       return { sliderId: null };
     case 'tinymce':

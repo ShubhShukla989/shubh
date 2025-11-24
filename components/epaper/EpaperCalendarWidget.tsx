@@ -103,11 +103,11 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
           key={day}
           onClick={() => hasEdition && handleDateSelect(date)}
           disabled={!hasEdition}
-          className={`p-2 text-center rounded transition-colors ${
+          className={`p-1 md:p-2 text-center rounded transition-colors text-xs md:text-base ${
             hasEdition 
               ? 'bg-blue-100 hover:bg-blue-200 cursor-pointer text-blue-900 font-semibold' 
               : 'text-gray-400 cursor-not-allowed'
-          } ${isToday ? 'ring-2 ring-blue-500' : ''}`}
+          } ${isToday ? 'ring-1 md:ring-2 ring-blue-500' : ''}`}
         >
           {day}
         </button>
@@ -128,16 +128,16 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
   const format = config.format || 'full-calendar';
 
   return (
-    <div className={config.cssClasses || ''} style={parseInlineStyle(config.style)}>
+    <div className={`px-3 md:px-0 ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
       {config.title && (
-        <h2 className="text-xl font-bold mb-4">{config.title}</h2>
+        <h2 className="text-lg md:text-xl font-bold mb-3 md:mb-4 text-center">{config.title}</h2>
       )}
 
       {/* Button formats */}
       {(format === 'full-calendar-with-button' || format === 'button-calendar-with-category') && (
         <button
           onClick={() => setShowCalendar(!showCalendar)}
-          className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          className="mb-3 md:mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm md:text-base w-full md:w-auto"
         >
           {showCalendar ? 'Hide Calendar' : 'Show Calendar'}
         </button>
@@ -152,7 +152,7 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
               router.push(`/epaper/view/${editionId}`);
             }
           }}
-          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
         >
           <option value="">Select Date</option>
           {editions.map((edition) => {
@@ -168,41 +168,41 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
 
       {/* Calendar view */}
       {showCalendar && format !== 'dropdown-calendar' && (
-        <div className="bg-white rounded-lg shadow-md p-4 max-w-md">
+        <div className="bg-white rounded-lg shadow-md p-3 md:p-4 w-full max-w-full md:max-w-md mx-auto">
           {/* Month navigation */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3 md:mb-4">
             <button
               onClick={() => changeMonth(-1)}
-              className="p-2 hover:bg-gray-100 rounded transition-colors"
+              className="p-2 hover:bg-gray-100 rounded transition-colors text-lg md:text-xl"
             >
               ←
             </button>
-            <h3 className="text-lg font-semibold">
+            <h3 className="text-sm md:text-lg font-semibold">
               {selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </h3>
             <button
               onClick={() => changeMonth(1)}
-              className="p-2 hover:bg-gray-100 rounded transition-colors"
+              className="p-2 hover:bg-gray-100 rounded transition-colors text-lg md:text-xl"
             >
               →
             </button>
           </div>
 
           {/* Day headers */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
+          <div className="grid grid-cols-7 gap-0.5 md:gap-1 mb-2">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div key={day} className="text-center text-sm font-semibold text-gray-600 p-2">
+              <div key={day} className="text-center text-xs md:text-sm font-semibold text-gray-600 p-1 md:p-2">
                 {day}
               </div>
             ))}
           </div>
 
           {/* Calendar days */}
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-0.5 md:gap-1">
             {renderCalendar()}
           </div>
 
-          <div className="mt-4 text-xs text-gray-500 text-center">
+          <div className="mt-3 md:mt-4 text-xs text-gray-500 text-center">
             Click on highlighted dates to view editions
           </div>
         </div>

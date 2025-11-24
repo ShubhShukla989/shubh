@@ -37,6 +37,16 @@ export function EpaperArchiveWidget({ config }: EpaperArchiveWidgetProps) {
   const { categoryId } = useCategory();
   const [editions, setEditions] = useState<Edition[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     fetchEditions();
@@ -80,15 +90,15 @@ export function EpaperArchiveWidget({ config }: EpaperArchiveWidgetProps) {
   const format = config.format || 'thumb-image-as-background';
 
   return (
-    <div className={`epaper-archive-widget ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
+    <div className={`epaper-archive-widget px-3 md:px-0 ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
       {config.title && (
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">{config.title}</h2>
+        <h2 className="text-lg md:text-2xl font-bold mb-3 md:mb-6 text-gray-800 text-center">{config.title}</h2>
       )}
       
       <div 
-        className="grid gap-6"
+        className="grid gap-3 md:gap-6"
         style={{
-          gridTemplateColumns: `repeat(${perRow}, 1fr)`,
+          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : `repeat(${perRow}, 1fr)`,
         }}
       >
         {editions.map((edition) => {
@@ -111,11 +121,11 @@ export function EpaperArchiveWidget({ config }: EpaperArchiveWidgetProps) {
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>
-                <div className="p-4 text-center bg-white border-t border-gray-100">
-                  <h3 className="font-semibold text-gray-800 text-base mb-1 group-hover:text-blue-600 transition-colors">
+                <div className="p-2 md:p-4 text-center bg-white border-t border-gray-100">
+                  <h3 className="font-semibold text-gray-800 text-xs md:text-base mb-1 group-hover:text-blue-600 transition-colors leading-tight">
                     {edition.title}
                   </h3>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-xs md:text-sm text-gray-500">
                     {new Date(edition.date).toLocaleDateString('en-IN', { 
                       day: 'numeric',
                       month: 'short',

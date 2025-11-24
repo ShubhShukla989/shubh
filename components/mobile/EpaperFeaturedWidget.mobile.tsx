@@ -7,10 +7,10 @@ import Image from 'next/image';
 interface TreeNode {
   id: number;
   title: string;
-  children: TreeNode[];
+  children?: TreeNode[];
 }
 
-interface EpaperFeaturedWidgetProps {
+interface EpaperFeaturedWidgetMobileProps {
   config: {
     title?: string;
     categoryTree?: TreeNode[];
@@ -29,7 +29,7 @@ interface EpaperFeaturedWidgetProps {
   };
 }
 
-export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
+export function EpaperFeaturedWidgetMobile({ config }: EpaperFeaturedWidgetMobileProps) {
   const [categories, setCategories] = useState<any[]>([]);
   const [latestEditions, setLatestEditions] = useState<{ [key: number]: any }>({});
   const [loading, setLoading] = useState(true);
@@ -37,12 +37,6 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
   // State management for navigation
   const [currentView, setCurrentView] = useState<'groups' | 'cities'>('groups');
   const [selectedGroup, setSelectedGroup] = useState<TreeNode | null>(null);
-
-  // Debug log
-  console.log('EpaperFeaturedWidget config:', config);
-  console.log('Categories:', categories);
-  console.log('Current view:', currentView);
-  console.log('Category tree:', config.categoryTree);
 
   useEffect(() => {
     fetchCategoriesData();
@@ -168,26 +162,18 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     return [selectedGroup, ...(selectedGroup.children || [])];
   };
 
-  const renderCategoryCard = (node: TreeNode, level: number = 0, showChildren: boolean = false, index: number = 0, totalCount: number = 1, perRow: number = 3, isGroupView: boolean = false) => {
+  const renderCategoryCard = (node: TreeNode, isGroupView: boolean = false) => {
     const category = getCategoryData(node.id);
     const thumbnail = getCategoryThumbnail(node.id);
     const edition = latestEditions[node.id];
     
-    const thumbnailWidth = config.thumbnailWidth || 180;
-    const thumbnailHeight = config.thumbnailHeight || 240;
     const cropThumbnails = config.cropThumbnails !== 'no';
     const categoryNamePosition = config.categoryNamePosition || 'bottom';
     const datePosition = config.datePosition || 'none';
-    const shareIconPosition = config.shareIconPosition || 'none';
-    const shareIconSize = config.shareIconSize || 20;
 
     if (!category) return null;
 
-    // Calculate border styles for seamless connection
-    const isRightEdge = (index + 1) % perRow === 0;
-    const isBottomEdge = index >= totalCount - perRow;
-
-    // Always show full category title - no name extraction
+    // Always show full category title
     const displayTitle = category.title;
 
     const handleClick = (e: React.MouseEvent) => {
@@ -201,90 +187,43 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     return (
       <div 
         key={node.id} 
-        className="featured-category-item bg-white border border-gray-300 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-        style={{ 
-          marginLeft: level > 0 ? '20px' : '0',
-          width: `${thumbnailWidth}px`,
-          height: cropThumbnails ? `${thumbnailHeight}px` : 'auto',
-          borderRadius: '6px',
-          overflow: 'hidden',
-        }}
+        className="featured-category-item bg-white border border-gray-300 shadow-sm hover:shadow-md transition-shadow cursor-pointer rounded-lg overflow-hidden"
         onClick={handleClick}
       >
-        <Link href={isGroupView && node.children && node.children.length > 0 ? '#' : getLinkUrl(node.id)} className="block relative group h-full">
+        <Link href={isGroupView && node.children && node.children.length > 0 ? '#' : getLinkUrl(node.id)} className="block relative group">
           {/* Thumbnail */}
-          <div 
-            className="relative overflow-hidden w-full h-full"
-          >
+          <div className="relative overflow-hidden w-full aspect-[3/4]">
             {thumbnail ? (
               <Image
                 src={thumbnail}
                 alt={category.title}
-                width={thumbnailWidth}
-                height={thumbnailHeight}
-                className={cropThumbnails ? 'object-cover w-full h-full' : 'object-contain w-full h-full'}
+                fill
+                className={cropThumbnails ? 'object-cover' : 'object-contain'}
               />
             ) : (
-              <div 
-                className="bg-gray-100 flex items-center justify-center text-gray-400 w-full h-full"
-              >
+              <div className="bg-gray-100 flex items-center justify-center text-gray-400 w-full h-full">
                 <span className="text-4xl">📰</span>
               </div>
             )}
 
             {/* Category Name Overlay */}
             {categoryNamePosition === 'overlay' && (
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                <h3 className="text-white font-bold text-lg">{category.title}</h3>
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                <h3 className="text-white font-bold text-xs">{category.title}</h3>
               </div>
             )}
 
             {/* Date Overlay */}
             {datePosition === 'overlay' && edition && (
-              <div className="absolute top-2 left-2 bg-black/70 text-white px-3 py-1 rounded text-sm">
+              <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
                 {new Date(edition.date).toLocaleDateString()}
               </div>
             )}
-
-            {/* Share Icon */}
-            {shareIconPosition !== 'none' && (
-              <button
-                className={`absolute bg-white/90 hover:bg-white rounded-full p-2 shadow-md transition-all ${
-                  shareIconPosition === 'top-left' ? 'top-2 left-2' :
-                  shareIconPosition === 'top-right' ? 'top-2 right-2' :
-                  shareIconPosition === 'bottom-left' ? 'bottom-2 left-2' :
-                  'bottom-2 right-2'
-                }`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (navigator.share) {
-                    navigator.share({
-                      title: category.title,
-                      url: window.location.origin + getLinkUrl(node.id),
-                    });
-                  }
-                }}
-              >
-                <svg 
-                  width={shareIconSize} 
-                  height={shareIconSize} 
-                  fill="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
-                </svg>
-              </button>
-            )}
           </div>
-
-          {/* Category Name Top */}
-          {categoryNamePosition === 'top' && (
-            <h3 className="font-bold text-lg mb-2 text-gray-800">{category.title}</h3>
-          )}
 
           {/* Category Name Bottom */}
           {categoryNamePosition === 'bottom' && (
-            <div className="absolute bottom-0 left-0 right-0 bg-white p-3 border-t">
+            <div className="p-2 border-t bg-white">
               <h3 className="font-bold text-sm text-gray-800 text-center leading-tight">{displayTitle}</h3>
               {datePosition === 'bottom' && edition && (
                 <p className="text-xs text-gray-500 text-center mt-1">
@@ -296,8 +235,8 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
 
           {/* Category Name Top */}
           {categoryNamePosition === 'top' && (
-            <div className="absolute top-0 left-0 right-0 bg-white p-3 border-b">
-              <h3 className="font-bold text-sm text-gray-800 text-center">{displayTitle}</h3>
+            <div className="p-2 border-b">
+              <h3 className="font-bold text-xs text-gray-800 text-center">{displayTitle}</h3>
               {datePosition === 'top' && edition && (
                 <p className="text-xs text-gray-500 text-center mt-1">
                   {new Date(edition.date).toLocaleDateString()}
@@ -306,47 +245,38 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
             </div>
           )}
         </Link>
-
-        {/* Render Children - Only if showChildren is true */}
-        {showChildren && node.children && node.children.length > 0 && (
-          <div className="mt-4 space-y-4">
-            {node.children.map(child => renderCategoryCard(child, level + 1, true, 0, 1, perRow, false))}
-          </div>
-        )}
       </div>
     );
   };
 
   if (loading) {
     return (
-      <div className={`epaper-featured-widget ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
-        {config.title && <h2 className="text-2xl font-bold mb-6">{config.title}</h2>}
-        <div className="text-center py-8 text-gray-500">Loading categories...</div>
+      <div className={`epaper-featured-widget-mobile m-0 p-0 ${config.cssClasses || ''}`} style={{ margin: 0, padding: 0, ...parseInlineStyle(config.style) }}>
+        {config.title && <h2 className="text-lg font-bold my-2 text-center px-3">{config.title}</h2>}
+        <div className="text-center py-4 text-gray-500">Loading categories...</div>
       </div>
     );
   }
 
   if (!config.categoryTree || config.categoryTree.length === 0) {
     return (
-      <div className={`epaper-featured-widget ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
-        {config.title && <h2 className="text-2xl font-bold mb-6">{config.title}</h2>}
-        <div className="text-center py-8 text-gray-500">No categories configured</div>
+      <div className={`epaper-featured-widget-mobile m-0 p-0 ${config.cssClasses || ''}`} style={{ margin: 0, padding: 0, ...parseInlineStyle(config.style) }}>
+        {config.title && <h2 className="text-lg font-bold my-2 text-center px-3">{config.title}</h2>}
+        <div className="text-center py-4 text-gray-500">No categories configured</div>
       </div>
     );
   }
 
-  const perRowCount = config.perRowCount || 3;
-
   return (
-    <div className={`epaper-featured-widget ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
-      {config.title && <h2 className="text-2xl font-bold mb-6">{config.title}</h2>}
+    <div className={`epaper-featured-widget-mobile m-0 ${config.cssClasses || ''}`} style={{ margin: 0, padding: 0, ...parseInlineStyle(config.style) }}>
+      {config.title && <h2 className="text-lg font-bold mb-2 mt-2 text-center px-3" style={{ color: '#dc2626', margin: '0.5rem 0' }}>{config.title}</h2>}
       
       {/* Back Button - Show only in cities view */}
       {currentView === 'cities' && (
-        <div className="mb-4">
+        <div className="mb-2 px-3">
           <button
             onClick={handleBackClick}
-            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center gap-2"
+            className="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -356,32 +286,19 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
         </div>
       )}
       
-      <div className="flex justify-center">
-        <div 
-          className="border-2 border-gray-400 bg-gray-50 p-4 rounded-lg shadow-lg"
-          style={{
-            display: 'inline-block',
-          }}
-        >
-          <div 
-            className="grid"
-            style={{
-              gridTemplateColumns: `repeat(${perRowCount}, 1fr)`,
-              gap: '12px',
-            }}
-          >
-            {currentView === 'groups' ? (
-              // State 1: Show root categories (groups)
-              getRootCategories().map((node, index) => 
-                renderCategoryCard(node, 0, false, index, getRootCategories().length, perRowCount, true)
-              )
-            ) : (
-              // State 2: Show cities for selected group
-              getCitiesForGroup().map((node, index) => 
-                renderCategoryCard(node, 0, false, index, getCitiesForGroup().length, perRowCount, false)
-              )
-            )}
-          </div>
+      <div className="px-3 pb-2">
+        <div className="grid grid-cols-2 gap-2">
+          {currentView === 'groups' ? (
+            // State 1: Show root categories (groups)
+            getRootCategories().map((node) => 
+              renderCategoryCard(node, true)
+            )
+          ) : (
+            // State 2: Show cities for selected group
+            getCitiesForGroup().map((node) => 
+              renderCategoryCard(node, false)
+            )
+          )}
         </div>
       </div>
     </div>

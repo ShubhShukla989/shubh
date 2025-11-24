@@ -9,7 +9,7 @@ type HandlePosition =
 
 interface ResizeHandleProps {
   position: HandlePosition;
-  onResizeStart: (e: React.MouseEvent, position: HandlePosition) => void;
+  onResizeStart: (e: React.MouseEvent | React.TouchEvent, position: HandlePosition) => void;
 }
 
 const getCursorStyle = (position: HandlePosition): string => {
@@ -29,11 +29,11 @@ const getCursorStyle = (position: HandlePosition): string => {
 const getPositionStyle = (position: HandlePosition): React.CSSProperties => {
   const baseStyle: React.CSSProperties = {
     position: 'absolute',
-    width: '12px',
-    height: '12px',
+    width: '10px',
+    height: '10px',
     backgroundColor: 'white',
-    border: '3px solid #3b82f6',
-    borderRadius: '3px',
+    border: '2px solid #3b82f6',
+    borderRadius: '2px',
     zIndex: 20,
     boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
   };
@@ -63,21 +63,27 @@ export default function ResizeHandle({ position, onResizeStart }: ResizeHandlePr
   const cursor = getCursorStyle(position);
   const positionStyle = getPositionStyle(position);
 
+  const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onResizeStart(e, position);
+  };
+
   return (
     <div
       className="resize-handle hover:bg-blue-500 hover:scale-125 transition-all"
       style={{
         ...positionStyle,
         cursor,
-        // Larger hit area for easier clicking
-        padding: '4px',
-        margin: '-4px',
+        // Balanced hit area - visible handle with extended touch area
+        padding: '6px',
+        margin: '-6px',
+        minWidth: '24px',
+        minHeight: '24px',
+        touchAction: 'none', // Prevent default touch behaviors
       }}
-      onMouseDown={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        onResizeStart(e, position);
-      }}
+      onMouseDown={handleStart}
+      onTouchStart={handleStart}
       title={`Resize from ${position}`}
     />
   );

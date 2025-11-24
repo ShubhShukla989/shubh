@@ -109,57 +109,60 @@ export default function CalendarModal({ onClose }: CalendarModalProps) {
       
       {/* Compact Calendar Dropdown */}
       <div 
-        className="absolute right-0 top-full mt-1 bg-white rounded-md shadow-xl z-50 w-64 border border-gray-200"
+        className="fixed md:absolute right-2 md:right-0 top-16 md:top-full mt-1 bg-white rounded-md shadow-xl z-50 w-[280px] md:w-64 border border-gray-200 max-w-[calc(100vw-1rem)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-red-600 text-white rounded-t-md">
-          <h3 className="text-sm font-bold">Select Date</h3>
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-200 bg-red-600 text-white rounded-t-md">
+          <h3 className="text-sm md:text-sm font-bold">Select Date</h3>
           <button
             onClick={onClose}
-            className="p-0.5 hover:bg-red-700 rounded transition-colors"
+            className="p-1 hover:bg-red-700 rounded transition-colors"
+            aria-label="Close calendar"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Calendar */}
-        <div className="p-3">
+        <div className="p-3 md:p-3">
           {/* Month/Year Navigation */}
           <div className="flex items-center justify-between mb-3">
             <button
               onClick={handlePrevMonth}
-              className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              aria-label="Previous month"
             >
-              <ChevronLeft className="w-4 h-4 text-gray-700" />
+              <ChevronLeft className="w-5 h-5 text-gray-700" />
             </button>
             
-            <h4 className="text-sm font-bold text-gray-900">
+            <h4 className="text-sm md:text-sm font-bold text-gray-900">
               {months[currentMonth]} {currentYear}
             </h4>
             
             <button
               onClick={handleNextMonth}
-              className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              aria-label="Next month"
             >
-              <ChevronRight className="w-4 h-4 text-gray-700" />
+              <ChevronRight className="w-5 h-5 text-gray-700" />
             </button>
           </div>
 
           {/* Day Headers */}
-          <div className="grid grid-cols-7 gap-0.5 mb-1">
+          <div className="grid grid-cols-7 gap-1 mb-2">
             {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
-              <div key={day} className="text-center font-semibold text-gray-600 text-[10px] py-0.5">
+              <div key={day} className="text-center font-semibold text-gray-600 text-[10px] md:text-[10px] py-1">
                 {day}
               </div>
             ))}
           </div>
 
           {/* Calendar Grid */}
-          <div className="grid grid-cols-7 gap-0.5">
+          <div className="grid grid-cols-7 gap-1">
             {/* Empty cells for days before month starts */}
             {emptyDays.map((_, index) => (
-              <div key={`empty-${index}`} className="w-8 h-8" />
+              <div key={`empty-${index}`} className="w-8 h-8 md:w-8 md:h-8" />
             ))}
             
             {/* Days of month */}
@@ -176,12 +179,12 @@ export default function CalendarModal({ onClose }: CalendarModalProps) {
                   onClick={() => handleDateClick(day)}
                   disabled={!hasEd}
                   className={`
-                    w-8 h-8 flex items-center justify-center rounded text-[11px] font-medium transition-all
+                    w-8 h-8 md:w-8 md:h-8 flex items-center justify-center rounded text-xs md:text-[11px] font-medium transition-all
                     ${hasEd 
-                      ? 'bg-red-600 text-white hover:bg-red-700 cursor-pointer' 
+                      ? 'bg-red-600 text-white hover:bg-red-700 cursor-pointer active:bg-red-800' 
                       : 'bg-gray-50 text-gray-400 cursor-not-allowed'
                     }
-                    ${isToday && hasEd ? 'ring-1 ring-red-800' : ''}
+                    ${isToday && hasEd ? 'ring-2 ring-red-800' : ''}
                     ${isToday && !hasEd ? 'ring-1 ring-gray-300' : ''}
                   `}
                   title={hasEd ? `View edition for ${months[currentMonth]} ${day}, ${currentYear}` : 'No edition available'}
@@ -193,13 +196,13 @@ export default function CalendarModal({ onClose }: CalendarModalProps) {
           </div>
 
           {/* Legend */}
-          <div className="mt-2.5 flex items-center justify-center gap-3 text-[10px] border-t border-gray-200 pt-2">
-            <div className="flex items-center gap-1">
-              <div className="w-2.5 h-2.5 bg-red-600 rounded"></div>
+          <div className="mt-3 flex items-center justify-center gap-3 text-[10px] border-t border-gray-200 pt-2.5">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 bg-red-600 rounded"></div>
               <span className="text-gray-600">Available</span>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2.5 h-2.5 bg-gray-50 border border-gray-200 rounded"></div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 bg-gray-50 border border-gray-200 rounded"></div>
               <span className="text-gray-600">Not Available</span>
             </div>
           </div>
