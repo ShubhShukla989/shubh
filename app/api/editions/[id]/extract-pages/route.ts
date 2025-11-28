@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PDFDocument } from 'pdf-lib';
-import gm from 'gm';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { writeFile, readFile, unlink } from 'fs/promises';
 import { createClient } from '@supabase/supabase-js';
 
 /**
  * POST /api/editions/:id/extract-pages
  * 
- * Extracts pages from PDF using GraphicsMagick/ImageMagick
+ * Extracts pages from PDF using Railway PDF Extraction Service
  * 
- * REQUIREMENTS:
- * - ImageMagick must be installed on the system
- * - macOS: brew install imagemagick
- * - Linux: apt-get install imagemagick
+ * This uses a separate microservice deployed on Railway that has ImageMagick installed.
+ * The service converts PDF pages to high-quality PNG images.
  */
 
 // Initialize Supabase admin client
@@ -128,43 +122,54 @@ export async function POST(
 
     const extractedPages = [];
 
-    // Save PDF to temp file
-    const tempPdfPath = join(tmpdir(), `temp-pdf-${id}-${Date.now()}.pdf`);
-    const pdfBuffer = await pdfDoc.save();
-    await writeFile(tempPdfPath, Buffer.from(pdfBuffer));
-    console.log('Temp PDF saved to:', tempPdfPath);
+    // Get PDF buffer for sending to extraction service
+    const pdfBufferData = await pdfDoc.save();
+    console.log('PDF buffer prepared, size:', pdfBufferData.byteLength);
 
-    // Use ImageMagick (gm uses ImageMagick by default on macOS with homebrew)
-    const imageMagick = gm.subClass({ imageMagick: true });
+    // Call Railway PDF Extraction Service
+    const PDF_SERVICE_URL = process.env.PDF_EXTRACTION_SERVICE_URL || 'http://localhost:3333';
+    console.log('Calling PDF extraction service:', PDF_SERVICE_URL);
 
-    // Extract each page as PNG image
-    for (let pageNum = startPage; pageNum <= Math.min(startPage + maxPages - 1, totalPages); pageNum++) {
-      const tempImagePath = join(tmpdir(), `temp-page-${id}-${pageNum}-${Date.now()}.png`);
-      
+    // Create FormData for PDF upload
+    const formData = new FormData();
+    const pdfBlob = new Blob([pdfBufferData], { type: 'application/pdf' });
+    formData.append('pdf', pdfBlob, `edition-${id}.pdf`);
+    formData.append('startPage', startPage.toString());
+    formData.append('endPage', Math.min(startPage + maxPages - 1, totalPages).toString());
+    formData.append('extractAll', extractAll.toString());
+    formData.append('resolution', resolution.toString());
+
+    // Call extraction service
+    const extractResponse = await fetch(`${PDF_SERVICE_URL}/extract-pdf`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!extractResponse.ok) {
+      const errorText = await extractResponse.text();
+      console.error('PDF extraction service error:', errorText);
+      return NextResponse.json(
+        { success: false, error: 'PDF extraction service failed: ' + errorText },
+        { status: 500 }
+      );
+    }
+
+    const extractResult = await extractResponse.json();
+    console.log(`Extraction service returned ${extractResult.pages?.length || 0} pages`);
+
+    // Process each extracted page
+    for (const page of extractResult.pages || []) {
       try {
-        console.log(`Processing page ${pageNum}...`);
-        
-        // Convert PDF page to PNG using GraphicsMagick/ImageMagick
-        // Format: input.pdf[page-1] means extract specific page (0-indexed)
-        await new Promise<void>((resolve, reject) => {
-          imageMagick(`${tempPdfPath}[${pageNum - 1}]`)
-            .density(resolution, resolution)
-            .quality(90)
-            .write(tempImagePath, (err: Error | null) => {
-              if (err) reject(err);
-              else resolve();
-            });
-        });
-        
-        // Read the generated image
-        const imageBuffer = await readFile(tempImagePath);
-        console.log(`Page ${pageNum} converted to PNG, size: ${imageBuffer.byteLength} bytes`);
-        
-        // Clean up temp image file
-        await unlink(tempImagePath).catch(() => {});
-        
+        const { pageNumber, imageData } = page;
+        console.log(`Processing extracted page ${pageNumber}...`);
+
+        // Convert base64 to buffer
+        const base64Data = imageData.replace(/^data:image\/png;base64,/, '');
+        const imageBuffer = Buffer.from(base64Data, 'base64');
+        console.log(`Page ${pageNumber} image size: ${imageBuffer.byteLength} bytes`);
+
         // Upload PNG image to storage
-        const fileName = `edition-${id}-page-${pageNum}.png`;
+        const fileName = `edition-${id}-page-${pageNumber}.png`;
         const { error: uploadError } = await supabaseAdmin.storage
           .from('page-assets')
           .upload(fileName, imageBuffer, {
@@ -173,7 +178,7 @@ export async function POST(
           });
 
         if (uploadError) {
-          console.error(`Failed to upload page ${pageNum}:`, uploadError);
+          console.error(`Failed to upload page ${pageNumber}:`, uploadError);
           continue;
         }
 
@@ -185,39 +190,31 @@ export async function POST(
         const imageUrl = urlData.publicUrl;
 
         // Create page record with image URL
-        console.log(`Inserting page ${pageNum} into database...`);
+        console.log(`Inserting page ${pageNumber} into database...`);
         const { data: pageData, error: pageError } = await supabaseAdmin
           .from('edition_pages')
           .insert({
             edition_id: parseInt(id),
-            page_number: pageNum,
+            page_number: pageNumber,
             image_url: imageUrl,
           })
           .select()
           .single();
 
         if (pageError) {
-          console.error(`Failed to insert page ${pageNum} into database:`, pageError);
+          console.error(`Failed to insert page ${pageNumber} into database:`, pageError);
           continue;
         }
 
         if (pageData) {
-          console.log(`Page ${pageNum} inserted successfully, ID: ${pageData.id}`);
+          console.log(`Page ${pageNumber} inserted successfully, ID: ${pageData.id}`);
           extractedPages.push(pageData);
         }
-        
-        console.log(`Page ${pageNum} processed successfully`);
-      } catch (pageError) {
-        console.error(`Error processing page ${pageNum}:`, pageError);
-      }
-    }
 
-    // Clean up temp file
-    try {
-      await unlink(tempPdfPath);
-      console.log('Temp PDF file deleted');
-    } catch (cleanupError) {
-      console.error('Failed to delete temp PDF:', cleanupError);
+        console.log(`Page ${pageNumber} processed successfully`);
+      } catch (pageError) {
+        console.error(`Error processing page:`, pageError);
+      }
     }
 
     return NextResponse.json({
