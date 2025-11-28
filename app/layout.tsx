@@ -5,6 +5,7 @@ import './globals.css';
 import '../styles/mobile.css';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
 import { ClientLayout } from '@/components/ClientLayout';
+import { Analytics } from '@vercel/analytics/next';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -31,6 +32,7 @@ export default function RootLayout({
         <ClientLayout>
           {children}
         </ClientLayout>
+        <Analytics />
       </body>
     </html>
   );
