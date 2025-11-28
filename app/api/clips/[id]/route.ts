@@ -8,6 +8,13 @@ export async function GET(
   try {
     const clipId = params.id;
 
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+
     // Fetch clip data from database
     const { data: clip, error } = await supabaseAdmin
       .from('epaper_clips')
