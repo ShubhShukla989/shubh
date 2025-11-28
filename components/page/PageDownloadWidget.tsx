@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 
-interface EpaperPdfDownloadWidgetProps {
+interface PageDownloadWidgetProps {
   config: {
     title?: string;
     buttonText?: string;
@@ -19,7 +19,7 @@ interface Edition {
   title: string;
 }
 
-export function EpaperPdfDownloadWidget({ config }: EpaperPdfDownloadWidgetProps) {
+export function PageDownloadWidget({ config }: PageDownloadWidgetProps) {
   const [edition, setEdition] = useState<Edition | null>(null);
   const [loading, setLoading] = useState(true);
   const params = useParams();
@@ -57,7 +57,7 @@ export function EpaperPdfDownloadWidget({ config }: EpaperPdfDownloadWidgetProps
   }
 
   if (!edition?.pdf_url) {
-    return null; // Don't show button if no PDF available
+    return null;
   }
 
   return (

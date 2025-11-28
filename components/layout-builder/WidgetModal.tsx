@@ -130,6 +130,85 @@ function EpaperDisplayForm({ config, onChange }: { config: any; onChange: (confi
         />
       </div>
 
+      {/* Popup */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Popup</label>
+        <select
+          value={config.popup || 'dialog'}
+          onChange={(e) => onChange({ ...config, popup: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="popup">Popup</option>
+          <option value="dialog">Dialog</option>
+          <option value="new-tab">New Tab</option>
+        </select>
+      </div>
+
+      {/* Popup/Dialog Width */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Popup/Dialog Width</label>
+        <input
+          type="text"
+          value={config.popupWidth || '900'}
+          onChange={(e) => onChange({ ...config, popupWidth: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="900"
+        />
+      </div>
+
+      {/* Popup/Dialog Height */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Popup/Dialog Height</label>
+        <input
+          type="text"
+          value={config.popupHeight || '600'}
+          onChange={(e) => onChange({ ...config, popupHeight: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="600"
+        />
+      </div>
+
+      {/* Display Navigation Buttons On */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Display Navigation Buttons On</label>
+        <select
+          value={config.displayNavigationButtons || 'both'}
+          onChange={(e) => onChange({ ...config, displayNavigationButtons: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="none">None</option>
+          <option value="mobile">Mobile</option>
+          <option value="desktop">Desktop</option>
+          <option value="both">Both Mobile and Desktop</option>
+        </select>
+      </div>
+
+      {/* Enable Swipe on Navigation */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Enable Swipe on Navigation</label>
+        <select
+          value={config.enableSwipeNavigation || 'enabled'}
+          onChange={(e) => onChange({ ...config, enableSwipeNavigation: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="enabled">Enabled</option>
+          <option value="disabled">Disabled</option>
+        </select>
+      </div>
+
+      {/* Enable Swipe to Navigate on Mobile */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Enable Swipe to Navigate on Mobile</label>
+        <select
+          value={config.enableSwipeOnMobile || 'enabled'}
+          onChange={(e) => onChange({ ...config, enableSwipeOnMobile: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="enabled">Enabled</option>
+          <option value="disabled">Disabled</option>
+        </select>
+      </div>
+
       {/* CSS Classes */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">CSS Classes</label>
@@ -138,7 +217,7 @@ function EpaperDisplayForm({ config, onChange }: { config: any; onChange: (confi
           value={config.cssClasses || ''}
           onChange={(e) => onChange({ ...config, cssClasses: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded"
-          placeholder="w-full"
+          placeholder="p-2 shadow"
         />
       </div>
 
@@ -152,11 +231,6 @@ function EpaperDisplayForm({ config, onChange }: { config: any; onChange: (confi
           className="w-full px-3 py-2 border border-gray-300 rounded"
           placeholder="max-width: 1200px;"
         />
-      </div>
-
-      <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded">
-        <p className="font-medium mb-1">Note:</p>
-        <p>This widget displays the current epaper page with zoom controls and area map interactions.</p>
       </div>
     </div>
   );
@@ -311,6 +385,283 @@ function EpaperPdfDownloadForm({ config, onChange }: { config: any; onChange: (c
   );
 }
 
+// Epaper Clip Display Form Component
+function EpaperClipDisplayForm({ config, onChange }: { config: any; onChange: (config: any) => void }) {
+  return (
+    <div className="space-y-4">
+      {/* Title */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+        <input
+          type="text"
+          value={config.title || ''}
+          onChange={(e) => onChange({ ...config, title: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Clip Display"
+        />
+      </div>
+
+      {/* Show Image */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Show Image</label>
+        <select
+          value={config.showImage !== false ? 'true' : 'false'}
+          onChange={(e) => onChange({ ...config, showImage: e.target.value === 'true' })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+
+      {/* Show URL */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Show URL</label>
+        <select
+          value={config.showUrl !== false ? 'true' : 'false'}
+          onChange={(e) => onChange({ ...config, showUrl: e.target.value === 'true' })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+
+      {/* CSS Classes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">CSS Classes</label>
+        <input
+          type="text"
+          value={config.cssClasses || ''}
+          onChange={(e) => onChange({ ...config, cssClasses: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="text-center"
+        />
+      </div>
+
+      {/* Style */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Style</label>
+        <input
+          type="text"
+          value={config.style || ''}
+          onChange={(e) => onChange({ ...config, style: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="padding: 20px;"
+        />
+      </div>
+    </div>
+  );
+}
+
+// Social Widget Form Component
+function SocialForm({ config, onChange }: { config: any; onChange: (config: any) => void }) {
+  return (
+    <div className="space-y-4">
+      {/* Title */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+        <input
+          type="text"
+          value={config.title || ''}
+          onChange={(e) => onChange({ ...config, title: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Share"
+        />
+      </div>
+
+      {/* Format */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Format</label>
+        <select
+          value={config.format || 'format-1'}
+          onChange={(e) => onChange({ ...config, format: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="format-1">Format 1 (Solid)</option>
+          <option value="format-2">Format 2 (Circular)</option>
+          <option value="format-3">Format 3 (Text + Icon)</option>
+        </select>
+      </div>
+
+      {/* Size */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Size</label>
+        <input
+          type="number"
+          value={config.size || 20}
+          onChange={(e) => onChange({ ...config, size: parseInt(e.target.value) })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="20"
+          min="10"
+          max="50"
+        />
+      </div>
+
+      {/* CSS Classes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">CSS Classes</label>
+        <input
+          type="text"
+          value={config.cssClasses || ''}
+          onChange={(e) => onChange({ ...config, cssClasses: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="text-center"
+        />
+      </div>
+
+      {/* Style */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Style</label>
+        <input
+          type="text"
+          value={config.style || ''}
+          onChange={(e) => onChange({ ...config, style: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="padding: 20px;"
+        />
+      </div>
+    </div>
+  );
+}
+
+// Epaper Zoom Widget Form Component
+function EpaperZoomForm({ config, onChange }: { config: any; onChange: (config: any) => void }) {
+  return (
+    <div className="space-y-4">
+      {/* Title */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+        <input
+          type="text"
+          value={config.title || ''}
+          onChange={(e) => onChange({ ...config, title: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Zoom Controls"
+        />
+      </div>
+
+      {/* Show Labels */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Show Labels</label>
+        <select
+          value={config.showLabels !== false ? 'true' : 'false'}
+          onChange={(e) => onChange({ ...config, showLabels: e.target.value === 'true' })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+
+      {/* Orientation */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Orientation</label>
+        <select
+          value={config.orientation || 'horizontal'}
+          onChange={(e) => onChange({ ...config, orientation: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="horizontal">Horizontal</option>
+          <option value="vertical">Vertical</option>
+        </select>
+      </div>
+
+      {/* CSS Classes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">CSS Classes</label>
+        <input
+          type="text"
+          value={config.cssClasses || ''}
+          onChange={(e) => onChange({ ...config, cssClasses: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="text-center"
+        />
+      </div>
+
+      {/* Style */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Style</label>
+        <input
+          type="text"
+          value={config.style || ''}
+          onChange={(e) => onChange({ ...config, style: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="padding: 20px;"
+        />
+      </div>
+    </div>
+  );
+}
+
+// Page Download Form Component
+function PageDownloadForm({ config, onChange }: { config: any; onChange: (config: any) => void }) {
+  return (
+    <div className="space-y-4">
+      {/* Title */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+        <input
+          type="text"
+          value={config.title || ''}
+          onChange={(e) => onChange({ ...config, title: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Download PDF"
+        />
+      </div>
+
+      {/* Button Text */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Button Text</label>
+        <input
+          type="text"
+          value={config.buttonText || 'PDF'}
+          onChange={(e) => onChange({ ...config, buttonText: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="PDF"
+        />
+      </div>
+
+      {/* Target */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Target</label>
+        <select
+          value={config.target || 'same-window'}
+          onChange={(e) => onChange({ ...config, target: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="same-window">Same Window</option>
+          <option value="new-window">New Window</option>
+        </select>
+      </div>
+
+      {/* CSS Classes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">CSS Classes</label>
+        <input
+          type="text"
+          value={config.cssClasses || ''}
+          onChange={(e) => onChange({ ...config, cssClasses: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="text-center"
+        />
+      </div>
+
+      {/* Style */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Style</label>
+        <input
+          type="text"
+          value={config.style || ''}
+          onChange={(e) => onChange({ ...config, style: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="padding: 20px;"
+        />
+      </div>
+    </div>
+  );
+}
+
 // Epaper Pagination Control Form Component
 function EpaperPaginationForm({ config, onChange }: { config: any; onChange: (config: any) => void }) {
   return (
@@ -398,6 +749,18 @@ function EpaperCalendarForm({ config, onChange }: { config: any; onChange: (conf
           <option value="button-calendar-with-category">Button Calendar With Category</option>
           <option value="dropdown-calendar">Dropdown Calendar</option>
         </select>
+      </div>
+
+      {/* Button Label */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Button Label</label>
+        <input
+          type="text"
+          value={config.buttonLabel || ''}
+          onChange={(e) => onChange({ ...config, buttonLabel: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="<--Epaper-all--><i> Archive"
+        />
       </div>
 
       {/* Consider Current Epaper Category on Redirection */}
@@ -1152,6 +1515,54 @@ function NavigationForm({ config, onChange }: { config: any; onChange: (config: 
   );
 }
 
+// Epaper Area Map Display Form Component
+function EpaperAreaMapForm({ config, onChange }: { config: any; onChange: (config: any) => void }) {
+  return (
+    <div className="space-y-4">
+      {/* Title */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+        <input
+          type="text"
+          value={config.title || ''}
+          onChange={(e) => onChange({ ...config, title: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Area Map Display"
+        />
+      </div>
+
+      {/* CSS Classes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">CSS Classes</label>
+        <input
+          type="text"
+          value={config.cssClasses || ''}
+          onChange={(e) => onChange({ ...config, cssClasses: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="text-center"
+        />
+      </div>
+
+      {/* Style */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Style</label>
+        <input
+          type="text"
+          value={config.style || ''}
+          onChange={(e) => onChange({ ...config, style: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="padding: 20px;"
+        />
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+        <strong>Note:</strong> This widget displays area-mapped images with clickable regions. 
+        Area map configuration is managed per page in the page settings.
+      </div>
+    </div>
+  );
+}
+
 interface WidgetModalProps {
   widget?: Widget;
   onSelect?: (type: Widget['type']) => void;
@@ -1205,8 +1616,13 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
     { type: 'epaper-pdf-download', label: 'PDF Download Widget', icon: '📥', color: 'bg-red-800' },
     { type: 'epaper-thumb-navigation', label: 'Thumb Navigation Widget', icon: '🖼️', color: 'bg-yellow-700' },
     { type: 'epaper-clip-share', label: 'Clip & Share Widget', icon: '✂️', color: 'bg-pink-700' },
+    { type: 'epaper-clip-display', label: 'Epaper: Clip Page: Clip Display', icon: '📋', color: 'bg-purple-600' },
     { type: 'epaper-display', label: 'Epaper Display Widget', icon: '📰', color: 'bg-slate-800' },
+    { type: 'epaper-zoom', label: 'Zoom Controls Widget', icon: '🔍', color: 'bg-indigo-700' },
+    { type: 'social-sharing', label: 'Social Sharing Widget', icon: '🔗', color: 'bg-blue-600' },
     { type: 'epaper-featured', label: 'Featured Categories Widget', icon: '⭐', color: 'bg-cyan-700' },
+    { type: 'page-download', label: 'Page: Download Widget', icon: '📥', color: 'bg-red-600' },
+    { type: 'epaper-area-map', label: 'Area Map Display Widget', icon: '🗺️', color: 'bg-amber-700' },
   ];
 
   const handleSave = () => {
@@ -1541,8 +1957,18 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
                     />
                   </div>
                 </div>
+              ) : editedWidget.type === 'social' ? (
+                <SocialForm
+                  config={editedWidget.config}
+                  onChange={(config) => setEditedWidget({ ...editedWidget, config })}
+                />
               ) : editedWidget.type === 'epaper-clip-share' ? (
                 <EpaperClipShareForm
+                  config={editedWidget.config}
+                  onChange={(config) => setEditedWidget({ ...editedWidget, config })}
+                />
+              ) : editedWidget.type === 'epaper-clip-display' ? (
+                <EpaperClipDisplayForm
                   config={editedWidget.config}
                   onChange={(config) => setEditedWidget({ ...editedWidget, config })}
                 />
@@ -1558,6 +1984,26 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
                 />
               ) : editedWidget.type === 'epaper-pdf-download' ? (
                 <EpaperPdfDownloadForm
+                  config={editedWidget.config}
+                  onChange={(config) => setEditedWidget({ ...editedWidget, config })}
+                />
+              ) : editedWidget.type === 'epaper-zoom' ? (
+                <EpaperZoomForm
+                  config={editedWidget.config}
+                  onChange={(config) => setEditedWidget({ ...editedWidget, config })}
+                />
+              ) : editedWidget.type === 'social-sharing' ? (
+                <SocialForm
+                  config={editedWidget.config}
+                  onChange={(config) => setEditedWidget({ ...editedWidget, config })}
+                />
+              ) : editedWidget.type === 'page-download' ? (
+                <PageDownloadForm
+                  config={editedWidget.config}
+                  onChange={(config) => setEditedWidget({ ...editedWidget, config })}
+                />
+              ) : editedWidget.type === 'epaper-area-map' ? (
+                <EpaperAreaMapForm
                   config={editedWidget.config}
                   onChange={(config) => setEditedWidget({ ...editedWidget, config })}
                 />

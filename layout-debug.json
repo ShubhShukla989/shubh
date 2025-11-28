@@ -1,0 +1,167 @@
+﻿{
+    "rows":  [
+                 {
+                     "id":  "row-1764243166723",
+                     "columns":  [
+                                     {
+                                         "id":  "col-1764243168140",
+                                         "rows":  [
+
+                                                  ],
+                                         "width":  3,
+                                         "widgets":  [
+                                                         {
+                                                             "id":  "widget-1764243172965",
+                                                             "type":  "epaper-pagination",
+                                                             "config":  {
+                                                                            "pagerFormat":  "dropdown-list-page-numbers"
+                                                                        }
+                                                         }
+                                                     ],
+                                         "properties":  {
+                                                            "cssClass":  "",
+                                                            "largeWidth":  "12",
+                                                            "smallWidth":  "12",
+                                                            "customStyle":  "",
+                                                            "mediumWidth":  "12",
+                                                            "extraLargeWidth":  "12",
+                                                            "extraSmallWidth":  "12"
+                                                        }
+                                     },
+                                     {
+                                         "id":  "col-1764243174725",
+                                         "rows":  [
+
+                                                  ],
+                                         "width":  3,
+                                         "widgets":  [
+                                                         {
+                                                             "id":  "widget-1764243181210",
+                                                             "type":  "epaper-pagination",
+                                                             "config":  {
+
+                                                                        }
+                                                         }
+                                                     ],
+                                         "properties":  {
+                                                            "cssClass":  "",
+                                                            "largeWidth":  "6",
+                                                            "smallWidth":  "12",
+                                                            "customStyle":  "",
+                                                            "mediumWidth":  "6",
+                                                            "extraLargeWidth":  "6",
+                                                            "extraSmallWidth":  "12"
+                                                        }
+                                     },
+                                     {
+                                         "id":  "col-1764243182912",
+                                         "rows":  [
+
+                                                  ],
+                                         "width":  3,
+                                         "widgets":  [
+                                                         {
+                                                             "id":  "widget-1764243199852",
+                                                             "type":  "epaper-pdf-download",
+                                                             "config":  {
+
+                                                                        }
+                                                         }
+                                                     ],
+                                         "properties":  {
+                                                            "cssClass":  "",
+                                                            "largeWidth":  "6",
+                                                            "smallWidth":  "12",
+                                                            "customStyle":  "",
+                                                            "mediumWidth":  "6",
+                                                            "extraLargeWidth":  "6",
+                                                            "extraSmallWidth":  "12"
+                                                        }
+                                     },
+                                     {
+                                         "id":  "col-1764243230283",
+                                         "rows":  [
+
+                                                  ],
+                                         "width":  3,
+                                         "widgets":  [
+                                                         {
+                                                             "id":  "widget-1764243236410",
+                                                             "type":  "epaper-calendar",
+                                                             "config":  {
+                                                                            "format":  "full-calendar-with-button",
+                                                                            "buttonLabel":  "\u003ci class=\"fas fa-calendar-alt\"\u003e\u003c/i\u003e Archive"
+                                                                        }
+                                                         },
+                                                         {
+                                                             "id":  "widget-1764243996763",
+                                                             "type":  "epaper-clip-share",
+                                                             "config":  {
+
+                                                                        }
+                                                         }
+                                                     ],
+                                         "properties":  {
+                                                            "cssClass":  "",
+                                                            "largeWidth":  "6",
+                                                            "smallWidth":  "12",
+                                                            "customStyle":  "",
+                                                            "mediumWidth":  "6",
+                                                            "extraLargeWidth":  "6",
+                                                            "extraSmallWidth":  "12"
+                                                        }
+                                     },
+                                     {
+                                         "id":  "col-1764243255522",
+                                         "rows":  [
+
+                                                  ],
+                                         "width":  5,
+                                         "widgets":  [
+                                                         {
+                                                             "id":  "widget-1764243260560",
+                                                             "type":  "epaper-thumb-navigation",
+                                                             "config":  {
+
+                                                                        }
+                                                         }
+                                                     ],
+                                         "properties":  {
+                                                            "cssClass":  "",
+                                                            "largeWidth":  "6",
+                                                            "smallWidth":  "12",
+                                                            "customStyle":  "",
+                                                            "mediumWidth":  "6",
+                                                            "extraLargeWidth":  "6",
+                                                            "extraSmallWidth":  "12"
+                                                        }
+                                     },
+                                     {
+                                         "id":  "col-1764243262922",
+                                         "rows":  [
+
+                                                  ],
+                                         "width":  7,
+                                         "widgets":  [
+                                                         {
+                                                             "id":  "widget-1764245249581",
+                                                             "type":  "epaper-display",
+                                                             "config":  {
+
+                                                                        }
+                                                         }
+                                                     ],
+                                         "properties":  {
+                                                            "cssClass":  "",
+                                                            "largeWidth":  "6",
+                                                            "smallWidth":  "12",
+                                                            "customStyle":  "",
+                                                            "mediumWidth":  "6",
+                                                            "extraLargeWidth":  "6",
+                                                            "extraSmallWidth":  "12"
+                                                        }
+                                     }
+                                 ]
+                 }
+             ]
+}

@@ -35,6 +35,16 @@ export default function EditionPagesPage() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfZoom, setPdfZoom] = useState(100);
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null);
+  
+  // Edit page modal state
+  const [showEditPageModal, setShowEditPageModal] = useState(false);
+  const [editingPage, setEditingPage] = useState<Page | null>(null);
+  const [pageFormData, setPageFormData] = useState({
+    title: '',
+    alias: '',
+    description: '',
+    category: '',
+  });
 
   useEffect(() => {
     if (editionId) {
@@ -341,7 +351,16 @@ export default function EditionPagesPage() {
                           Create Area Maps
                         </Link>
                         <button
-                          onClick={() => alert('Edit page functionality coming soon')}
+                          onClick={() => {
+                            setEditingPage(page);
+                            setPageFormData({
+                              title: `Page ${page.page_number}`,
+                              alias: `page-${page.page_number}`,
+                              description: '',
+                              category: page.category || '',
+                            });
+                            setShowEditPageModal(true);
+                          }}
                           className="p-1.5 bg-green-500 text-white rounded hover:bg-green-600"
                           title="Edit Page"
                         >
@@ -784,6 +803,164 @@ export default function EditionPagesPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Page Modal */}
+      {showEditPageModal && editingPage && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-900">Edit</h2>
+              <button
+                onClick={() => {
+                  setShowEditPageModal(false);
+                  setEditingPage(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Page Title */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Page Title
+                </label>
+                <input
+                  type="text"
+                  value={pageFormData.title}
+                  onChange={(e) => setPageFormData({ ...pageFormData, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Page 1"
+                />
+              </div>
+
+              {/* Alias */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Alias
+                </label>
+                <input
+                  type="text"
+                  value={pageFormData.alias}
+                  onChange={(e) => setPageFormData({ ...pageFormData, alias: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="page-1"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={pageFormData.description}
+                  onChange={(e) => setPageFormData({ ...pageFormData, description: e.target.value })}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter page description..."
+                />
+              </div>
+
+              {/* Page Category */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Page Category
+                </label>
+                <select
+                  value={pageFormData.category}
+                  onChange={(e) => setPageFormData({ ...pageFormData, category: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">--None--</option>
+                  <option value="front-page">Front Page</option>
+                  <option value="sports">Sports</option>
+                  <option value="business">Business</option>
+                  <option value="entertainment">Entertainment</option>
+                  <option value="local">Local News</option>
+                </select>
+              </div>
+
+              {/* Page Preview */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Page Preview
+                </label>
+                <div className="border border-gray-200 rounded p-4 bg-gray-50">
+                  {editingPage.image_url ? (
+                    <img
+                      src={editingPage.image_url}
+                      alt={`Page ${editingPage.page_number}`}
+                      className="w-32 h-40 object-cover border border-gray-300 rounded mx-auto"
+                      onError={(e) => {
+                        e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="128" height="160"><rect width="128" height="160" fill="%23f3f4f6"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="12">No Image</text></svg>';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-32 h-40 bg-gray-200 flex items-center justify-center mx-auto rounded">
+                      <span className="text-gray-400 text-sm">No Preview</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowEditPageModal(false);
+                  setEditingPage(null);
+                }}
+                className="px-6 py-2 bg-gray-400 text-white rounded hover:bg-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!editingPage) return;
+                  
+                  try {
+                    const response = await fetch(`/api/editions/${editionId}/pages/${editingPage.id}`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        title: pageFormData.title,
+                        alias: pageFormData.alias,
+                        description: pageFormData.description,
+                        category: pageFormData.category,
+                      }),
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                      alert('Page updated successfully!');
+                      setShowEditPageModal(false);
+                      setEditingPage(null);
+                      fetchPages();
+                    } else {
+                      alert('Error: ' + result.error);
+                    }
+                  } catch (error) {
+                    console.error('Update error:', error);
+                    alert('Failed to update page');
+                  }
+                }}
+                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Save
+              </button>
             </div>
           </div>
         </div>

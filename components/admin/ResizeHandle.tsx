@@ -29,13 +29,13 @@ const getCursorStyle = (position: HandlePosition): string => {
 const getPositionStyle = (position: HandlePosition): React.CSSProperties => {
   const baseStyle: React.CSSProperties = {
     position: 'absolute',
-    width: '10px',
-    height: '10px',
+    width: '12px',
+    height: '12px',
     backgroundColor: 'white',
-    border: '2px solid #3b82f6',
-    borderRadius: '2px',
+    border: '2px solid #ef4444',
+    borderRadius: '1px',
     zIndex: 20,
-    boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
   };
 
   // Position the handle
@@ -71,7 +71,7 @@ export default function ResizeHandle({ position, onResizeStart }: ResizeHandlePr
 
   return (
     <div
-      className="resize-handle hover:bg-blue-500 hover:scale-125 transition-all"
+      className="resize-handle hover:bg-red-500 hover:scale-110 transition-all"
       style={{
         ...positionStyle,
         cursor,

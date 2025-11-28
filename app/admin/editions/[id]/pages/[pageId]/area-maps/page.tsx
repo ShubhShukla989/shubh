@@ -158,6 +158,7 @@ export default function AreaMapsPage() {
     if (img.naturalWidth > 0) {
       const newScale = img.clientWidth / img.naturalWidth;
       setImageScale(newScale);
+      console.log('📐 Image loaded - Natural size:', img.naturalWidth, 'x', img.naturalHeight, 'Display size:', img.clientWidth, 'x', img.clientHeight, 'Scale:', newScale);
     }
   };
 
@@ -207,7 +208,32 @@ export default function AreaMapsPage() {
       const response = await fetch(`/api/editions/${editionId}/pages/${pageId}/area-maps`);
       const result = await response.json();
       if (result.success) {
-        setAreaMaps(result.data || []);
+        const maps = result.data || [];
+        console.log('📥 Loaded area maps:', maps.length, maps);
+        
+        // Validate area maps are within image bounds
+        if (imageRef.current && maps.length > 0) {
+          const imgWidth = imageRef.current.naturalWidth;
+          const imgHeight = imageRef.current.naturalHeight;
+          
+          const validMaps = maps.filter((area: AreaMap) => {
+            const isValid = area.x >= 0 && area.y >= 0 && 
+                           area.x + area.width <= imgWidth && 
+                           area.y + area.height <= imgHeight;
+            if (!isValid) {
+              console.warn('⚠️ Area map outside image bounds:', area, 'Image size:', imgWidth, 'x', imgHeight);
+            }
+            return isValid;
+          });
+          
+          if (validMaps.length < maps.length) {
+            console.warn(`⚠️ Filtered out ${maps.length - validMaps.length} invalid area maps`);
+          }
+          
+          setAreaMaps(validMaps);
+        } else {
+          setAreaMaps(maps);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch area maps:', error);
@@ -247,6 +273,110 @@ export default function AreaMapsPage() {
     };
     
     setAreaMaps([...areaMaps, newArea]);
+  };
+
+  // Mouse down to start drawing
+  const handleImageMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only start drawing if clicking directly on the image (not on existing boxes)
+    if (e.target !== e.currentTarget && e.target !== imageRef.current) return;
+    if (!imageRef.current || !containerRef.current) return;
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / imageScale;
+    const y = (e.clientY - rect.top) / imageScale;
+    
+    isDrawingRef.current = true;
+    drawStartRef.current = { x, y };
+    
+    currentRectRef.current = {
+      x,
+      y,
+      width: 0,
+      height: 0,
+      title: `Area ${areaMaps.length + 1}`,
+      url: '#',
+      isNew: true
+    };
+    
+    document.addEventListener('mousemove', handleDrawMove);
+    document.addEventListener('mouseup', handleDrawEnd);
+  };
+
+  const handleDrawMove = (e: MouseEvent) => {
+    if (!isDrawingRef.current || !drawStartRef.current || !imageRef.current) return;
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    const currentX = (e.clientX - rect.left) / imageScale;
+    const currentY = (e.clientY - rect.top) / imageScale;
+    
+    const width = currentX - drawStartRef.current.x;
+    const height = currentY - drawStartRef.current.y;
+    
+    currentRectRef.current = {
+      x: width < 0 ? currentX : drawStartRef.current.x,
+      y: height < 0 ? currentY : drawStartRef.current.y,
+      width: Math.abs(width),
+      height: Math.abs(height),
+      title: `Area ${areaMaps.length + 1}`,
+      url: '#',
+      isNew: true
+    };
+    
+    // Force re-render to show the drawing box
+    if (drawingRectRef.current) {
+      drawingRectRef.current.style.left = `${currentRectRef.current.x * imageScale}px`;
+      drawingRectRef.current.style.top = `${currentRectRef.current.y * imageScale}px`;
+      drawingRectRef.current.style.width = `${currentRectRef.current.width * imageScale}px`;
+      drawingRectRef.current.style.height = `${currentRectRef.current.height * imageScale}px`;
+      drawingRectRef.current.style.display = 'block';
+    }
+  };
+
+  const handleDrawEnd = () => {
+    // Hide drawing rectangle
+    if (drawingRectRef.current) {
+      drawingRectRef.current.style.display = 'none';
+    }
+    
+    if (!isDrawingRef.current || !currentRectRef.current) {
+      isDrawingRef.current = false;
+      drawStartRef.current = null;
+      currentRectRef.current = null;
+      document.removeEventListener('mousemove', handleDrawMove);
+      document.removeEventListener('mouseup', handleDrawEnd);
+      return;
+    }
+    
+    if (currentRectRef.current.width > 20 && currentRectRef.current.height > 20) {
+      // Validate that area is within image bounds
+      if (imageRef.current) {
+        const imgWidth = imageRef.current.naturalWidth;
+        const imgHeight = imageRef.current.naturalHeight;
+        
+        const area = { ...currentRectRef.current };
+        
+        // Clamp coordinates to image bounds
+        area.x = Math.max(0, Math.min(area.x, imgWidth - area.width));
+        area.y = Math.max(0, Math.min(area.y, imgHeight - area.height));
+        area.width = Math.min(area.width, imgWidth - area.x);
+        area.height = Math.min(area.height, imgHeight - area.y);
+        
+        console.log('✅ Created area within bounds:', area, 'Image size:', imgWidth, 'x', imgHeight);
+        
+        area.isNew = false;
+        setAreaMaps([...areaMaps, area]);
+      } else {
+        const newArea = { ...currentRectRef.current, isNew: false };
+        setAreaMaps([...areaMaps, newArea]);
+      }
+    }
+    
+    isDrawingRef.current = false;
+    drawStartRef.current = null;
+    currentRectRef.current = null;
+    
+    document.removeEventListener('mousemove', handleDrawMove);
+    document.removeEventListener('mouseup', handleDrawEnd);
   };
 
   // Handle moving an area
@@ -699,7 +829,7 @@ export default function AreaMapsPage() {
             onClick={handleAddClipArea}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 text-sm font-medium"
           >
-            <Plus className="w-4 h-4" /> Add Clip Area
+            <Plus className="w-4 h-4" /> Add Area Map
           </button>
           <button
             onClick={handleSaveAll}
@@ -707,6 +837,18 @@ export default function AreaMapsPage() {
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 text-sm font-medium disabled:opacity-50"
           >
             <SaveIcon className="w-4 h-4" /> {isSaving ? 'Saving...' : `Save All Area Maps (${areaMaps.length})`}
+          </button>
+          <button
+            onClick={() => {
+              if (confirm('Delete ALL area maps from this page? This cannot be undone!')) {
+                setAreaMaps([]);
+                handleSaveAll();
+              }
+            }}
+            disabled={areaMaps.length === 0}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+          >
+            🗑️ Delete All
           </button>
 
         </div>
@@ -853,7 +995,7 @@ export default function AreaMapsPage() {
       <div className="bg-white border border-gray-200 rounded-lg p-4">
         <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded p-3">
           <p className="text-sm text-yellow-800">
-            <strong>Instructions:</strong> Click "Add Clip Area" button to create a new clip box. Click and drag the box to move it. Use corner/edge handles to resize.
+            <strong>Instructions:</strong> Hold mouse to drag and create boxes. Click and drag the box to move it. Use corner/edge handles to resize.
           </p>
           <div className="mt-2 flex items-center gap-4 text-xs text-gray-600">
             <span>Image Scale: {(imageScale * 100).toFixed(1)}%</span>
@@ -864,6 +1006,7 @@ export default function AreaMapsPage() {
           ref={containerRef}
           className="relative border-2 border-gray-300 rounded overflow-hidden"
           style={{ userSelect: 'none' }}
+          onMouseDown={handleImageMouseDown}
         >
           <div className="relative">
             <img
@@ -879,6 +1022,13 @@ export default function AreaMapsPage() {
             />
           </div>
           
+          {/* Drawing rectangle - shown while creating new box */}
+          <div
+            ref={drawingRectRef}
+            className="absolute border-2 border-blue-500 bg-blue-500/20 pointer-events-none"
+            style={{ display: 'none' }}
+          />
+          
           {/* Render existing area maps */}
           {areaMaps.map((area, index) => (
             <div
@@ -891,11 +1041,22 @@ export default function AreaMapsPage() {
                 height: `${area.height * imageScale}px`,
               }}
             >
-              {/* Action Buttons - Shown above the area */}
-              <div className="absolute -top-10 left-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <ActionIcons.Group>
-                  <ActionIcons.Edit
-                    onClick={async () => {
+              {/* Area Rectangle - Click and drag to move */}
+              <div 
+                className="w-full h-full border-2 border-red-500 bg-red-500/20 cursor-move hover:bg-red-500/30"
+                onMouseDown={(e) => handleMoveStart(e, index)}
+              >
+                {/* Area number - top right */}
+                <div className="absolute top-0 right-0 bg-red-500 text-white text-xs px-1 pointer-events-none">
+                  {index + 1}
+                </div>
+                
+                {/* Action Icons - top left, always visible */}
+                <div className="absolute top-1 left-1 flex gap-1 z-10">
+                  {/* Green Edit Icon */}
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
                       // Fetch latest available area maps before opening modal
                       try {
                         const response = await fetch(`/api/editions/${editionId}/all-area-maps`, {
@@ -907,7 +1068,6 @@ export default function AreaMapsPage() {
                         const result = await response.json();
                         if (result.success) {
                           setAvailableAreaMaps(result.data || []);
-                          // Wait a bit for state to update
                           await new Promise(resolve => setTimeout(resolve, 100));
                         }
                       } catch (error) {
@@ -916,27 +1076,66 @@ export default function AreaMapsPage() {
                       setEditingArea(area);
                       setShowEditModal(true);
                     }}
+                    className="w-6 h-6 bg-green-500 hover:bg-green-600 rounded flex items-center justify-center shadow-md transition-colors"
                     title="Edit"
-                  />
-                  <ActionIcons.Delete
-                    onClick={() => handleDeleteArea(area)}
+                  >
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  
+                  {/* Blue Save Icon */}
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        setIsSaving(true);
+                        const response = await fetch(`/api/editions/${editionId}/pages/${pageId}/area-maps`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ areaMaps }),
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                          alert('Area map saved successfully!');
+                          fetchAreaMaps();
+                          fetchAvailableAreaMaps();
+                        } else {
+                          alert('Error: ' + result.error);
+                        }
+                      } catch (error) {
+                        console.error('Save error:', error);
+                        alert('Failed to save area map');
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}
+                    className="w-6 h-6 bg-blue-500 hover:bg-blue-600 rounded flex items-center justify-center shadow-md transition-colors"
+                    title="Save"
+                  >
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  
+                  {/* Red Delete Icon */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteArea(area);
+                    }}
+                    className="w-6 h-6 bg-red-500 hover:bg-red-600 rounded flex items-center justify-center shadow-md transition-colors"
                     title="Delete"
-                  />
-                </ActionIcons.Group>
-              </div>
-              
-              {/* Area Rectangle - Click and drag to move */}
-              <div 
-                className="w-full h-full border-2 border-red-500 bg-red-500/20 cursor-move hover:bg-red-500/30"
-                onMouseDown={(e) => handleMoveStart(e, index)}
-              >
-                <div className="absolute top-0 right-0 bg-red-500 text-white text-xs px-1 pointer-events-none">
-                  {index + 1}
+                  >
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
               </div>
               
-              {/* Resize Handles - Show on hover */}
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Resize Handles - Always visible, 8 square boxes */}
+              <div>
                 <ResizeHandle position="top-left" onResizeStart={(e, pos) => handleResizeStart(e, index, pos)} />
                 <ResizeHandle position="top" onResizeStart={(e, pos) => handleResizeStart(e, index, pos)} />
                 <ResizeHandle position="top-right" onResizeStart={(e, pos) => handleResizeStart(e, index, pos)} />

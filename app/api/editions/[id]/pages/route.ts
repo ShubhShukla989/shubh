@@ -15,7 +15,8 @@ export async function GET(
       );
     }
 
-    const { data, error } = await supabaseAdmin
+    // Fetch pages
+    const { data: pages, error } = await supabaseAdmin
       .from('edition_pages')
       .select('*')
       .eq('edition_id', id)
@@ -28,7 +29,43 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, data: data || [] });
+    // Fetch area maps for all pages
+    if (pages && pages.length > 0) {
+      const pageIds = pages.map(p => p.id);
+      
+      const { data: areaMaps, error: areaMapsError } = await supabaseAdmin
+        .from('area_maps')
+        .select('*')
+        .in('page_id', pageIds);
+
+      if (!areaMapsError && areaMaps) {
+        // Group area maps by page_id
+        const areaMapsByPage: Record<number, any[]> = {};
+        areaMaps.forEach(am => {
+          if (!areaMapsByPage[am.page_id]) {
+            areaMapsByPage[am.page_id] = [];
+          }
+          areaMapsByPage[am.page_id].push(am);
+        });
+
+        // Add area_map_config to each page
+        pages.forEach(page => {
+          const pageMaps = areaMapsByPage[page.id] || [];
+          if (pageMaps.length > 0) {
+            page.area_map_config = {
+              areas: pageMaps.map(am => ({
+                coords: `${am.x},${am.y},${am.x + am.width},${am.y + am.height}`,
+                shape: 'rect' as const,
+                linkedPageNumber: am.linked_page_number,
+                linked_page_number: am.linked_page_number // Support both formats
+              }))
+            };
+          }
+        });
+      }
+    }
+
+    return NextResponse.json({ success: true, data: pages || [] });
   } catch (error) {
     console.error('Get pages error:', error);
     return NextResponse.json(

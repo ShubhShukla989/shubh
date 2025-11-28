@@ -150,6 +150,7 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
         { type: 'html' as const, label: 'HTML Code Widget' },
         { type: 'tinymce' as const, label: 'TinyMCE Widget' },
         { type: 'page-content' as const, label: 'Page Content Widget' },
+        { type: 'page-download' as const, label: 'Page: Download Widget' },
       ]
     },
     {
@@ -190,6 +191,8 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
         { type: 'epaper-pdf-download' as const, label: 'Epaper Display Page: PDF Download Widget' },
         { type: 'epaper-thumb-navigation' as const, label: 'Epaper Display Page: Thumb Navigation' },
         { type: 'epaper-clip-share' as const, label: 'Epaper Display Page: Clip and Share' },
+        { type: 'epaper-clip-display' as const, label: 'Epaper: Clip Page: Clip Display' },
+        { type: 'epaper-area-map' as const, label: 'Epaper: Area Map Display Widget' },
       ]
     },
   ];

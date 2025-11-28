@@ -25,7 +25,12 @@ export default function FeaturedCategoriesPage() {
   const fetchFeaturedCategories = async () => {
     try {
       console.log('Fetching featured categories...');
-      const response = await fetch('/api/epaper/categories/featured');
+      const response = await fetch('/api/epaper/categories/featured', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       console.log('Response status:', response.status);
       const result = await response.json();
       console.log('API Response:', result);
@@ -46,7 +51,12 @@ export default function FeaturedCategoriesPage() {
     if (!confirm(`Remove "${title}" from featured categories?`)) return;
 
     try {
-      const getResponse = await fetch(`/api/epaper/categories/${id}`);
+      const getResponse = await fetch(`/api/epaper/categories/${id}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       const getResult = await getResponse.json();
       
       if (!getResult.success) {
@@ -69,8 +79,11 @@ export default function FeaturedCategoriesPage() {
 
       const result = await response.json();
       if (result.success) {
+        // Immediately update local state to remove the category
+        setCategories(categories.filter(cat => cat.id !== id));
         alert('Category removed from featured');
-        fetchFeaturedCategories();
+        // Also fetch fresh data
+        setTimeout(() => fetchFeaturedCategories(), 500);
       } else {
         alert('Error: ' + result.error);
       }

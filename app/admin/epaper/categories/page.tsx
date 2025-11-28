@@ -27,7 +27,12 @@ export default function CategoriesPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/epaper/categories');
+      const response = await fetch('/api/epaper/categories', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       const result = await response.json();
       if (result.success) {
         setCategories(result.data || []);
@@ -45,7 +50,12 @@ export default function CategoriesPage() {
 
     try {
       // First get the full category data
-      const getResponse = await fetch(`/api/epaper/categories/${id}`);
+      const getResponse = await fetch(`/api/epaper/categories/${id}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       const getResult = await getResponse.json();
       
       if (!getResult.success) {
@@ -69,8 +79,13 @@ export default function CategoriesPage() {
 
       const result = await response.json();
       if (result.success) {
+        // Immediately update local state
+        setCategories(categories.map(cat => 
+          cat.id === id ? { ...cat, is_featured: !currentFeatured } : cat
+        ));
         alert(`Category ${currentFeatured ? 'removed from' : 'added to'} featured successfully`);
-        fetchCategories();
+        // Also fetch fresh data
+        setTimeout(() => fetchCategories(), 500);
       } else {
         alert('Error: ' + result.error);
       }

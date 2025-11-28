@@ -24,7 +24,9 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const params = useParams();
-  const editionId = params?.id as string;
+  const editionId = (params?.editionId || params?.id) as string;
+
+  console.log('EpaperPaginationWidget rendered', { editionId, config, params });
 
   useEffect(() => {
     if (editionId) {
@@ -54,7 +56,7 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
     setCurrentPage(pageNumber);
     const page = pages.find(p => p.page_number === pageNumber);
     if (page) {
-      router.push(`/epaper/${editionId}?page=${pageNumber}`);
+      router.push(`/epaper/view/${editionId}?page=${pageNumber}`);
     }
   };
 
@@ -88,35 +90,59 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
 
       {/* Pagination Control (Full) */}
       {format === 'pagination-control' && (
-        <div className="flex items-center justify-center gap-2 flex-wrap">
+        <div className="inline-flex items-center gap-1">
+          {/* Previous button */}
           <button
             onClick={goToPrevious}
             disabled={currentPage === 1}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="w-10 h-10 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
-            ← Previous
+            <span className="text-lg">&#9664;&#9664;</span>
           </button>
           
-          {pages.map((page) => (
-            <button
-              key={page.id}
-              onClick={() => goToPage(page.page_number)}
-              className={`px-3 py-2 rounded transition-colors ${
-                currentPage === page.page_number
-                  ? 'bg-blue-600 text-white font-semibold'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              {page.page_number}
-            </button>
-          ))}
+          {/* Page numbers - Smart pagination (max 5 pages) */}
+          {(() => {
+            const totalPages = pages.length;
+            const maxVisible = 5;
+            let startPage = 1;
+            let endPage = totalPages;
+
+            if (totalPages > maxVisible) {
+              // Calculate range to keep current page in center
+              const halfVisible = Math.floor(maxVisible / 2);
+              startPage = Math.max(1, currentPage - halfVisible);
+              endPage = Math.min(totalPages, startPage + maxVisible - 1);
+              
+              // Adjust if we're near the end
+              if (endPage - startPage < maxVisible - 1) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
+              }
+            }
+
+            return pages
+              .filter(p => p.page_number >= startPage && p.page_number <= endPage)
+              .map((page) => (
+                <button
+                  key={page.id}
+                  onClick={() => goToPage(page.page_number)}
+                  className={`w-10 h-10 flex items-center justify-center rounded transition-colors text-base font-semibold ${
+                    currentPage === page.page_number
+                      ? 'bg-red-600 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {page.page_number}
+                </button>
+              ));
+          })()}
           
+          {/* Next button */}
           <button
             onClick={goToNext}
             disabled={currentPage === pages.length}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="w-10 h-10 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
-            Next →
+            <span className="text-lg">&#9654;&#9654;</span>
           </button>
         </div>
       )}
@@ -129,7 +155,7 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
             disabled={currentPage === 1}
             className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
           >
-            ←
+            &lt;&lt;
           </button>
           
           <span className="px-3 py-1 bg-gray-100 rounded text-sm font-medium">
@@ -141,7 +167,7 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
             disabled={currentPage === pages.length}
             className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
           >
-            →
+            &gt;&gt;
           </button>
         </div>
       )}
@@ -151,7 +177,7 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
         <select
           value={currentPage}
           onChange={(e) => goToPage(parseInt(e.target.value))}
-          className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-auto px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           {pages.map((page) => (
             <option key={page.id} value={page.page_number}>
@@ -166,7 +192,7 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
         <select
           value={currentPage}
           onChange={(e) => goToPage(parseInt(e.target.value))}
-          className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-auto px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           {pages.map((page) => (
             <option key={page.id} value={page.page_number}>

@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import PDFThumbnail from '@/components/PDFThumbnail';
 import ResizeHandle from '@/components/admin/ResizeHandle';
+import { EpaperAreaMapDisplayWidget } from './EpaperAreaMapDisplayWidget';
+import { SocialWidget } from '../SocialWidget';
 
 interface Page {
   number: number;
@@ -20,6 +22,7 @@ interface AreaMap {
   title: string;
   url: string;
   linked_area_ids?: number[];
+  linked_page_number?: number;
 }
 
 interface PageViewerProps {
@@ -32,6 +35,7 @@ interface PageViewerProps {
   onClipCancel: () => void;
   loading: boolean;
   editionId?: string;
+  onPageNavigate?: (pageNumber: number) => void;
 }
 
 export default function PageViewer({
@@ -43,7 +47,8 @@ export default function PageViewer({
   onClipComplete,
   onClipCancel,
   loading,
-  editionId
+  editionId,
+  onPageNavigate
 }: PageViewerProps) {
   const [clipStart, setClipStart] = useState<{ x: number; y: number } | null>(null);
   const [clipEnd, setClipEnd] = useState<{ x: number; y: number } | null>(null);
@@ -71,6 +76,10 @@ export default function PageViewer({
   const [zoomModalTitle, setZoomModalTitle] = useState<string>('');
   const [isZoomedIn, setIsZoomedIn] = useState(false);
   const [zoomOrigin, setZoomOrigin] = useState<{ x: number; y: number }>({ x: 50, y: 50 }); // Percentage
+  
+  // Area Map Modal State
+  const [showAreaMapModal, setShowAreaMapModal] = useState(false);
+  const [selectedAreaMapId, setSelectedAreaMapId] = useState<number | null>(null);
 
   const [editionData, setEditionData] = useState<any>(null);
   const [logoCache, setLogoCache] = useState<string | null>(null);
@@ -151,14 +160,23 @@ export default function PageViewer({
     if (!page?.id || !editionId) return;
     
     try {
-      const response = await fetch(`/api/editions/${editionId}/pages/${page.id}/area-maps`);
+      const url = `/api/editions/${editionId}/pages/${page.id}/area-maps`;
+      console.log('🔍 Fetching area maps from:', url);
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       const result = await response.json();
-      console.log('📍 Fetched area maps for page:', page.id, result.data);
+      console.log('📍 Fetched area maps for page:', page.id, 'Count:', result.data?.length || 0, 'Data:', result.data);
       if (result.success) {
         setAreaMaps(result.data || []);
+      } else {
+        console.error('❌ Failed to fetch area maps:', result.error);
       }
     } catch (error) {
-      console.error('Failed to fetch area maps:', error);
+      console.error('❌ Error fetching area maps:', error);
     }
   };
 
@@ -255,31 +273,16 @@ export default function PageViewer({
   const handleAreaClick = async (e: React.MouseEvent, area: AreaMap) => {
     e.preventDefault();
     e.stopPropagation();
-    setSelectedArea(area);
     
-    console.log('🔍 Area clicked:', area);
-    console.log('🔗 Linked area IDs:', area.linked_area_ids);
-    console.log('🔗 Type:', typeof area.linked_area_ids, 'Is Array:', Array.isArray(area.linked_area_ids));
-    console.log('🔗 Length:', area.linked_area_ids?.length);
-    
-    // Check if this area has linked areas
-    if (area.linked_area_ids && area.linked_area_ids.length > 0) {
-      console.log('✅ Fetching linked areas...');
-      // Fetch all linked areas and combine them
-      const combinedImage = await createCombinedClipFromLinkedAreas(area);
-      if (combinedImage) {
-        setZoomModalImage(combinedImage);
-        setZoomModalTitle(`${area.title} (${area.linked_area_ids.length + 1} parts)`);
-      }
-    } else {
-      console.log('❌ No linked areas, showing single area');
-      // Single area - show in zoom modal first
-      const imageData = await createClipFromArea(area);
-      if (imageData) {
-        setZoomModalImage(imageData);
-        setZoomModalTitle(area.title || `Page ${page?.number} - Article`);
-      }
-    }
+    // Open area map modal
+    console.log('🔍 Opening area map modal:', area.id);
+    setSelectedAreaMapId(area.id);
+    setShowAreaMapModal(true);
+  };
+  
+  const handleCloseAreaMapModal = () => {
+    setShowAreaMapModal(false);
+    setSelectedAreaMapId(null);
   };
 
   // Clip resize handlers - Using refs to avoid closure issues (copied from area-maps)
@@ -930,29 +933,36 @@ export default function PageViewer({
             )}
             
             {/* Area Maps - Interactive Regions */}
-            {!isClipping && areaMaps.map((area) => (
-              <div
-                key={area.id}
-                className="absolute transition-all duration-200"
-                style={{
-                  left: `${area.x * imageScale}px`,
-                  top: `${area.y * imageScale}px`,
-                  width: `${area.width * imageScale}px`,
-                  height: `${area.height * imageScale}px`,
-                  border: hoveredArea?.id === area.id 
-                    ? '3px solid #ef4444' 
-                    : '3px solid transparent',
-                  backgroundColor: hoveredArea?.id === area.id 
-                    ? 'rgba(239, 68, 68, 0.1)' 
-                    : 'transparent',
-                  cursor: 'pointer', // Normal pointer cursor
-                }}
-                onMouseEnter={() => setHoveredArea(area)}
-                onMouseLeave={() => setHoveredArea(null)}
-                onClick={(e) => handleAreaClick(e, area)}
-                title={area.title}
-              />
-            ))}
+            {!isClipping && (() => {
+              console.log('🎨 Rendering area maps:', areaMaps.length, 'Image scale:', imageScale);
+              return areaMaps.map((area) => {
+                console.log('📦 Rendering area:', area.id, 'Position:', { x: area.x, y: area.y, width: area.width, height: area.height });
+                return (
+                  <div
+                    key={area.id}
+                    className="absolute transition-all duration-200"
+                    style={{
+                      left: `${area.x * imageScale}px`,
+                      top: `${area.y * imageScale}px`,
+                      width: `${area.width * imageScale}px`,
+                      height: `${area.height * imageScale}px`,
+                      border: hoveredArea?.id === area.id 
+                        ? '3px solid #ef4444' 
+                        : '2px solid transparent',
+                      backgroundColor: hoveredArea?.id === area.id 
+                        ? 'rgba(239, 68, 68, 0.1)' 
+                        : 'transparent',
+                      cursor: 'pointer',
+                      zIndex: 10,
+                    }}
+                    onMouseEnter={() => setHoveredArea(area)}
+                    onMouseLeave={() => setHoveredArea(null)}
+                    onClick={(e) => handleAreaClick(e, area)}
+                    title={area.title}
+                  />
+                );
+              });
+            })()}
           </>
         ) : null}
 
@@ -1158,61 +1168,6 @@ export default function PageViewer({
           
           {/* Action Buttons - Outside Paper, Below */}
           <div className="flex gap-3 z-10" onClick={(e) => e.stopPropagation()}>
-            {/* Share Button */}
-            <button
-              onClick={async (e) => {
-                e.stopPropagation();
-                
-                // Convert base64 to blob for sharing
-                const dataURLtoBlob = (dataurl: string) => {
-                  const arr = dataurl.split(',');
-                  const mime = arr[0].match(/:(.*?);/)?.[1];
-                  const bstr = atob(arr[1]);
-                  let n = bstr.length;
-                  const u8arr = new Uint8Array(n);
-                  while (n--) {
-                    u8arr[n] = bstr.charCodeAt(n);
-                  }
-                  return new Blob([u8arr], { type: mime });
-                };
-                
-                try {
-                  // Try Web Share API with image
-                  if (navigator.share && navigator.canShare) {
-                    const blob = dataURLtoBlob(zoomModalImage);
-                    const file = new File([blob], `article-${Date.now()}.png`, { type: 'image/png' });
-                    
-                    const shareData = {
-                      files: [file],
-                      title: zoomModalTitle || 'Article',
-                      text: 'Check out this article from Do Boje Dopahar'
-                    };
-
-                    if (navigator.canShare(shareData)) {
-                      await navigator.share(shareData);
-                      return;
-                    }
-                  }
-                  
-                  // Fallback - copy link
-                  navigator.clipboard.writeText(window.location.href);
-                  alert('Link copied to clipboard!');
-                } catch (error) {
-                  // If user cancels, don't show error
-                  if ((error as Error).name !== 'AbortError') {
-                    navigator.clipboard.writeText(window.location.href);
-                    alert('Link copied to clipboard!');
-                  }
-                }
-              }}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-              Share
-            </button>
-            
             {/* Download Button */}
             <button
               onClick={(e) => {
@@ -1229,49 +1184,176 @@ export default function PageViewer({
               </svg>
               Download
             </button>
-            
-            {/* More Options Button */}
+          </div>
+        </div>
+      )}
+      {/* Area Map Modal */}
+      {showAreaMapModal && selectedAreaMapId && (
+        <div 
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={handleCloseAreaMapModal}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-auto relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // Show more options menu
-                const options = [
-                  'WhatsApp',
-                  'Facebook',
-                  'Twitter',
-                  'Copy Link',
-                  'Print'
-                ];
-                const choice = prompt('More Options:\n' + options.map((o, i) => `${i + 1}. ${o}`).join('\n') + '\n\nEnter number:');
-                
-                if (choice === '1') {
-                  // WhatsApp
-                  window.open(`https://wa.me/?text=${encodeURIComponent(window.location.href)}`, '_blank');
-                } else if (choice === '2') {
-                  // Facebook
-                  window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`, '_blank');
-                } else if (choice === '3') {
-                  // Twitter
-                  window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.href)}`, '_blank');
-                } else if (choice === '4') {
-                  // Copy Link
-                  navigator.clipboard.writeText(window.location.href);
-                  alert('Link copied!');
-                } else if (choice === '5') {
-                  // Print
-                  window.print();
-                }
-              }}
-              className="px-6 py-3 bg-gray-700 text-white rounded-lg shadow-lg hover:bg-gray-800 transition-colors font-medium flex items-center gap-2"
+              onClick={handleCloseAreaMapModal}
+              className="absolute top-4 right-4 z-50 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+              title="Close"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+              <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
-              More
             </button>
+            
+            {/* Modal Content - Render Epaper Map Layout */}
+            <div className="p-6">
+              <EpaperMapLayoutContent 
+                areaMapId={selectedAreaMapId.toString()}
+                editionId={editionId || ''}
+                pageNumber={page?.number?.toString() || ''}
+              />
+            </div>
           </div>
         </div>
       )}
     </div>
   );
+}
+
+// Component to render Epaper Map layout content inside modal
+function EpaperMapLayoutContent({ areaMapId, editionId, pageNumber }: { areaMapId: string; editionId: string; pageNumber: string }) {
+  const [layoutData, setLayoutData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLayout();
+  }, []);
+
+  const fetchLayout = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/layouts/Epaper Map`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        setLayoutData(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching layout:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!layoutData) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded p-4">
+        <p className="text-red-800">Failed to load layout</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Custom CSS */}
+      {layoutData.custom_css && (
+        <style dangerouslySetInnerHTML={{ __html: layoutData.custom_css }} />
+      )}
+
+      {/* Render Layout Structure */}
+      <div className="layout-renderer" data-layout="Epaper Map">
+        {layoutData.structure?.rows?.map((row: any) => (
+          <div 
+            key={row.id} 
+            className={`layout-row ${row.properties?.cssClass || row.cssClass || ''}`}
+            style={parseInlineStyle(row.properties?.customCss || row.properties?.customStyle || row.customStyle)}
+          >
+            <div className="flex flex-wrap">
+              {row.columns?.map((column: any) => (
+                <div
+                  key={column.id}
+                  className={`layout-column ${column.properties?.cssClass || column.cssClass || ''}`}
+                  style={{
+                    flex: `0 0 ${((column.width || 6) / 12) * 100}%`,
+                    maxWidth: `${((column.width || 6) / 12) * 100}%`,
+                    boxSizing: 'border-box',
+                    ...parseInlineStyle(column.properties?.customCss || column.properties?.customStyle || column.customStyle),
+                  }}
+                >
+                  {/* Render Widgets */}
+                  {column.widgets?.map((widget: any) => (
+                    <div key={widget.id} className={`widget ${widget.config?.cssClasses || ''}`}>
+                      {renderWidget(widget, areaMapId, editionId, pageNumber)}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// Widget rendering function (simplified version for modal)
+function renderWidget(widget: any, areaMapId?: string, editionId?: string, pageNumber?: string) {
+  switch (widget.type) {
+    case 'social':
+      return <SocialWidget config={widget.config} />;
+      
+    case 'epaper-area-map':
+    case 'epaper-area-map-display':
+      return <EpaperAreaMapDisplayWidget config={widget.config} areaMapId={areaMapId} editionId={editionId} pageNumber={pageNumber} />;
+      
+    case 'text':
+    case 'html':
+      return (
+        <div 
+          className={widget.config.cssClasses || ''}
+          style={parseInlineStyle(widget.config.style)}
+          dangerouslySetInnerHTML={{ __html: widget.config.content || widget.config.html }} 
+        />
+      );
+      
+    default:
+      return null;
+  }
+}
+
+function parseInlineStyle(styleString?: string): React.CSSProperties {
+  if (!styleString) return {};
+  
+  try {
+    const styles: any = {};
+    styleString.split(';').forEach(rule => {
+      const [property, value] = rule.split(':').map(s => s.trim());
+      if (property && value) {
+        const camelProperty = property.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+        styles[camelProperty] = value;
+      }
+    });
+    return styles;
+  } catch {
+    return {};
+  }
 }

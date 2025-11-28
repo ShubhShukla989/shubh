@@ -34,7 +34,7 @@ interface Edition {
 }
 
 export function EpaperArchiveWidget({ config }: EpaperArchiveWidgetProps) {
-  const { categoryId } = useCategory();
+  const { categoryId, categoryTitle } = useCategory();
   const [editions, setEditions] = useState<Edition[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -90,13 +90,17 @@ export function EpaperArchiveWidget({ config }: EpaperArchiveWidgetProps) {
   const format = config.format || 'thumb-image-as-background';
 
   return (
-    <div className={`epaper-archive-widget px-3 md:px-0 ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
-      {config.title && (
-        <h2 className="text-lg md:text-2xl font-bold mb-3 md:mb-6 text-gray-800 text-center">{config.title}</h2>
-      )}
+    <div className={`epaper-archive-widget ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
+      {/* Header with Category Title and Underline */}
+      <div className="mb-8 px-4 md:px-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+          {categoryTitle || config.title || 'Archive'}
+        </h1>
+        <div className="w-32 h-1 bg-gradient-to-r from-red-600 to-orange-500"></div>
+      </div>
       
       <div 
-        className="grid gap-3 md:gap-6"
+        className="grid gap-4 md:gap-6 px-4 md:px-8"
         style={{
           gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : `repeat(${perRow}, 1fr)`,
         }}
@@ -113,7 +117,7 @@ export function EpaperArchiveWidget({ config }: EpaperArchiveWidgetProps) {
               className="block group"
               title={`View ${edition.title}`}
             >
-              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+              <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 hover:border-red-500">
                 <div className="relative overflow-hidden" style={{ paddingBottom: '133%' }}>
                   <img
                     src={thumbnailUrl}
@@ -121,11 +125,11 @@ export function EpaperArchiveWidget({ config }: EpaperArchiveWidgetProps) {
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>
-                <div className="p-2 md:p-4 text-center bg-white border-t border-gray-100">
-                  <h3 className="font-semibold text-gray-800 text-xs md:text-base mb-1 group-hover:text-blue-600 transition-colors leading-tight">
+                <div className="p-3 md:p-4 text-center bg-white border-t-2 border-gray-200">
+                  <h3 className="font-bold text-gray-900 text-xs md:text-base mb-1 group-hover:text-red-600 transition-colors leading-tight">
                     {edition.title}
                   </h3>
-                  <p className="text-xs md:text-sm text-gray-500">
+                  <p className="text-xs md:text-sm text-gray-600 font-medium">
                     {new Date(edition.date).toLocaleDateString('en-IN', { 
                       day: 'numeric',
                       month: 'short',

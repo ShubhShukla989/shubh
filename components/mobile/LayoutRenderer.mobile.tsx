@@ -6,8 +6,10 @@ import { EpaperCalendarWidget } from '../epaper/EpaperCalendarWidget';
 import { EpaperPaginationWidget } from '../epaper/EpaperPaginationWidget';
 import { EpaperPdfDownloadWidget } from '../epaper/EpaperPdfDownloadWidget';
 import { EpaperThumbNavigationWidget } from '../epaper/EpaperThumbNavigationWidget';
-import { EpaperDisplayWidget } from '../epaper/EpaperDisplayWidget';
+
 import { EpaperClipShareWidget } from '../epaper/EpaperClipShareWidget';
+import { EpaperAreaMapDisplayWidget } from '../epaper/EpaperAreaMapDisplayWidget';
+import { PageDownloadWidget } from '../page/PageDownloadWidget';
 import { EpaperFeaturedWidgetMobile } from './EpaperFeaturedWidget.mobile';
 import { NavigationWidgetMobile } from './NavigationWidget.mobile';
 
@@ -193,6 +195,9 @@ function renderWidget(widget: any) {
     case 'epaper-pdf-download':
       return <EpaperPdfDownloadWidget config={widget.config} />;
 
+    case 'page-download':
+      return <PageDownloadWidget config={widget.config} />;
+
     case 'epaper-thumb-navigation':
       return <EpaperThumbNavigationWidget config={widget.config} />;
 
@@ -200,13 +205,16 @@ function renderWidget(widget: any) {
       return <EpaperClipShareWidget config={widget.config} />;
 
     case 'epaper-display':
-      return <EpaperDisplayWidget config={widget.config} />;
+      return null; // Widget removed
 
     case 'epaper-featured':
       return <EpaperFeaturedWidgetMobile config={widget.config} />;
 
     case 'epaper-category':
       return <EpaperFeaturedWidgetMobile config={widget.config} />;
+
+    case 'epaper-area-map':
+      return <EpaperAreaMapDisplayWidget config={widget.config} />;
 
     case 'navigation':
       return <NavigationWidgetMobile config={widget.config} />;

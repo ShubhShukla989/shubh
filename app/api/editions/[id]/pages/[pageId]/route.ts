@@ -39,6 +39,56 @@ export async function GET(
   }
 }
 
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string; pageId: string } }
+) {
+  try {
+    const { id, pageId } = params;
+    const body = await request.json();
+
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { success: false, error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Update page details
+    const { data, error } = await supabaseAdmin
+      .from('edition_pages')
+      .update({
+        title: body.title,
+        alias: body.alias,
+        description: body.description,
+        category: body.category,
+      })
+      .eq('id', pageId)
+      .eq('edition_id', id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data,
+      message: 'Page updated successfully',
+    });
+  } catch (error) {
+    console.error('Update page error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Failed to update page' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string; pageId: string } }

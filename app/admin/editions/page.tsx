@@ -63,6 +63,10 @@ export default function EditionsPage() {
     pdf: true,
     status: true,
   });
+  
+  // Bulk actions state
+  const [selectedEditions, setSelectedEditions] = useState<number[]>([]);
+  const [bulkAction, setBulkAction] = useState('');
 
   useEffect(() => {
     fetchEditions();
@@ -206,6 +210,97 @@ export default function EditionsPage() {
     }
   };
 
+  const handleBulkAction = async () => {
+    if (selectedEditions.length === 0) {
+      alert('Please select at least one edition');
+      return;
+    }
+
+    if (!bulkAction) {
+      alert('Please select an action');
+      return;
+    }
+
+    const actionText = bulkAction === 'delete' 
+      ? `delete ${selectedEditions.length} edition(s)` 
+      : `${bulkAction} ${selectedEditions.length} edition(s)`;
+
+    if (!confirm(`Are you sure you want to ${actionText}?`)) {
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const editionId of selectedEditions) {
+        try {
+          if (bulkAction === 'delete') {
+            const response = await fetch(`/api/editions/${editionId}`, {
+              method: 'DELETE',
+            });
+            const result = await response.json();
+            if (result.success) {
+              successCount++;
+            } else {
+              errorCount++;
+              console.error(`Failed to delete edition ${editionId}:`, result.error);
+            }
+          } else {
+            // Get the edition first
+            const getResponse = await fetch(`/api/editions/${editionId}`);
+            const getResult = await getResponse.json();
+            
+            if (!getResult.success) {
+              errorCount++;
+              console.error(`Failed to get edition ${editionId}:`, getResult.error);
+              continue;
+            }
+
+            const edition = getResult.data;
+            const newStatus = bulkAction === 'publish' ? 'published' : 'draft';
+
+            // Update the edition
+            const response = await fetch(`/api/editions/${editionId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                ...edition,
+                status: newStatus,
+                scheduled_date: null, // Clear scheduled date when publishing/unpublishing
+              }),
+            });
+
+            const result = await response.json();
+            if (result.success) {
+              successCount++;
+            } else {
+              errorCount++;
+              console.error(`Failed to update edition ${editionId}:`, result.error);
+            }
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`Error processing edition ${editionId}:`, error);
+        }
+      }
+
+      if (successCount > 0) {
+        alert(`Successfully ${bulkAction === 'delete' ? 'deleted' : 'updated'} ${successCount} edition(s)!${errorCount > 0 ? ` ${errorCount} failed.` : ''}`);
+        setSelectedEditions([]);
+        setBulkAction('');
+        fetchEditions();
+      } else {
+        alert(`Failed to ${bulkAction} any editions.`);
+      }
+    } catch (error) {
+      console.error('Bulk action error:', error);
+      alert(`Failed to perform bulk action: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   return (
     <div>
       {/* Breadcrumb Bar */}
@@ -246,13 +341,23 @@ export default function EditionsPage() {
 
             {(isSuperAdmin() || hasPermission('delete_editions')) && (
               <>
-                <select className="px-3 py-2 border border-gray-300 rounded text-sm">
-                  <option>-- Bulk Actions --</option>
-                  <option>Publish</option>
-                  <option>Unpublish</option>
-                  <option>Delete</option>
+                <select 
+                  value={bulkAction}
+                  onChange={(e) => setBulkAction(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded text-sm"
+                >
+                  <option value="">-- Bulk Actions --</option>
+                  <option value="publish">Publish</option>
+                  <option value="unpublish">Unpublish</option>
+                  <option value="delete">Delete</option>
                 </select>
-                <button className="px-3 py-2 bg-purple-600 text-white rounded text-sm">Apply</button>
+                <button 
+                  onClick={handleBulkAction}
+                  disabled={selectedEditions.length === 0 || !bulkAction}
+                  className="px-3 py-2 bg-purple-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700"
+                >
+                  Apply
+                </button>
               </>
             )}
           </div>
@@ -343,7 +448,18 @@ export default function EditionsPage() {
             <thead className="bg-purple-50">
               <tr>
                 <th className="px-4 py-3 text-left">
-                  <input type="checkbox" className="rounded border-gray-300" />
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300"
+                    checked={selectedEditions.length === editions.length && editions.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedEditions(editions.map(ed => ed.id));
+                      } else {
+                        setSelectedEditions([]);
+                      }
+                    }}
+                  />
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
                   Actions
@@ -385,7 +501,18 @@ export default function EditionsPage() {
                     className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
                   >
                     <td className="px-4 py-3">
-                      <input type="checkbox" className="rounded border-gray-300" />
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300"
+                        checked={selectedEditions.includes(edition.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedEditions([...selectedEditions, edition.id]);
+                          } else {
+                            setSelectedEditions(selectedEditions.filter(id => id !== edition.id));
+                          }
+                        }}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <ActionIcons.Group>

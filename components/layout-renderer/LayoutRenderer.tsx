@@ -8,17 +8,27 @@ import { EpaperCalendarWidget } from '../epaper/EpaperCalendarWidget';
 import { EpaperPaginationWidget } from '../epaper/EpaperPaginationWidget';
 import { EpaperPdfDownloadWidget } from '../epaper/EpaperPdfDownloadWidget';
 import { EpaperThumbNavigationWidget } from '../epaper/EpaperThumbNavigationWidget';
-import { EpaperDisplayWidget } from '../epaper/EpaperDisplayWidget';
+
 import { EpaperClipShareWidget } from '../epaper/EpaperClipShareWidget';
+import { EpaperClipDisplayWidget } from '../epaper/EpaperClipDisplayWidget';
 import { EpaperFeaturedWidget } from '../epaper/EpaperFeaturedWidget';
+import { EpaperPageDisplayWidget } from '../epaper/EpaperPageDisplayWidget';
+import { EpaperZoomWidget } from '../epaper/EpaperZoomWidget';
+import { EpaperSocialSharingWidget } from '../epaper/EpaperSocialSharingWidget';
+import { EpaperAreaMapDisplayWidget } from '../epaper/EpaperAreaMapDisplayWidget';
+import { SocialWidget } from '../SocialWidget';
+import { PageDownloadWidget } from '../page/PageDownloadWidget';
 import { NavigationWidget } from '../navigation/NavigationWidget';
 
 interface LayoutRendererProps {
   layoutName: string;
   pageName?: string;
+  areaMapId?: string;
+  editionId?: string;
+  pageNumber?: string;
 }
 
-export function LayoutRenderer({ layoutName, pageName }: LayoutRendererProps) {
+export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pageNumber }: LayoutRendererProps) {
   const { isMobile, isLoaded } = useDeviceDetection();
   const [layoutData, setLayoutData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -103,7 +113,7 @@ export function LayoutRenderer({ layoutName, pageName }: LayoutRendererProps) {
                   {/* Render Widgets */}
                   {column.widgets?.map((widget: any) => (
                     <div key={widget.id} className={`widget ${widget.config?.cssClasses || ''}`}>
-                      {renderWidget(widget)}
+                      {renderWidget(widget, areaMapId, editionId, pageNumber)}
                     </div>
                   ))}
                 </div>
@@ -124,7 +134,7 @@ export function LayoutRenderer({ layoutName, pageName }: LayoutRendererProps) {
   );
 }
 
-function renderWidget(widget: any) {
+function renderWidget(widget: any, areaMapId?: string, editionId?: string, pageNumber?: string) {
   switch (widget.type) {
     case 'image':
       const imgStyle = parseInlineStyle(widget.config.style);
@@ -189,6 +199,9 @@ function renderWidget(widget: any) {
         </a>
       );
 
+    case 'social':
+      return <SocialWidget config={widget.config} />;
+
     case 'epaper-archive':
       return <EpaperArchiveWidget config={widget.config} />;
 
@@ -201,20 +214,37 @@ function renderWidget(widget: any) {
     case 'epaper-pdf-download':
       return <EpaperPdfDownloadWidget config={widget.config} />;
 
+    case 'page-download':
+      return <PageDownloadWidget config={widget.config} />;
+
     case 'epaper-thumb-navigation':
       return <EpaperThumbNavigationWidget config={widget.config} />;
 
     case 'epaper-clip-share':
       return <EpaperClipShareWidget config={widget.config} />;
 
+    case 'epaper-clip-display':
+      return <EpaperClipDisplayWidget config={widget.config} />;
+
     case 'epaper-display':
-      return <EpaperDisplayWidget config={widget.config} />;
+    case 'epaper-page-display':
+      return <EpaperPageDisplayWidget config={widget.config} />;
+
+    case 'epaper-zoom':
+      return <EpaperZoomWidget config={widget.config} />;
+
+    case 'social-sharing':
+      return <EpaperSocialSharingWidget config={widget.config} />;
 
     case 'epaper-featured':
       return <EpaperFeaturedWidget config={widget.config} />;
 
     case 'epaper-category':
       return <EpaperFeaturedWidget config={widget.config} />;
+
+    case 'epaper-area-map':
+    case 'epaper-area-map-display':
+      return <EpaperAreaMapDisplayWidget config={widget.config} areaMapId={areaMapId} editionId={editionId} pageNumber={pageNumber} />
 
     case 'navigation':
       return <NavigationWidget config={widget.config} />;
