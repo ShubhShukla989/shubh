@@ -132,7 +132,9 @@ export async function POST(
 
     // Create FormData for PDF upload
     const formData = new FormData();
-    const pdfBlob = new Blob([pdfBufferData], { type: 'application/pdf' });
+    // Convert Uint8Array to Buffer for proper Blob creation
+    const pdfBuffer = Buffer.from(pdfBufferData);
+    const pdfBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
     formData.append('pdf', pdfBlob, `edition-${id}.pdf`);
     formData.append('startPage', startPage.toString());
     formData.append('endPage', Math.min(startPage + maxPages - 1, totalPages).toString());
