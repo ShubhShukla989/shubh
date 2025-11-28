@@ -7,8 +7,10 @@ export async function GET(
 ) {
   try {
     const { id } = params;
+    console.log('[GET /api/editions/[id]/pages] Edition ID:', id);
 
     if (!supabaseAdmin) {
+      console.log('[GET /api/editions/[id]/pages] ERROR: Database not configured');
       return NextResponse.json(
         { success: false, error: 'Database not configured' },
         { status: 500 }
@@ -22,7 +24,14 @@ export async function GET(
       .eq('edition_id', id)
       .order('page_number', { ascending: true });
 
+    console.log('[GET /api/editions/[id]/pages] Query result:', { 
+      pagesCount: pages?.length || 0, 
+      error: error?.message,
+      firstPage: pages?.[0]
+    });
+
     if (error) {
+      console.log('[GET /api/editions/[id]/pages] ERROR:', error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -65,9 +74,10 @@ export async function GET(
       }
     }
 
+    console.log('[GET /api/editions/[id]/pages] Returning response with', pages?.length || 0, 'pages');
     return NextResponse.json({ success: true, data: pages || [] });
   } catch (error) {
-    console.error('Get pages error:', error);
+    console.error('[GET /api/editions/[id]/pages] Catch error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch pages' },
       { status: 500 }

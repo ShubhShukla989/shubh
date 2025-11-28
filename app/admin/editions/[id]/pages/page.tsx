@@ -68,23 +68,26 @@ export default function EditionPagesPage() {
   const fetchPages = async () => {
     try {
       // Fetch pages for this edition
-      console.log('Fetching pages for edition:', editionId);
+      console.log('[fetchPages] Fetching pages for edition:', editionId);
       const response = await fetch(`/api/editions/${editionId}/pages`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
         },
       });
+      console.log('[fetchPages] Response status:', response.status);
       const result = await response.json();
-      console.log('Pages API response:', result);
+      console.log('[fetchPages] Pages API response:', result);
+      console.log('[fetchPages] Pages count:', result.data?.length);
+      console.log('[fetchPages] First page:', result.data?.[0]);
       if (result.success) {
-        console.log('Setting pages:', result.data);
+        console.log('[fetchPages] Setting pages:', result.data);
         setPages(result.data || []);
       } else {
-        console.error('API returned error:', result.error);
+        console.error('[fetchPages] API returned error:', result.error);
       }
     } catch (error) {
-      console.error('Failed to fetch pages:', error);
+      console.error('[fetchPages] Failed to fetch pages:', error);
     } finally {
       setLoading(false);
     }
