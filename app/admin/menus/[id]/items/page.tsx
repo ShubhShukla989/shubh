@@ -88,10 +88,14 @@ export default function MenuItemsManager() {
 
   const fetchPages = async () => {
     try {
+      // Fetch static pages from sidebar Pages section
       const response = await fetch('/api/pages');
       if (response.ok) {
         const data = await response.json();
-        setPages(Array.isArray(data) ? data : data.pages || []);
+        const staticPages = Array.isArray(data) ? data : data.data || [];
+        setPages(staticPages);
+      } else {
+        setPages([]);
       }
     } catch (error) {
       console.error('Failed to fetch pages:', error);
@@ -258,7 +262,7 @@ export default function MenuItemsManager() {
           >
             <ChevronLeft className="w-6 h-6" />
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-500">
             Menuitems Manager - {menu?.name || 'Loading...'}
           </h1>
         </div>
@@ -311,7 +315,7 @@ export default function MenuItemsManager() {
                 className="px-6 py-4 flex items-center justify-between hover:bg-gray-50"
               >
                 <div>
-                  <div className="font-medium text-gray-900">{item.title}</div>
+                  <div className="font-medium text-gray-500">{item.title}</div>
                   <div className="text-sm text-gray-500">
                     Type: {item.type} {item.url && `• URL: ${item.url}`}
                   </div>
@@ -346,14 +350,14 @@ export default function MenuItemsManager() {
               <h2 className="text-xl font-bold">New Menuitem</h2>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
+                className="text-gray-500 hover:text-gray-500 text-2xl"
               >
                 ×
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-500 mb-1">
                   Title
                 </label>
                 <input
@@ -369,7 +373,7 @@ export default function MenuItemsManager() {
 
               {formData.type === 'external' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     Link
                   </label>
                   <input
@@ -386,7 +390,7 @@ export default function MenuItemsManager() {
 
               {formData.type === 'page' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     Page
                   </label>
                   <select
@@ -408,7 +412,7 @@ export default function MenuItemsManager() {
 
               {formData.type === 'epaper_category' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     Category ID
                   </label>
                   <input
@@ -424,7 +428,7 @@ export default function MenuItemsManager() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-500 mb-1">
                   Parent
                 </label>
                 <select
@@ -444,7 +448,7 @@ export default function MenuItemsManager() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-500 mb-1">
                   Target
                 </label>
                 <select
@@ -517,7 +521,7 @@ export default function MenuItemsManager() {
                   setShowEditModal(false);
                   setEditingItem(null);
                 }}
-                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-500 rounded hover:bg-gray-400"
               >
                 Cancel
               </button>

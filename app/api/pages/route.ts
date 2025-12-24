@@ -1,130 +1,109 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { pages } from '@/lib/schema';
+import { eq, desc, ilike, ne, and } from 'drizzle-orm';
 
 /**
- * GET /api/pages - List all pages with optional filters
+ * GET /api/pages/check-alias - Check if alias is available
  */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
-    const status = searchParams.get('status');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const alias = searchParams.get('alias');
+    const excludeId = searchParams.get('excludeId');
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
+    // Handle alias availability check
+    if (alias) {
+      let whereConditions = [eq(pages.alias, alias)];
+      
+      if (excludeId) {
+        // If excludeId is provided, we want to exclude that page from the check
+        whereConditions.push(ne(pages.id, parseInt(excludeId)));
+      }
+      
+      const existingPages = await db
+        .select()
+        .from(pages)
+        .where(and(...whereConditions));
+      
+      const available = existingPages.length === 0;
+      
+      return NextResponse.json({ available });
     }
 
-    let query = supabaseAdmin.from('pages').select('*', { count: 'exact' });
+    // Handle regular page listing
+    let query = db.select().from(pages).orderBy(desc(pages.created_at));
 
-    // Apply filters
+    let data;
     if (search) {
-      query = query.or(`title.ilike.%${search}%,alias.ilike.%${search}%`);
+      data = await db
+        .select()
+        .from(pages)
+        .where(ilike(pages.title, `%${search}%`))
+        .orderBy(desc(pages.created_at));
+    } else {
+      data = await query;
     }
 
-    if (status) {
-      query = query.eq('status', status);
-    }
-
-    // Apply pagination
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-    query = query.range(from, to).order('created_at', { ascending: false });
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      pages: data || [],
-      total: count || 0,
-      page,
-      limit,
-    });
+    return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error('API error:', error);
+    console.error('Get pages error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, error: 'Failed to fetch pages' },
       { status: 500 }
     );
   }
 }
 
 /**
- * POST /api/pages - Create a new page
+ * POST /api/pages - Create new page
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, alias, description, content, status, seo } = body;
 
-    if (!title || !alias) {
+    // Validate required fields
+    if (!body.title || !body.alias) {
       return NextResponse.json(
-        { error: 'Title and alias are required' },
+        { success: false, error: 'Title and alias are required' },
         { status: 400 }
-      );
-    }
-
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
       );
     }
 
     // Check if alias already exists
-    const { data: existing } = await supabaseAdmin
-      .from('pages')
-      .select('id')
-      .eq('alias', alias)
-      .single();
+    const existingPage = await db
+      .select()
+      .from(pages)
+      .where(eq(pages.alias, body.alias))
+      .limit(1);
 
-    if (existing) {
+    if (existingPage.length > 0) {
       return NextResponse.json(
-        { error: 'Alias already exists' },
+        { success: false, error: `Alias "${body.alias}" already exists. Please use a different alias.` },
         { status: 400 }
       );
     }
 
-    // Create page
-    const { data, error } = await supabaseAdmin
-      .from('pages')
-      .insert({
-        title,
-        alias,
-        description: description || null,
-        content: content || null,
-        status: status || 'Draft',
-        meta_title: seo?.customTitle || null,
-        meta_description: seo?.metaDescription || null,
-        meta_keywords: seo?.metaKeywords || null,
-        og_image: seo?.ogImage || null,
-        twitter_title: seo?.twitterTitle || null,
-        twitter_description: seo?.twitterDescription || null,
-        twitter_image: seo?.twitterImage || null,
-        header_code: seo?.headerCode || null,
-        footer_code: seo?.footerCode || null,
-      })
-      .select()
-      .single();
+    const [newPage] = await db
+      .insert(pages)
+      .values(body)
+      .returning();
 
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, data: newPage }, { status: 201 });
+  } catch (error: any) {
+    console.error('❌ Create page error:', error);
+    
+    // Handle specific database errors
+    if (error.message && error.message.includes('UNIQUE constraint failed')) {
+      return NextResponse.json(
+        { success: false, error: 'A page with this alias already exists. Please use a different alias.' },
+        { status: 400 }
+      );
     }
-
-    return NextResponse.json(data, { status: 201 });
-  } catch (error) {
-    console.error('API error:', error);
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, error: error.message || 'Failed to create page' },
       { status: 500 }
     );
   }

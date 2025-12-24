@@ -1,28 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { editions } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
+import { unlink } from 'fs/promises';
+import { join } from 'path';
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
-
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
+    const editionId = parseInt(params.id);
 
     // Get edition to find PDF file path
-    const { data: edition, error: editionError } = await supabaseAdmin
-      .from('editions')
-      .select('pdf_url')
-      .eq('id', id)
-      .single();
+    const [edition] = await db
+      .select()
+      .from(editions)
+      .where(eq(editions.id, editionId))
+      .limit(1);
 
-    if (editionError || !edition) {
+    if (!edition) {
       return NextResponse.json(
         { success: false, error: 'Edition not found' },
         { status: 404 }
@@ -36,32 +33,24 @@ export async function DELETE(
       );
     }
 
-    // Extract file path from URL
-    const urlParts = edition.pdf_url.split('/');
-    const fileName = urlParts[urlParts.length - 1];
-
-    // Delete from storage
-    const { error: deleteError } = await supabaseAdmin.storage
-      .from('edition-pdfs')
-      .remove([fileName]);
-
-    if (deleteError) {
-      console.error('Storage delete error:', deleteError);
-      // Continue anyway to clear the database reference
+    // Delete from file system if MEDIA_PATH is set
+    if (process.env.MEDIA_PATH) {
+      try {
+        const urlParts = edition.pdf_url.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        const filePath = join(process.env.MEDIA_PATH, 'pdfs', fileName);
+        await unlink(filePath);
+      } catch (error) {
+        console.error('File delete error:', error);
+        // Continue anyway to clear the database reference
+      }
     }
 
     // Update edition to remove PDF URL
-    const { error: updateError } = await supabaseAdmin
-      .from('editions')
-      .update({ pdf_url: null })
-      .eq('id', id);
-
-    if (updateError) {
-      return NextResponse.json(
-        { success: false, error: updateError.message },
-        { status: 500 }
-      );
-    }
+    await db
+      .update(editions)
+      .set({ pdf_url: null })
+      .where(eq(editions.id, editionId));
 
     return NextResponse.json({
       success: true,

@@ -1,96 +1,113 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { writeFile, mkdir, unlink } from 'fs/promises';
+import { join } from 'path';
+import { db } from '@/lib/db';
+import { edition_pages } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
+/**
+ * POST /api/editions/[id]/pages/[pageId]/replace
+ * Replace an existing page image
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string; pageId: string } }
 ) {
   try {
-    const { id, pageId } = params;
+    const editionId = parseInt(params.id);
+    const pageId = parseInt(params.pageId);
     const formData = await request.formData();
-    const image = formData.get('image') as File;
+    const file = formData.get('image') as File;
 
-    if (!image) {
+    if (!file) {
       return NextResponse.json(
-        { success: false, error: 'No image provided' },
+        { success: false, error: 'No image file provided' },
         { status: 400 }
       );
     }
 
-    if (!supabaseAdmin) {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
       return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
+        { success: false, error: 'File must be an image' },
+        { status: 400 }
       );
     }
 
-    // Get existing page
-    const { data: page, error: fetchError } = await supabaseAdmin
-      .from('edition_pages')
-      .select('*')
-      .eq('id', pageId)
-      .eq('edition_id', id)
-      .single();
+    // Get existing page data
+    const [existingPage] = await db
+      .select()
+      .from(edition_pages)
+      .where(eq(edition_pages.id, pageId))
+      .limit(1);
 
-    if (fetchError || !page) {
+    if (!existingPage) {
       return NextResponse.json(
         { success: false, error: 'Page not found' },
         { status: 404 }
       );
     }
 
-    // Delete old image from storage
-    const oldUrlParts = page.image_url.split('/');
-    const oldFileName = oldUrlParts[oldUrlParts.length - 1];
-    await supabaseAdmin.storage
-      .from('page-assets')
-      .remove([oldFileName]);
+    // Convert file to buffer
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
 
-    // Upload new image
-    const imageBuffer = await image.arrayBuffer();
-    const fileName = `edition-${id}-page-${page.page_number}-${Date.now()}.${image.type.split('/')[1]}`;
+    // Create upload directory
+    const mediaPath = process.env.MEDIA_PATH || './public/uploads';
+    const dirPath = join(mediaPath, 'page-assets');
+    await mkdir(dirPath, { recursive: true });
 
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('page-assets')
-      .upload(fileName, imageBuffer, {
-        contentType: image.type,
-        upsert: true,
-      });
+    // Generate new filename
+    const fileExtension = file.name.split('.').pop() || 'jpg';
+    const fileName = `edition-${editionId}-page-${existingPage.page_number}-${Date.now()}.${fileExtension}`;
+    const filePath = join(dirPath, fileName);
 
-    if (uploadError) {
-      return NextResponse.json(
-        { success: false, error: 'Failed to upload image' },
-        { status: 500 }
-      );
+    // Save new file
+    await writeFile(filePath, buffer);
+
+    // Delete old file if it exists
+    if (existingPage.image_url) {
+      try {
+        const oldFileName = existingPage.image_url.split('/').pop();
+        if (oldFileName) {
+          const oldFilePath = join(dirPath, oldFileName);
+          await unlink(oldFilePath).catch(() => {}); // Ignore errors if file doesn't exist
+        }
+      } catch (deleteError) {
+        console.error('Failed to delete old image:', deleteError);
+        // Continue anyway - new image is more important
+      }
     }
 
-    // Get new public URL
-    const { data: urlData } = supabaseAdmin.storage
-      .from('page-assets')
-      .getPublicUrl(fileName);
+    // Generate public URL
+    const imageUrl = `/uploads/page-assets/${fileName}`;
 
-    // Update database
-    const { error: updateError } = await supabaseAdmin
-      .from('edition_pages')
-      .update({ image_url: urlData.publicUrl })
-      .eq('id', pageId);
-
-    if (updateError) {
-      return NextResponse.json(
-        { success: false, error: updateError.message },
-        { status: 500 }
-      );
-    }
+    // Update page in database
+    const [updatedPage] = await db
+      .update(edition_pages)
+      .set({
+        image_url: imageUrl,
+      })
+      .where(eq(edition_pages.id, pageId))
+      .returning();
 
     return NextResponse.json({
       success: true,
-      message: 'Page replaced successfully',
-      data: { image_url: urlData.publicUrl },
+      data: {
+        page: updatedPage,
+        image_url: imageUrl,
+        file_name: file.name,
+        file_size: buffer.length,
+      },
     });
+
   } catch (error) {
     console.error('Replace page error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to replace page' },
+      { 
+        success: false, 
+        error: 'Failed to replace page: ' + (error instanceof Error ? error.message : 'Unknown error')
+      },
       { status: 500 }
     );
   }

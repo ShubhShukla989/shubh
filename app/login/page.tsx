@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { signIn, getSession } from 'next-auth/react';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 function LoginPageContent() {
@@ -19,27 +20,33 @@ function LoginPageContent() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+      console.log('Attempting login with:', { email, password: '***' });
+      
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
       });
 
-      const data = await response.json();
+      console.log('Login result:', result);
 
-      if (data.success && data.user) {
-        // Store user in localStorage for AuthContext
-        localStorage.setItem('user', JSON.stringify(data.user));
+      if (result?.error) {
+        setError('Invalid credentials: ' + result.error);
+      } else if (result?.ok) {
+        // Wait a moment for session to be established
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Get redirect URL from query params or default to /admin
         const redirectTo = searchParams?.get('redirect') || '/admin';
+        console.log('Redirecting to:', redirectTo);
         
-        // Force page reload to initialize AuthContext
+        // Force a hard redirect to ensure middleware runs
         window.location.href = redirectTo;
       } else {
-        setError(data.error || 'Invalid credentials');
+        setError('Login failed - no result returned');
       }
     } catch (err) {
+      console.error('Login error:', err);
       setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);

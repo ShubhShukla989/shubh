@@ -1,35 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { edition_pages } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string; pageId: string } }
 ) {
   try {
-    const { id, pageId } = params;
+    const [page] = await db
+      .select()
+      .from(edition_pages)
+      .where(eq(edition_pages.id, parseInt(params.pageId)))
+      .limit(1);
 
-    if (!supabaseAdmin) {
+    if (!page) {
       return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('edition_pages')
-      .select('*')
-      .eq('id', pageId)
-      .eq('edition_id', id)
-      .single();
-
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: 'Page not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data: page });
   } catch (error) {
     console.error('Get page error:', error);
     return NextResponse.json(
@@ -44,42 +36,22 @@ export async function PUT(
   { params }: { params: { id: string; pageId: string } }
 ) {
   try {
-    const { id, pageId } = params;
     const body = await request.json();
 
-    if (!supabaseAdmin) {
+    const [updated] = await db
+      .update(edition_pages)
+      .set(body)
+      .where(eq(edition_pages.id, parseInt(params.pageId)))
+      .returning();
+
+    if (!updated) {
       return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
+        { success: false, error: 'Page not found' },
+        { status: 404 }
       );
     }
 
-    // Update page details
-    const { data, error } = await supabaseAdmin
-      .from('edition_pages')
-      .update({
-        title: body.title,
-        alias: body.alias,
-        description: body.description,
-        category: body.category,
-      })
-      .eq('id', pageId)
-      .eq('edition_id', id)
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data,
-      message: 'Page updated successfully',
-    });
+    return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     console.error('Update page error:', error);
     return NextResponse.json(
@@ -94,55 +66,9 @@ export async function DELETE(
   { params }: { params: { id: string; pageId: string } }
 ) {
   try {
-    const { id, pageId } = params;
-
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Get page details
-    const { data: page, error: fetchError } = await supabaseAdmin
-      .from('edition_pages')
-      .select('*')
-      .eq('id', pageId)
-      .eq('edition_id', id)
-      .single();
-
-    if (fetchError || !page) {
-      return NextResponse.json(
-        { success: false, error: 'Page not found' },
-        { status: 404 }
-      );
-    }
-
-    // Extract filename from URL
-    const urlParts = page.image_url.split('/');
-    const fileName = urlParts[urlParts.length - 1];
-
-    // Delete from storage
-    const { error: deleteStorageError } = await supabaseAdmin.storage
-      .from('page-assets')
-      .remove([fileName]);
-
-    if (deleteStorageError) {
-      console.error('Storage delete error:', deleteStorageError);
-    }
-
-    // Delete from database
-    const { error: deleteError } = await supabaseAdmin
-      .from('edition_pages')
-      .delete()
-      .eq('id', pageId);
-
-    if (deleteError) {
-      return NextResponse.json(
-        { success: false, error: deleteError.message },
-        { status: 500 }
-      );
-    }
+    await db
+      .delete(edition_pages)
+      .where(eq(edition_pages.id, parseInt(params.pageId)));
 
     return NextResponse.json({
       success: true,

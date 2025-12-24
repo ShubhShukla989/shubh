@@ -1,40 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { epaper_categories } from '@/lib/schema/categories';
+import { eq, asc, and } from 'drizzle-orm';
 
 // GET all categories
 export async function GET(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const featured = searchParams.get('featured');
     const active = searchParams.get('active');
 
-    let query = supabaseAdmin
-      .from('epaper_categories')
-      .select('*')
-      .order('display_order', { ascending: true });
+    let query = db.select().from(epaper_categories);
+    const conditions = [];
 
     if (featured === 'true') {
-      query = query.eq('is_featured', true);
+      conditions.push(eq(epaper_categories.is_featured, true));
     }
 
     if (active === 'true') {
-      query = query.eq('is_active', true);
+      conditions.push(eq(epaper_categories.is_active, true));
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
+    let data;
+    if (conditions.length > 0) {
+      data = await query.where(and(...conditions)).orderBy(asc(epaper_categories.display_order));
+    } else {
+      data = await query.orderBy(asc(epaper_categories.display_order));
     }
 
     return NextResponse.json({ success: true, data: data || [] });
@@ -50,13 +41,6 @@ export async function GET(request: NextRequest) {
 // POST create new category
 export async function POST(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
     const body = await request.json();
     const {
       title,
@@ -80,9 +64,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('epaper_categories')
-      .insert({
+    const [data] = await db
+      .insert(epaper_categories)
+      .values({
         title,
         alias,
         description,
@@ -96,15 +80,7 @@ export async function POST(request: NextRequest) {
         is_featured: is_featured || false,
         display_order: display_order || 0,
       })
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
+      .returning();
 
     return NextResponse.json({
       success: true,

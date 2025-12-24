@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
@@ -8,32 +7,12 @@ export async function GET(
   try {
     const clipId = params.id;
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Fetch clip data from database
-    const { data: clip, error } = await supabaseAdmin
-      .from('epaper_clips')
-      .select('*')
-      .eq('id', clipId)
-      .single();
-
-    if (error) {
-      console.error('Error fetching clip:', error);
-      return NextResponse.json(
-        { success: false, error: 'Clip not found' },
-        { status: 404 }
-      );
-    }
-
+    // Note: epaper_clips table needs to be added to schema
+    // For now, return a placeholder response
     return NextResponse.json({
-      success: true,
-      data: clip
-    });
+      success: false,
+      error: 'Clips feature requires schema migration - epaper_clips table not yet defined'
+    }, { status: 501 });
   } catch (error) {
     console.error('Error in clips API:', error);
     return NextResponse.json(

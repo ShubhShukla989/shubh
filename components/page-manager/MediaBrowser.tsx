@@ -52,9 +52,16 @@ export default function MediaBrowser({ isOpen, onClose, onSelect, accept = 'imag
   };
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('📤 handleFileUpload called');
     const uploadedFiles = e.target.files;
-    if (!uploadedFiles) return;
+    console.log('📁 Files selected:', uploadedFiles?.length || 0);
+    
+    if (!uploadedFiles) {
+      console.log('❌ No files selected');
+      return;
+    }
 
+    console.log('🚀 Starting upload process...');
     setUploading(true);
     try {
       const formData = new FormData();
@@ -71,7 +78,18 @@ export default function MediaBrowser({ isOpen, onClose, onSelect, accept = 'imag
 
       const result = await response.json();
       const newFiles = result.data || [];
+      console.log('📦 New files received from API:', newFiles);
       setFiles((prev) => [...newFiles, ...prev]);
+      
+      // Auto-select the first uploaded file
+      if (newFiles.length > 0) {
+        console.log('✅ Auto-selecting first uploaded file:', newFiles[0].url);
+        setSelectedFile(newFiles[0].url);
+        
+        // Show success message
+        const fileName = newFiles[0].name;
+        alert(`✅ File "${fileName}" uploaded and selected successfully!`);
+      }
     } catch (error) {
       console.error('Upload error:', error);
       alert('Failed to upload files');

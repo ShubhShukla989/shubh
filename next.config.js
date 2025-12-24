@@ -4,8 +4,17 @@ const nextConfig = {
     domains: ['localhost'],
     remotePatterns: [
       {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3000',
+      },
+      {
         protocol: 'https',
-        hostname: '**.supabase.co',
+        hostname: '**',
+      },
+      {
+        protocol: 'http',
+        hostname: '**',
       },
     ],
   },
@@ -22,10 +31,9 @@ const nextConfig = {
     // Ensure proper client reference manifest generation
     optimizePackageImports: ['@heroicons/react', 'lucide-react'],
   },
-  // Disable static optimization for route groups with client components
-  outputFileTracingIncludes: {
-    '/(public)': [],
-  },
+  // Optimize Fast Refresh for better development experience
+  reactStrictMode: false,
+  swcMinify: true,
 }
 
 module.exports = nextConfig

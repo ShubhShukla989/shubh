@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, requireSupabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { layout_backups } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 // GET /api/layouts/download/[id] - Download specific backup
 export async function GET(
@@ -7,27 +9,21 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const configError = requireSupabaseAdmin();
-    if (configError) return configError;
+    const [data] = await db
+      .select()
+      .from(layout_backups)
+      .where(eq(layout_backups.id, params.id))
+      .limit(1);
 
-    const { data, error } = await supabaseAdmin!
-      .from('layout_backups')
-      .select('*')
-      .eq('id', params.id)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json(
-          { success: false, error: 'Backup not found' },
-          { status: 404 }
-        );
-      }
-      throw error;
+    if (!data) {
+      return NextResponse.json(
+        { success: false, error: 'Backup not found' },
+        { status: 404 }
+      );
     }
 
     // Return as downloadable JSON
-    const filename = `${data.layout_name}-backup-${data.created_at}.json`;
+    const filename = `${data.layout_name}-backup-${data.timestamp}.json`;
     
     return new NextResponse(JSON.stringify(data, null, 2), {
       headers: {

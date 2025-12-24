@@ -1,24 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useDeviceDetection } from '../../hooks/useDeviceDetection';
-import { LayoutRendererMobile } from '../mobile/LayoutRenderer.mobile';
-import { EpaperArchiveWidget } from '../epaper/EpaperArchiveWidget';
-import { EpaperCalendarWidget } from '../epaper/EpaperCalendarWidget';
-import { EpaperPaginationWidget } from '../epaper/EpaperPaginationWidget';
-import { EpaperPdfDownloadWidget } from '../epaper/EpaperPdfDownloadWidget';
-import { EpaperThumbNavigationWidget } from '../epaper/EpaperThumbNavigationWidget';
+import { useColumnVisibility } from './ColumnVisibilityHelper';
 
-import { EpaperClipShareWidget } from '../epaper/EpaperClipShareWidget';
-import { EpaperClipDisplayWidget } from '../epaper/EpaperClipDisplayWidget';
-import { EpaperFeaturedWidget } from '../epaper/EpaperFeaturedWidget';
-import { EpaperPageDisplayWidget } from '../epaper/EpaperPageDisplayWidget';
-import { EpaperZoomWidget } from '../epaper/EpaperZoomWidget';
-import { EpaperSocialSharingWidget } from '../epaper/EpaperSocialSharingWidget';
-import { EpaperAreaMapDisplayWidget } from '../epaper/EpaperAreaMapDisplayWidget';
-import { SocialWidget } from '../SocialWidget';
-import { PageDownloadWidget } from '../page/PageDownloadWidget';
-import { NavigationWidget } from '../navigation/NavigationWidget';
+import { ContextAwareWidget } from './ContextAwareWidget';
+import { WidgetErrorBoundary } from './WidgetErrorBoundary';
 
 interface LayoutRendererProps {
   layoutName: string;
@@ -29,13 +15,9 @@ interface LayoutRendererProps {
 }
 
 export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pageNumber }: LayoutRendererProps) {
-  const { isMobile, isLoaded } = useDeviceDetection();
+  const { isColumnVisible, isRowVisible, isWidgetVisible } = useColumnVisibility();
   const [layoutData, setLayoutData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchLayout();
-  }, [layoutName, pageName]);
 
   const fetchLayout = async () => {
     try {
@@ -54,30 +36,88 @@ export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pag
       });
       const data = await response.json();
       
-      if (data.success) {
+      if (data.success && data.data) {
         console.log('Layout data fetched:', data.data);
         setLayoutData(data.data);
       } else {
         console.error('Failed to fetch layout:', data);
+        
+        // Auto-fallback to Website Homepage if current layout fails
+        if (layoutName !== 'Website Homepage') {
+          console.log('🔧 Attempting fallback to Website Homepage');
+          const fallbackUrl = `/api/layouts/${encodeURIComponent('Website Homepage')}`;
+          const fallbackResponse = await fetch(fallbackUrl, {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+            },
+          });
+          const fallbackData = await fallbackResponse.json();
+          
+          if (fallbackData.success && fallbackData.data) {
+            console.log('✅ Fallback layout loaded');
+            setLayoutData(fallbackData.data);
+          } else {
+            setLayoutData(null);
+          }
+        } else {
+          setLayoutData(null);
+        }
       }
     } catch (error) {
       console.error('Error fetching layout:', error);
+      setLayoutData(null);
     } finally {
       setLoading(false);
     }
   };
 
-  // Use mobile renderer for mobile devices
-  if (isLoaded && isMobile) {
-    return <LayoutRendererMobile layoutName={layoutName} pageName={pageName} />;
-  }
+  useEffect(() => {
+    if (layoutName) {
+      fetchLayout();
+    }
+  }, [layoutName, pageName]);
+
+  // Device detection removed - using responsive CSS instead
 
   if (loading) {
-    return null; // Silent loading
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <div className="text-gray-500">Loading layout...</div>
+      </div>
+    );
   }
 
   if (!layoutData) {
-    return null; // Silent fail
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <div className="text-red-500">Layout not found: {layoutName}</div>
+      </div>
+    );
+  }
+
+  // Parse structure safely
+  let structure;
+  try {
+    structure = typeof layoutData.structure === 'string' 
+      ? JSON.parse(layoutData.structure) 
+      : layoutData.structure;
+  } catch (error) {
+    console.error('Failed to parse layout structure:', error);
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <div className="text-red-500">Invalid layout structure</div>
+      </div>
+    );
+  }
+
+  if (!structure || !structure.rows || structure.rows.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <div className="text-yellow-600">Layout has no content</div>
+      </div>
+    );
   }
 
   return (
@@ -91,36 +131,115 @@ export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pag
       )}
 
       {/* Render Layout Structure */}
-      <div className="layout-renderer" data-layout={layoutName}>
-        {layoutData.structure?.rows?.map((row: any) => (
-          <div 
-            key={row.id} 
-            className={`layout-row ${row.properties?.cssClass || row.cssClass || ''}`}
-            style={parseInlineStyle(row.properties?.customCss || row.properties?.customStyle || row.customStyle)}
-          >
-            <div className="flex flex-wrap">
-              {row.columns?.map((column: any) => (
-                <div
-                  key={column.id}
-                  className={`layout-column ${column.properties?.cssClass || column.cssClass || ''}`}
-                  style={{
-                    flex: `0 0 ${((column.width || 6) / 12) * 100}%`,
-                    maxWidth: `${((column.width || 6) / 12) * 100}%`,
-                    boxSizing: 'border-box',
-                    ...parseInlineStyle(column.properties?.customCss || column.properties?.customStyle || column.customStyle),
-                  }}
-                >
-                  {/* Render Widgets */}
-                  {column.widgets?.map((widget: any) => (
-                    <div key={widget.id} className={`widget ${widget.config?.cssClasses || ''}`}>
-                      {renderWidget(widget, areaMapId, editionId, pageNumber)}
+      <div className="layout-renderer responsive-layout" data-layout={layoutName}>
+        <style jsx>{`
+          .layout-renderer .layout-row {
+            width: 100%;
+            display: block;
+          }
+          .layout-renderer .layout-row > div {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: stretch;
+          }
+          .layout-renderer .layout-column {
+            display: flex;
+            flex-direction: column;
+            min-height: 1px;
+            padding: 0.25rem;
+          }
+          
+          /* All screens: Keep columns in row (horizontal layout) */
+          .layout-renderer .layout-row > div {
+            flex-direction: row !important;
+            align-items: stretch !important;
+          }
+          
+          /* Mobile adjustments: Smaller padding, responsive text */
+          @media (max-width: 767px) {
+            .layout-renderer .layout-column {
+              padding: 0.125rem;
+            }
+            
+            /* Make widgets more compact on mobile */
+            .layout-renderer .widget {
+              font-size: 0.875rem;
+            }
+            
+            /* Smaller buttons on mobile */
+            .layout-renderer .widget button {
+              padding: 0.375rem 0.75rem;
+              font-size: 0.75rem;
+            }
+          }
+          
+          /* Ensure widgets fill their containers */
+          .layout-renderer .widget {
+            width: 100%;
+            display: block;
+          }
+        `}</style>
+        {console.log('🎯 Rendering structure:', structure)}
+        {structure.rows?.filter((row: any) => isRowVisible(row)).map((row: any) => {
+          // Filter visible columns for this device
+          const visibleColumns = row.columns?.filter((column: any) => {
+            if (!isColumnVisible(column)) return false;
+            
+            // Check if column has any visible widgets
+            const hasVisibleWidgets = column.widgets?.some((widget: any) => isWidgetVisible(widget));
+            return hasVisibleWidgets;
+          }) || [];
+          
+          // If no visible columns, don't render the row
+          if (visibleColumns.length === 0) return null;
+          
+          return (
+            <div 
+              key={row.id} 
+              className={`layout-row ${row.properties?.cssClass || row.cssClass || ''}`}
+              style={parseInlineStyle(row.properties?.customCss || row.properties?.customStyle || row.customStyle)}
+            >
+              <div className="flex flex-wrap w-full">
+                {visibleColumns.map((column: any, index: number) => {
+                  // Filter visible widgets for this column
+                  const visibleWidgets = column.widgets?.filter((widget: any) => isWidgetVisible(widget)) || [];
+                  
+                  // Auto-adjust width: divide 100% equally among visible columns with widgets
+                  const autoWidth = 100 / visibleColumns.length;
+                  
+                  return (
+                    <div
+                      key={column.id}
+                      className={`layout-column ${column.properties?.cssClass || column.cssClass || ''}`}
+                      style={{
+                        flex: `0 0 ${autoWidth}%`,
+                        maxWidth: `${autoWidth}%`,
+                        width: `${autoWidth}%`,
+                        boxSizing: 'border-box',
+                        ...parseInlineStyle(column.properties?.customCss || column.properties?.customStyle || column.customStyle),
+                      }}
+                    >
+                      {/* Render Only Visible Widgets */}
+                      {visibleWidgets.map((widget: any) => (
+                        <div key={widget.id} className={`widget responsive-widget ${widget.config?.cssClasses || ''}`}>
+                          <WidgetErrorBoundary widgetType={widget.type}>
+                            <ContextAwareWidget 
+                              widget={widget} 
+                              areaMapId={areaMapId} 
+                              editionId={editionId} 
+                              pageNumber={pageNumber}
+                            />
+                          </WidgetErrorBoundary>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Custom JS */}
@@ -134,125 +253,7 @@ export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pag
   );
 }
 
-function renderWidget(widget: any, areaMapId?: string, editionId?: string, pageNumber?: string) {
-  switch (widget.type) {
-    case 'image':
-      const imgStyle = parseInlineStyle(widget.config.style);
-      
-      const imgElement = (
-        <img
-          src={widget.config.src}
-          alt={widget.config.alt || ''}
-          title={widget.config.title || ''}
-          loading={widget.config.lazyload !== false ? 'lazy' : 'eager'}
-          className={widget.config.cssClasses || ''}
-          style={imgStyle}
-        />
-      );
-      
-      // If there's a link, wrap in anchor tag
-      if (widget.config.link) {
-        return (
-          <a 
-            href={widget.config.link} 
-            target={widget.config.target || '_self'}
-            className={widget.config.cssClasses || ''}
-          >
-            {imgElement}
-          </a>
-        );
-      }
-      
-      return imgElement;
 
-    case 'text':
-    case 'html':
-      return (
-        <div 
-          className={widget.config.cssClasses || ''}
-          style={parseInlineStyle(widget.config.style)}
-          dangerouslySetInnerHTML={{ __html: widget.config.content || widget.config.html }} 
-        />
-      );
-
-    case 'heading':
-      const HeadingTag = (widget.config.renderTag || 'h1') as keyof JSX.IntrinsicElements;
-      const headingText = widget.config.title || 'Heading';
-      const formatClass = widget.config.format || 'h4';
-      
-      return (
-        <HeadingTag 
-          className={`${formatClass} ${widget.config.cssClasses || ''}`}
-          style={parseInlineStyle(widget.config.style)}
-        >
-          {headingText}
-        </HeadingTag>
-      );
-
-    case 'button':
-      return (
-        <a
-          href={widget.config.link || '#'}
-          className={`btn btn-${widget.config.style || 'primary'}`}
-        >
-          {widget.config.text}
-        </a>
-      );
-
-    case 'social':
-      return <SocialWidget config={widget.config} />;
-
-    case 'epaper-archive':
-      return <EpaperArchiveWidget config={widget.config} />;
-
-    case 'epaper-calendar':
-      return <EpaperCalendarWidget config={widget.config} />;
-
-    case 'epaper-pagination':
-      return <EpaperPaginationWidget config={widget.config} />;
-
-    case 'epaper-pdf-download':
-      return <EpaperPdfDownloadWidget config={widget.config} />;
-
-    case 'page-download':
-      return <PageDownloadWidget config={widget.config} />;
-
-    case 'epaper-thumb-navigation':
-      return <EpaperThumbNavigationWidget config={widget.config} />;
-
-    case 'epaper-clip-share':
-      return <EpaperClipShareWidget config={widget.config} />;
-
-    case 'epaper-clip-display':
-      return <EpaperClipDisplayWidget config={widget.config} />;
-
-    case 'epaper-display':
-    case 'epaper-page-display':
-      return <EpaperPageDisplayWidget config={widget.config} />;
-
-    case 'epaper-zoom':
-      return <EpaperZoomWidget config={widget.config} />;
-
-    case 'social-sharing':
-      return <EpaperSocialSharingWidget config={widget.config} />;
-
-    case 'epaper-featured':
-      return <EpaperFeaturedWidget config={widget.config} />;
-
-    case 'epaper-category':
-      return <EpaperFeaturedWidget config={widget.config} />;
-
-    case 'epaper-area-map':
-    case 'epaper-area-map-display':
-      return <EpaperAreaMapDisplayWidget config={widget.config} areaMapId={areaMapId} editionId={editionId} pageNumber={pageNumber} />
-
-    case 'navigation':
-      return <NavigationWidget config={widget.config} />;
-
-    default:
-      return null;
-  }
-}
 
 function parseInlineStyle(styleString?: string): React.CSSProperties {
   if (!styleString) return {};

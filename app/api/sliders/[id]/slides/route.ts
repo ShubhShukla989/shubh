@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { db } from '@/lib/db';
+import { slides } from '@/lib/schema';
+import { eq, asc } from 'drizzle-orm';
 
 /**
  * GET /api/sliders/[id]/slides
@@ -14,19 +12,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { data, error } = await supabase
-      .from('slides')
-      .select('*')
-      .eq('slider_id', params.id)
-      .order('position', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching slides:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch slides' },
-        { status: 500 }
-      );
-    }
+    const data = await db
+      .select()
+      .from(slides)
+      .where(eq(slides.slider_id, parseInt(params.id)))
+      .orderBy(asc(slides.position));
 
     return NextResponse.json(data);
   } catch (error) {
@@ -59,29 +49,18 @@ export async function POST(
     }
 
     // Create slide
-    const { data, error } = await supabase
-      .from('slides')
-      .insert([
-        {
-          slider_id: params.id,
-          image_url: imageUrl,
-          caption,
-          alt: alt || '',
-          link,
-          position: position || 0,
-          visible: visible !== false,
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating slide:', error);
-      return NextResponse.json(
-        { error: 'Failed to create slide' },
-        { status: 500 }
-      );
-    }
+    const [data] = await db
+      .insert(slides)
+      .values({
+        slider_id: parseInt(params.id),
+        image_url: imageUrl,
+        caption,
+        alt: alt || '',
+        link,
+        position: position || 0,
+        visible: visible !== false,
+      })
+      .returning();
 
     return NextResponse.json(data, { status: 201 });
   } catch (error) {

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { menus, menu_items, pages } from '@/lib/schema';
+import { eq, asc } from 'drizzle-orm';
 
 /**
  * GET /api/menu/alias/:alias - Get menu with items by alias
@@ -14,41 +16,37 @@ export async function GET(
   try {
     const { alias } = params;
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
     // Get menu by alias
-    const { data: menu, error: menuError } = await supabaseAdmin
-      .from('menus')
-      .select('*')
-      .eq('alias', alias)
-      .single();
+    const [menu] = await db
+      .select()
+      .from(menus)
+      .where(eq(menus.alias, alias))
+      .limit(1);
 
-    if (menuError || !menu) {
+    if (!menu) {
       return NextResponse.json({ error: 'Menu not found' }, { status: 404 });
     }
 
     // Get menu items with page information
-    const { data: items, error: itemsError } = await supabaseAdmin
-      .from('menu_items')
-      .select(`
-        *,
-        pages!left(id, alias, title)
-      `)
-      .eq('menu_id', menu.id)
-      .order('position');
-
-    if (itemsError) {
-      console.error('Database error:', itemsError);
-      return NextResponse.json(
-        { error: itemsError.message },
-        { status: 500 }
-      );
-    }
+    const items = await db
+      .select({
+        id: menu_items.id,
+        menu_id: menu_items.menu_id,
+        title: menu_items.title,
+        type: menu_items.type,
+        url: menu_items.url,
+        page_id: menu_items.page_id,
+        category_id: menu_items.category_id,
+        position: menu_items.position,
+        parent_id: menu_items.parent_id,
+        created_at: menu_items.created_at,
+        updated_at: menu_items.updated_at,
+        pages: pages,
+      })
+      .from(menu_items)
+      .leftJoin(pages, eq(menu_items.page_id, pages.id))
+      .where(eq(menu_items.menu_id, menu.id))
+      .orderBy(asc(menu_items.position));
 
     const response = NextResponse.json({
       ...menu,

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { db } from '@/lib/db';
+import { sliders, slides } from '@/lib/schema';
+import { eq, asc } from 'drizzle-orm';
 
 /**
  * GET /api/sliders/[id]
@@ -14,26 +12,27 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { data, error } = await supabase
-      .from('sliders')
-      .select('*, slides(*)')
-      .eq('id', params.id)
-      .single();
+    const [slider] = await db
+      .select()
+      .from(sliders)
+      .where(eq(sliders.id, parseInt(params.id)))
+      .limit(1);
 
-    if (error) {
-      console.error('Error fetching slider:', error);
+    if (!slider) {
       return NextResponse.json(
         { error: 'Slider not found' },
         { status: 404 }
       );
     }
 
-    // Sort slides by position
-    if (data.slides) {
-      data.slides.sort((a: any, b: any) => a.position - b.position);
-    }
+    // Get slides sorted by position
+    const sliderSlides = await db
+      .select()
+      .from(slides)
+      .where(eq(slides.slider_id, parseInt(params.id)))
+      .orderBy(asc(slides.position));
 
-    return NextResponse.json(data);
+    return NextResponse.json({ ...slider, slides: sliderSlides });
   } catch (error) {
     console.error('Error in GET /api/sliders/[id]:', error);
     return NextResponse.json(
@@ -55,25 +54,23 @@ export async function PUT(
     const body = await request.json();
     const { title, alias, description, status, config } = body;
 
-    const { data, error } = await supabase
-      .from('sliders')
-      .update({
+    const [data] = await db
+      .update(sliders)
+      .set({
         title,
         alias,
         description,
         status,
-        config,
+        config: config ? JSON.stringify(config) : undefined,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', params.id)
-      .select()
-      .single();
+      .where(eq(sliders.id, parseInt(params.id)))
+      .returning();
 
-    if (error) {
-      console.error('Error updating slider:', error);
+    if (!data) {
       return NextResponse.json(
-        { error: 'Failed to update slider' },
-        { status: 500 }
+        { error: 'Slider not found' },
+        { status: 404 }
       );
     }
 
@@ -97,24 +94,14 @@ export async function DELETE(
 ) {
   try {
     // Delete all slides first
-    await supabase
-      .from('slides')
-      .delete()
-      .eq('slider_id', params.id);
+    await db
+      .delete(slides)
+      .where(eq(slides.slider_id, parseInt(params.id)));
 
     // Delete slider
-    const { error } = await supabase
-      .from('sliders')
-      .delete()
-      .eq('id', params.id);
-
-    if (error) {
-      console.error('Error deleting slider:', error);
-      return NextResponse.json(
-        { error: 'Failed to delete slider' },
-        { status: 500 }
-      );
-    }
+    await db
+      .delete(sliders)
+      .where(eq(sliders.id, parseInt(params.id)));
 
     return NextResponse.json({ success: true });
   } catch (error) {

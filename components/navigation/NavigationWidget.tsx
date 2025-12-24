@@ -36,6 +36,20 @@ export function NavigationWidget({ config }: NavigationWidgetProps) {
   }, []);
 
   useEffect(() => {
+    // Lock body scroll when sidebar is open
+    if (isMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isMenuOpen]);
+
+  useEffect(() => {
     if (config.menuId) {
       fetchMenuItems();
     } else {
@@ -49,8 +63,6 @@ export function NavigationWidget({ config }: NavigationWidgetProps) {
       const response = await fetch(`/api/menu/${config.menuId}/items`);
       const menuItems = await response.json();
       
-      console.log('Menu items received:', menuItems); // Debug log
-      
       if (Array.isArray(menuItems) && menuItems.length > 0) {
         // Convert database menu items to our format
         const formattedItems = menuItems.map(item => {
@@ -59,8 +71,9 @@ export function NavigationWidget({ config }: NavigationWidgetProps) {
           // Handle different menu item types
           if (item.type === 'external' && item.url) {
             url = item.url;
-          } else if (item.type === 'page' && item.page_id) {
-            url = `/page/${item.page_id}`; // Adjust based on your page routing
+          } else if (item.type === 'page' && item.pages) {
+            // Use page alias instead of ID
+            url = `/epaper/page/${item.pages.alias}`;
           } else if (item.type === 'epaper_category' && item.category_id) {
             url = `/category/${item.category_id}`; // Adjust based on your category routing
           }
@@ -72,10 +85,8 @@ export function NavigationWidget({ config }: NavigationWidgetProps) {
             children: [] // For now, no nested items
           };
         });
-        console.log('Formatted menu items:', formattedItems); // Debug log
         setMenuItems(formattedItems);
       } else {
-        console.log('No menu items found');
         setMenuItems([]);
       }
     } catch (error) {
@@ -107,8 +118,8 @@ export function NavigationWidget({ config }: NavigationWidgetProps) {
               className="nav-link flex-grow-1"
               style={{ color: config.textColor }}
               onClick={() => !hasChildren && setIsMenuOpen(false)}
+              dangerouslySetInnerHTML={{ __html: item.title }}
             >
-              {item.title}
             </Link>
             {hasChildren && (
               <button
@@ -139,14 +150,13 @@ export function NavigationWidget({ config }: NavigationWidgetProps) {
               data-bs-toggle="dropdown"
               aria-expanded="false"
               style={{ color: config.textColor }}
+              dangerouslySetInnerHTML={{ __html: item.title }}
             >
-              {item.title}
             </a>
             <ul className="dropdown-menu">
               {item.children.map(child => (
                 <li key={child.id}>
-                  <Link className="dropdown-item" href={child.url}>
-                    {child.title}
+                  <Link className="dropdown-item" href={child.url} dangerouslySetInnerHTML={{ __html: child.title }}>
                   </Link>
                 </li>
               ))}
@@ -160,8 +170,8 @@ export function NavigationWidget({ config }: NavigationWidgetProps) {
               className="nav-link"
               href={item.url}
               style={{ color: config.textColor }}
+              dangerouslySetInnerHTML={{ __html: item.title }}
             >
-              {item.title}
             </Link>
           </div>
         );
@@ -239,32 +249,86 @@ export function NavigationWidget({ config }: NavigationWidgetProps) {
                   padding: '8px 12px',
                   display: 'block'
                 }}
+                dangerouslySetInnerHTML={{ __html: item.title }}
               >
-                {item.title}
               </Link>
             ))}
           </div>
 
-          {/* Mobile menu */}
+          {/* Mobile Sidebar */}
           {isMenuOpen && (
-            <div className="d-lg-none position-absolute top-100 start-0 w-100 bg-dark">
-              {menuItems.map(item => (
-                <Link
-                  key={item.id}
-                  href={item.url}
-                  style={{ 
-                    color: config.textColor || '#ffffff',
-                    textDecoration: 'none',
-                    padding: '12px 20px',
-                    display: 'block',
-                    borderBottom: '1px solid #333'
-                  }}
-                  onClick={() => setIsMenuOpen(false)}
+            <>
+              {/* Backdrop */}
+              <div 
+                className="d-lg-none position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50"
+                style={{ zIndex: 1040 }}
+                onClick={() => setIsMenuOpen(false)}
+              />
+              
+              {/* Sidebar */}
+              <div 
+                className="d-lg-none position-fixed top-0 start-0 h-100 bg-white shadow-lg"
+                style={{ 
+                  width: '280px',
+                  zIndex: 1050,
+                  transform: isMenuOpen ? 'translateX(0)' : 'translateX(-100%)',
+                  transition: 'transform 0.3s ease-in-out',
+                  overflowY: 'auto'
+                }}
+              >
+                {/* Sidebar Header */}
+                <div 
+                  className="d-flex justify-content-between align-items-center p-3 border-bottom"
+                  style={{ backgroundColor: config.backgroundColor || '#000000' }}
                 >
-                  {item.title}
-                </Link>
-              ))}
-            </div>
+                  {config.logoUrl && (
+                    <Image
+                      src={config.logoUrl}
+                      alt="Logo"
+                      width={120}
+                      height={40}
+                      className="d-inline-block"
+                    />
+                  )}
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => setIsMenuOpen(false)}
+                    style={{ color: config.textColor || '#ffffff' }}
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Sidebar Menu Items */}
+                <div className="p-0">
+                  {menuItems.map(item => (
+                    <Link
+                      key={item.id}
+                      href={item.url}
+                      className="d-block text-decoration-none border-bottom"
+                      style={{ 
+                        color: '#333',
+                        padding: '15px 20px',
+                        borderBottomColor: '#eee !important',
+                        transition: 'background-color 0.2s ease'
+                      }}
+                      onClick={() => setIsMenuOpen(false)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f8f9fa';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <span className="fw-medium" dangerouslySetInnerHTML={{ __html: item.title }}></span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>

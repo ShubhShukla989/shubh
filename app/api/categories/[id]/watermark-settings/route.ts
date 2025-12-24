@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, requireSupabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { category_watermark_settings } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,20 +11,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const configError = requireSupabaseAdmin();
-    if (configError) return configError;
-
     const categoryId = parseInt(params.id);
 
-    const { data, error } = await supabaseAdmin!
-      .from('category_watermark_settings')
-      .select('*')
-      .eq('category_id', categoryId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
+    const [data] = await db
+      .select()
+      .from(category_watermark_settings)
+      .where(eq(category_watermark_settings.category_id, categoryId))
+      .limit(1);
 
     // Return default settings if not found
     if (!data) {
@@ -67,25 +62,22 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const configError = requireSupabaseAdmin();
-    if (configError) return configError;
-
     const categoryId = parseInt(params.id);
     const body = await request.json();
 
     // Check if settings already exist
-    const { data: existing } = await supabaseAdmin!
-      .from('category_watermark_settings')
-      .select('id')
-      .eq('category_id', categoryId)
-      .single();
+    const [existing] = await db
+      .select()
+      .from(category_watermark_settings)
+      .where(eq(category_watermark_settings.category_id, categoryId))
+      .limit(1);
 
     let result;
     if (existing) {
       // Update existing settings
-      result = await supabaseAdmin!
-        .from('category_watermark_settings')
-        .update({
+      [result] = await db
+        .update(category_watermark_settings)
+        .set({
           override_global_settings: body.override_global_settings,
           enable_watermarking: body.enable_watermarking,
           logo_url: body.logo_url,
@@ -103,25 +95,22 @@ export async function POST(
           enable_center_watermark: body.enable_center_watermark,
           center_watermark_url: body.center_watermark_url,
           center_watermark_opacity: body.center_watermark_opacity,
+          updated_at: new Date().toISOString(),
         })
-        .eq('category_id', categoryId)
-        .select()
-        .single();
+        .where(eq(category_watermark_settings.category_id, categoryId))
+        .returning();
     } else {
       // Insert new settings
-      result = await supabaseAdmin!
-        .from('category_watermark_settings')
-        .insert({
+      [result] = await db
+        .insert(category_watermark_settings)
+        .values({
           category_id: categoryId,
           ...body,
         })
-        .select()
-        .single();
+        .returning();
     }
 
-    if (result.error) throw result.error;
-
-    return NextResponse.json({ success: true, data: result.data });
+    return NextResponse.json({ success: true, data: result });
   } catch (error) {
     console.error('Error saving watermark settings:', error);
     return NextResponse.json(

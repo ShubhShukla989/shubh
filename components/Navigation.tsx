@@ -82,24 +82,40 @@ export default function Navigation({ menuAlias = 'main-menu', className = '' }: 
 
   return (
     <nav className={className}>
-      <ul className="flex space-x-6">
+      <ul 
+        className="flex space-x-6" 
+        style={{ 
+          display: 'flex', 
+          flexDirection: 'row', 
+          gap: '1.5rem',
+          listStyle: 'none',
+          margin: 0,
+          padding: 0
+        }}
+      >
         {menuItems.map((item) => (
-          <li key={item.id}>
+          <li 
+            key={item.id} 
+            style={{ 
+              display: 'inline-block',
+              marginRight: '1.5rem'
+            }}
+          >
             {isExternalLink(item) ? (
               <a
                 href={getMenuItemUrl(item)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-gray-700 hover:text-blue-600 transition-colors"
+                dangerouslySetInnerHTML={{ __html: item.title }}
               >
-                {item.title}
               </a>
             ) : (
               <Link
                 href={getMenuItemUrl(item)}
                 className="text-gray-700 hover:text-blue-600 transition-colors"
+                dangerouslySetInnerHTML={{ __html: item.title }}
               >
-                {item.title}
               </Link>
             )}
           </li>

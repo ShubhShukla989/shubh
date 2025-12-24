@@ -22,8 +22,12 @@ export interface Edition {
   seo_meta_description?: string | null;
   scheduled_date?: string | null;
   created_by: number | null;
+  updated_by: number | null;
   created_at: string;
   updated_at: string;
+  created_by_name?: string | null;
+  updated_by_name?: string | null;
+  pages?: EditionPage[];
 }
 
 export interface EditionPage {

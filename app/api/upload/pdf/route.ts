@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, requireSupabaseAdmin } from '@/lib/supabase';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
 
 export async function POST(request: NextRequest) {
   try {
-    const configError = requireSupabaseAdmin();
-    if (configError) return configError;
-
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
@@ -42,29 +40,25 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabaseAdmin!.storage
-      .from('epaper-pdf')
-      .upload(filePath, buffer, {
-        contentType: 'application/pdf',
-        upsert: false,
-      });
+    // Save to local file system
+    const mediaPath = process.env.MEDIA_PATH || './public/uploads';
+    const fullPath = join(mediaPath, filePath);
+    const dirPath = join(mediaPath, 'editions');
 
-    if (uploadError) {
-      console.error('[Upload PDF] Error:', uploadError);
-      throw uploadError;
-    }
+    // Ensure directory exists
+    await mkdir(dirPath, { recursive: true });
 
-    // Get public URL
-    const { data: urlData } = supabaseAdmin!.storage
-      .from('epaper-pdf')
-      .getPublicUrl(filePath);
+    // Write file
+    await writeFile(fullPath, buffer);
+
+    // Generate public URL - use uploads path to match MEDIA_PATH
+    const publicUrl = `/uploads/${filePath}`;
 
     return NextResponse.json({
       success: true,
       data: {
-        path: uploadData.path,
-        url: urlData.publicUrl,
+        path: filePath,
+        url: publicUrl,
         fileName: file.name,
         fileSize: file.size,
       },

@@ -1,250 +1,157 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PDFDocument } from 'pdf-lib';
-import gm from 'gm';
-import { tmpdir } from 'os';
 import { join } from 'path';
-import { writeFile, readFile, unlink } from 'fs/promises';
-import { createClient } from '@supabase/supabase-js';
+import { mkdir } from 'fs/promises';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { PDFDocument } from 'pdf-lib';
+import { readFile } from 'fs/promises';
+import { db } from '@/lib/db';
+import { editions, edition_pages } from '@/lib/schema/index';
+import { eq } from 'drizzle-orm';
 
 /**
- * POST /api/editions/:id/extract-pages
+ * Clean PDF Page Extraction
  * 
- * Extracts pages from PDF using GraphicsMagick/ImageMagick
+ * Uses only essential tools:
+ * - Ghostscript: PDF to image conversion
+ * - pdf-lib: PDF metadata reading
  * 
- * REQUIREMENTS:
- * - ImageMagick must be installed on the system
- * - macOS: brew install imagemagick
- * - Linux: apt-get install imagemagick
+ * Requirements:
+ * - Ghostscript installed on system
+ * - Environment variable: GHOSTSCRIPT_PATH (optional)
+ * 
+ * Usage: POST /api/editions/[id]/extract-pages
+ * Body: { resolution?: number, format?: 'png' | 'jpg', quality?: number }
  */
 
-// Initialize Supabase admin client
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-export const dynamic = 'force-dynamic';
+const execAsync = promisify(exec);
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  console.log('=== PDF EXTRACTION STARTED ===');
   try {
-    const { id } = params;
-    console.log('Edition ID:', id);
-    
+    const editionId = parseInt(params.id);
     const body = await request.json();
-    const { 
-      startPage = 1, 
-      endPage = 1, 
-      extractAll = true,
-      resolution = 150 // DPI for image quality
-    } = body;
-    console.log('Extraction settings:', { startPage, endPage, extractAll, resolution });
+    
+    // Extract settings with defaults
+    const resolution = body.resolution || 150;
+    const format = body.format || 'png';
+    const quality = body.quality || 90;
+    
+    console.log('🚀 Starting PDF extraction');
+    console.log('📋 Settings:', { editionId, resolution, format, quality });
 
-    if (!supabaseAdmin) {
+    // Get edition details
+    const edition = await db
+      .select()
+      .from(editions)
+      .where(eq(editions.id, editionId))
+      .limit(1);
+
+    if (!edition.length || !edition[0].pdf_url) {
       return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Get edition with PDF URL
-    const { data: edition, error: editionError } = await supabaseAdmin
-      .from('editions')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (editionError || !edition) {
-      return NextResponse.json(
-        { success: false, error: 'Edition not found' },
+        { success: false, error: 'Edition or PDF not found' },
         { status: 404 }
       );
     }
 
-    if (!edition.pdf_url) {
-      return NextResponse.json(
-        { success: false, error: 'No PDF uploaded for this edition' },
-        { status: 400 }
-      );
-    }
+    const pdfPath = join(process.cwd(), 'public', edition[0].pdf_url);
+    console.log('📄 PDF Path:', pdfPath);
 
-    // Download PDF from URL with timeout
-    console.log('Downloading PDF from:', edition.pdf_url);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    // Read PDF to get page count
+    const pdfBuffer = await readFile(pdfPath);
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    const pageCount = pdfDoc.getPageCount();
     
-    let pdfDoc;
-    let totalPages;
+    console.log('📊 PDF has', pageCount, 'pages');
+
+    // Create uploads directory if it doesn't exist
+    const uploadsDir = join(process.cwd(), 'public', 'uploads');
+    await mkdir(uploadsDir, { recursive: true });
+
+    // Get Ghostscript executable path
+    const gsPath = process.env.GHOSTSCRIPT_PATH || 'C:\\Program Files\\gs\\gs10.03.1\\bin\\gswin64c.exe';
     
-    try {
-      const pdfResponse = await fetch(edition.pdf_url, {
-        signal: controller.signal,
+    // Extract all pages using Ghostscript
+    const outputPattern = join(uploadsDir, `edition-${editionId}-page-%d.${format}`);
+    
+    // Build Ghostscript command
+    const gsCommand = [
+      `"${gsPath}"`,
+      '-dNOPAUSE',
+      '-dBATCH',
+      '-dSAFER',
+      '-sDEVICE=' + (format === 'png' ? 'png16m' : 'jpeg'),
+      `-r${resolution}`,
+      format === 'jpg' ? `-dJPEGQ=${quality}` : '',
+      `-sOutputFile="${outputPattern}"`,
+      `"${pdfPath}"`
+    ].filter(Boolean).join(' ');
+
+    console.log('⚙️ Executing extraction command');
+
+    // Execute Ghostscript
+    const { stdout, stderr } = await execAsync(gsCommand);
+    
+    if (stderr && !stderr.includes('Warning')) {
+      console.error('❌ Extraction error:', stderr);
+    }
+    
+    console.log('✅ Extraction completed successfully');
+    if (stdout) console.log('📝 Output:', stdout);
+
+    // Clear existing pages for this edition
+    await db.delete(edition_pages).where(eq(edition_pages.edition_id, editionId));
+    console.log('🗑️ Cleared existing pages');
+
+    // Insert new pages into database
+    const newPages = [];
+    for (let i = 1; i <= pageCount; i++) {
+      const filename = `edition-${editionId}-page-${i}.${format}`;
+      const imagePath = `/uploads/${filename}`;
+      
+      newPages.push({
+        edition_id: editionId,
+        page_number: i,
+        image_url: imagePath,
       });
-      clearTimeout(timeout);
-      
-      if (!pdfResponse.ok) {
-        return NextResponse.json(
-          { success: false, error: 'Failed to download PDF' },
-          { status: 500 }
-        );
-      }
-
-      const pdfBuffer = await pdfResponse.arrayBuffer();
-      console.log('PDF downloaded, size:', pdfBuffer.byteLength);
-
-      // Load PDF with pdf-lib
-      console.log('Loading PDF document...');
-      pdfDoc = await PDFDocument.load(pdfBuffer);
-      totalPages = pdfDoc.getPageCount();
-      console.log('PDF loaded successfully, total pages:', totalPages);
-    } catch (fetchError) {
-      clearTimeout(timeout);
-      console.error('PDF download error:', fetchError);
-      return NextResponse.json(
-        { success: false, error: 'Failed to download or load PDF: ' + (fetchError instanceof Error ? fetchError.message : 'Unknown error') },
-        { status: 500 }
-      );
-    }
-    
-    // Delete existing pages for this edition to allow re-extraction
-    console.log('Deleting existing pages for edition:', id);
-    const { error: deleteError } = await supabaseAdmin
-      .from('edition_pages')
-      .delete()
-      .eq('edition_id', id);
-    
-    if (deleteError) {
-      console.error('Failed to delete existing pages:', deleteError);
-      // Continue anyway - might be first extraction
-    } else {
-      console.log('Existing pages deleted successfully');
-    }
-    
-    const pagesToExtract = extractAll ? totalPages : Math.min(endPage, totalPages) - startPage + 1;
-    const maxPages = Math.min(pagesToExtract, 30); // Limit to 30 pages
-
-    const extractedPages = [];
-
-    // Save PDF to temp file
-    const tempPdfPath = join(tmpdir(), `temp-pdf-${id}-${Date.now()}.pdf`);
-    const pdfBuffer = await pdfDoc.save();
-    await writeFile(tempPdfPath, Buffer.from(pdfBuffer));
-    console.log('Temp PDF saved to:', tempPdfPath);
-
-    // Use ImageMagick (gm uses ImageMagick by default on macOS with homebrew)
-    const imageMagick = gm.subClass({ imageMagick: true });
-
-    // Extract each page as PNG image
-    for (let pageNum = startPage; pageNum <= Math.min(startPage + maxPages - 1, totalPages); pageNum++) {
-      const tempImagePath = join(tmpdir(), `temp-page-${id}-${pageNum}-${Date.now()}.png`);
-      
-      try {
-        console.log(`Processing page ${pageNum}...`);
-        
-        // Convert PDF page to PNG using GraphicsMagick/ImageMagick
-        // Format: input.pdf[page-1] means extract specific page (0-indexed)
-        await new Promise<void>((resolve, reject) => {
-          imageMagick(`${tempPdfPath}[${pageNum - 1}]`)
-            .density(resolution, resolution)
-            .quality(90)
-            .write(tempImagePath, (err: Error | null) => {
-              if (err) reject(err);
-              else resolve();
-            });
-        });
-        
-        // Read the generated image
-        const imageBuffer = await readFile(tempImagePath);
-        console.log(`Page ${pageNum} converted to PNG, size: ${imageBuffer.byteLength} bytes`);
-        
-        // Clean up temp image file
-        await unlink(tempImagePath).catch(() => {});
-        
-        // Upload PNG image to storage
-        const fileName = `edition-${id}-page-${pageNum}.png`;
-        const { error: uploadError } = await supabaseAdmin.storage
-          .from('page-assets')
-          .upload(fileName, imageBuffer, {
-            contentType: 'image/png',
-            upsert: true,
-          });
-
-        if (uploadError) {
-          console.error(`Failed to upload page ${pageNum}:`, uploadError);
-          continue;
-        }
-
-        // Get public URL
-        const { data: urlData } = supabaseAdmin.storage
-          .from('page-assets')
-          .getPublicUrl(fileName);
-
-        const imageUrl = urlData.publicUrl;
-
-        // Create page record with image URL
-        console.log(`Inserting page ${pageNum} into database...`);
-        const { data: pageData, error: pageError } = await supabaseAdmin
-          .from('edition_pages')
-          .insert({
-            edition_id: parseInt(id),
-            page_number: pageNum,
-            image_url: imageUrl,
-          })
-          .select()
-          .single();
-
-        if (pageError) {
-          console.error(`Failed to insert page ${pageNum} into database:`, pageError);
-          continue;
-        }
-
-        if (pageData) {
-          console.log(`Page ${pageNum} inserted successfully, ID: ${pageData.id}`);
-          extractedPages.push(pageData);
-        }
-        
-        console.log(`Page ${pageNum} processed successfully`);
-      } catch (pageError) {
-        console.error(`Error processing page ${pageNum}:`, pageError);
-      }
     }
 
-    // Clean up temp file
-    try {
-      await unlink(tempPdfPath);
-      console.log('Temp PDF file deleted');
-    } catch (cleanupError) {
-      console.error('Failed to delete temp PDF:', cleanupError);
-    }
+    const insertedPages = await db.insert(edition_pages).values(newPages).returning();
+    console.log('💾 Inserted', insertedPages.length, 'pages into database');
 
     return NextResponse.json({
       success: true,
+      message: `Successfully extracted ${pageCount} pages`,
       data: {
-        totalPages,
-        extractedPages: extractedPages.length,
-        pages: extractedPages,
-      },
+        pageCount,
+        pages: insertedPages,
+        settings: { resolution, format, quality },
+        tool: 'Ghostscript'
+      }
     });
 
-  } catch (error) {
-    console.error('Extract pages error:', error);
+  } catch (error: any) {
+    console.error('💥 PDF extraction failed:', error);
     
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorStack = error instanceof Error ? error.stack : '';
+    // Provide helpful error messages
+    let errorMessage = 'Failed to extract PDF pages';
     
-    console.error('Detailed error:', {
-      message: errorMessage,
-      stack: errorStack,
-    });
+    if (error.message?.includes('gs: command not found') || error.message?.includes('not recognized')) {
+      errorMessage = 'Ghostscript not found. Please install Ghostscript and set GHOSTSCRIPT_PATH if needed.';
+    } else if (error.message?.includes('ENOENT')) {
+      errorMessage = 'PDF file not found or Ghostscript executable not found.';
+    } else if (error.message?.includes('invalidpdf') || error.message?.includes('PDF')) {
+      errorMessage = 'Invalid or corrupted PDF file.';
+    }
 
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Failed to extract pages: ' + errorMessage,
-        details: errorStack?.split('\n').slice(0, 3).join('\n'),
+        error: errorMessage,
+        details: error.message,
+        tool: 'Ghostscript'
       },
       { status: 500 }
     );

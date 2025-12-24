@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCategory } from '@/contexts/CategoryContext';
+import { useEpaper } from '@/contexts/EpaperContext';
 
 
 interface EpaperCalendarWidgetProps {
@@ -24,12 +25,40 @@ interface Edition {
 }
 
 export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
-  const { categoryId } = useCategory();
+  // Try to get categoryId from CategoryContext first, then from EpaperContext
+  const categoryContext = useCategory();
+  const epaperContext = (() => {
+    try {
+      return useEpaper();
+    } catch {
+      return null;
+    }
+  })();
+  
+  const categoryId = categoryContext?.categoryId || epaperContext?.categoryId || null;
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [editions, setEditions] = useState<Edition[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCalendar, setShowCalendar] = useState(config.format !== 'full-calendar-with-button' && config.format !== 'button-calendar-with-category');
   const router = useRouter();
+
+  const getCleanButtonText = () => {
+    if (!config.buttonLabel) {
+      return showCalendar ? 'Hide Calendar' : 'Calendar';
+    }
+    
+    // If buttonLabel contains HTML, extract just the text part
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = config.buttonLabel;
+    const textContent = tempDiv.textContent || tempDiv.innerText || '';
+    
+    // If it's just "calendar" or similar, use our default
+    if (textContent.toLowerCase().trim() === 'calendar') {
+      return showCalendar ? 'Hide Calendar' : 'Calendar';
+    }
+    
+    return textContent.trim() || (showCalendar ? 'Hide Calendar' : 'Calendar');
+  };
 
   useEffect(() => {
     fetchEditions();
@@ -42,20 +71,20 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
       console.log('🔄 Fetching editions - categoryId:', categoryId, 'considerCurrentCategory:', config.considerCurrentCategory);
       
       // Smart default: if categoryId exists and considerCurrentCategory is not explicitly 'no', filter by category
+      // This means: undefined or 'yes' = filter by category, only 'no' = show all
       const shouldFilterByCategory = categoryId && config.considerCurrentCategory !== 'no';
       
       if (shouldFilterByCategory) {
         url += `&category_id=${categoryId}`;
-        console.log('✅ Adding category filter to URL:', url);
+        console.log('✅ Filtering by category:', categoryId);
       } else {
-        console.log('❌ NOT filtering by category - considerCurrentCategory:', config.considerCurrentCategory, 'categoryId:', categoryId);
+        console.log('❌ Showing all categories');
       }
       
       const response = await fetch(url);
       const data = await response.json();
       if (data.success) {
         console.log('📦 Fetched editions count:', data.data?.length);
-        console.log('📦 First 3 editions:', data.data?.slice(0, 3).map((e: Edition) => ({ id: e.id, category_id: e.category_id })));
         setEditions(data.data || []);
       }
     } catch (error) {
@@ -95,31 +124,28 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
     // Determine which edition to navigate to
     let edition = null;
     
-    // Check if we should filter by category
     // Smart default: if categoryId exists and considerCurrentCategory is not explicitly 'no', filter by category
     const shouldFilterByCategory = categoryId && config.considerCurrentCategory !== 'no';
     
-    console.log('🔍 Should filter by category?', shouldFilterByCategory, '(categoryId:', categoryId, 'config:', config.considerCurrentCategory, ')');
+    console.log('🔍 Date selected:', dateStr);
+    console.log('🔍 Should filter by category?', shouldFilterByCategory);
+    console.log('🔍 Current categoryId:', categoryId);
+    console.log('🔍 Available editions for date:', dateEditions.map(e => ({ id: e.id, category_id: e.category_id })));
     
     if (shouldFilterByCategory) {
-      // MUST find edition matching current category
-      edition = dateEditions.find(e => {
-        console.log('Checking edition:', e.id, 'category:', e.category_id, 'vs current:', categoryId);
-        return e.category_id === categoryId;
-      });
+      // Find edition matching current category
+      edition = dateEditions.find(e => e.category_id === categoryId);
       
       if (!edition) {
         console.log('❌ No edition found for current category:', categoryId);
-        console.log('Available editions:', dateEditions.map(e => ({ id: e.id, category_id: e.category_id })));
         alert(`No edition available for this date in the current category.`);
-        // Don't navigate if category doesn't match
         return;
       }
-      console.log('✅ Found matching edition:', edition.id, 'category:', edition.category_id);
+      console.log('✅ Using category-filtered edition:', edition.id);
     } else {
-      // If not considering category, take first edition
-      console.log('⚠️ Not filtering by category, taking first edition');
+      // Take first available edition (any category)
       edition = dateEditions[0];
+      console.log('✅ Using first available edition:', edition.id, 'category:', edition.category_id);
     }
     
     if (edition) {
@@ -129,14 +155,16 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
   };
 
   const getDatesWithEditions = () => {
-    // If considerCurrentCategory is enabled, only show dates for current category
+    // Smart default: if categoryId exists and considerCurrentCategory is not explicitly 'no', filter by category
     let filteredEditions = editions;
     
-    // Smart default: if categoryId exists and considerCurrentCategory is not explicitly 'no', filter by category
     const shouldFilterByCategory = categoryId && config.considerCurrentCategory !== 'no';
     
     if (shouldFilterByCategory) {
       filteredEditions = editions.filter(e => e.category_id === categoryId);
+      console.log('📅 Showing dates for category:', categoryId, 'count:', filteredEditions.length);
+    } else {
+      console.log('📅 Showing dates for all categories, count:', filteredEditions.length);
     }
     
     return filteredEditions.map(e => {
@@ -228,9 +256,15 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
         <div className="relative inline-block">
           <button
             onClick={() => setShowCalendar(!showCalendar)}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm md:text-base"
-            dangerouslySetInnerHTML={{ __html: config.buttonLabel || (showCalendar ? 'Hide Calendar' : 'Show Calendar') }}
-          />
+            className="px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-xs sm:text-sm md:text-base flex items-center justify-center gap-1 sm:gap-2"
+          >
+            {/* Calendar Icon */}
+            <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+            </svg>
+            {/* Button Text - Show on all screens */}
+            <span>{getCleanButtonText()}</span>
+          </button>
           
           {/* Calendar Dropdown */}
           {showCalendar && (

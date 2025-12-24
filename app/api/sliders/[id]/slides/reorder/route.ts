@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { db } from '@/lib/db';
+import { slides } from '@/lib/schema';
+import { eq, and } from 'drizzle-orm';
 
 /**
  * PUT /api/sliders/[id]/slides/reorder
@@ -26,11 +24,15 @@ export async function PUT(
 
     // Update position for each slide
     const updates = order.map((slideId, index) =>
-      supabase
-        .from('slides')
-        .update({ position: index })
-        .eq('id', slideId)
-        .eq('slider_id', params.id)
+      db
+        .update(slides)
+        .set({ position: index })
+        .where(
+          and(
+            eq(slides.id, slideId),
+            eq(slides.slider_id, parseInt(params.id))
+          )
+        )
     );
 
     await Promise.all(updates);

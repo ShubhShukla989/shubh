@@ -1,28 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { menus } from '@/lib/schema';
+import { asc } from 'drizzle-orm';
 
 /**
  * GET /api/menu - Get all menus
  */
 export async function GET() {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('menus')
-      .select('*')
-      .order('name');
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
+    const data = await db.select().from(menus).orderBy(asc(menus.name));
     return NextResponse.json(data || []);
   } catch (error) {
     console.error('API error:', error);
@@ -38,13 +24,6 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
     const body = await request.json();
     const { name } = body;
 
@@ -55,16 +34,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('menus')
-      .insert([{ name: name.trim() }])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const [data] = await db
+      .insert(menus)
+      .values({ name: name.trim() })
+      .returning();
 
     return NextResponse.json(data);
   } catch (error) {

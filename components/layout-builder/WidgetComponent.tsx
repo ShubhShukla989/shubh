@@ -36,6 +36,7 @@ export function WidgetComponent({ widget, onEdit, onDelete, onDuplicate, onDragS
       case 'epaper-category': return 'FeaturedCategoryWidget';
       case 'epaper-gallery': return 'GalleryWidget';
       case 'epaper-featured': return 'FeaturedWidget';
+      case 'featured-editions': return 'FeaturedEditionsWidget';
       case 'epaper-archive': return 'ArchiveWidget';
       case 'epaper-calendar': return 'CalendarWidget';
       case 'epaper-pagination': return 'PaginationWidget';
@@ -76,6 +77,7 @@ export function WidgetComponent({ widget, onEdit, onDelete, onDuplicate, onDragS
       case 'epaper-category': return 'bg-orange-600';
       case 'epaper-gallery': return 'bg-teal-600';
       case 'epaper-featured': return 'bg-cyan-700';
+      case 'featured-editions': return 'bg-green-700';
       case 'epaper-archive': return 'bg-purple-800';
       case 'epaper-calendar': return 'bg-green-700';
       case 'epaper-pagination': return 'bg-blue-800';

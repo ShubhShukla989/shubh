@@ -14,7 +14,6 @@ export default function EditEditionPage() {
   const [saving, setSaving] = useState(false);
   const [edition, setEdition] = useState<any>(null);
   const [categories, setCategories] = useState<any[]>([]);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleDateTime, setScheduleDateTime] = useState('');
   const [formData, setFormData] = useState({
     title: '',
@@ -22,8 +21,6 @@ export default function EditEditionPage() {
     date: '',
     description: '',
     category_id: '',
-    seo_h1: '',
-    seo_meta_description: '',
     status: 'draft',
   });
 
@@ -56,8 +53,6 @@ export default function EditEditionPage() {
           date: result.data.date || '',
           description: result.data.description || '',
           category_id: result.data.category_id || '',
-          seo_h1: result.data.seo_h1 || '',
-          seo_meta_description: result.data.seo_meta_description || '',
           status: result.data.status || 'draft',
         });
       }
@@ -68,12 +63,31 @@ export default function EditEditionPage() {
     }
   };
 
-  const handleScheduleClick = async () => {
-    // Schedule with current date/time
-    const now = new Date();
-    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      .toISOString();
+  const getSaveButtonText = () => {
+    switch (formData.status) {
+      case 'published':
+        return 'Publish Now';
+      case 'scheduled':
+        return 'Schedule';
+      case 'draft':
+      default:
+        return 'Save Privately';
+    }
+  };
 
+  const handleSaveAction = async () => {
+    if (formData.status === 'scheduled') {
+      if (!scheduleDateTime) {
+        alert('Please select a date and time for scheduling');
+        return;
+      }
+      await handleScheduleSave();
+    } else {
+      await handleSave(formData.status);
+    }
+  };
+
+  const handleScheduleSave = async () => {
     try {
       setSaving(true);
       const response = await fetch(`/api/editions/${editionId}`, {
@@ -82,7 +96,7 @@ export default function EditEditionPage() {
         body: JSON.stringify({
           ...formData,
           status: 'scheduled',
-          scheduled_date: localDateTime,
+          scheduled_date: new Date(scheduleDateTime).toISOString(),
         }),
       });
       
@@ -172,7 +186,7 @@ export default function EditEditionPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Edit Edition</h1>
+        <h1 className="text-2xl font-bold text-gray-500">Edit Edition</h1>
         <p className="text-gray-600 mt-1">Update edition details</p>
       </div>
 
@@ -181,10 +195,10 @@ export default function EditEditionPage() {
           {/* Main Form Column */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Details</h2>
+              <h2 className="text-lg font-semibold text-gray-500 mb-4">Details</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
                     Edition Title *
                   </label>
                   <input
@@ -193,13 +207,13 @@ export default function EditEditionPage() {
                     value={formData.title}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Enter edition title"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
                     Alias (URL Slug)
                   </label>
                   <input
@@ -207,13 +221,13 @@ export default function EditEditionPage() {
                     name="alias"
                     value={formData.alias}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="edition-slug"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
                     Description
                   </label>
                   <textarea
@@ -221,13 +235,13 @@ export default function EditEditionPage() {
                     value={formData.description}
                     onChange={handleChange}
                     rows={4}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Brief description..."
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
                     Epaper Date *
                   </label>
                   <input
@@ -236,19 +250,19 @@ export default function EditEditionPage() {
                     value={formData.date}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
                     Categories
                   </label>
                   <select
                     name="category_id"
                     value={formData.category_id}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Select Category</option>
                     {categories.map((category) => (
@@ -258,118 +272,72 @@ export default function EditEditionPage() {
                     ))}
                   </select>
                 </div>
-              </div>
-            </div>
-
-            {/* SEO Section */}
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">SEO</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    H1
-                  </label>
-                  <input
-                    type="text"
-                    name="seo_h1"
-                    value={formData.seo_h1}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="SEO H1 heading"
-                  />
-                </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Meta Description
-                  </label>
-                  <textarea
-                    name="seo_meta_description"
-                    value={formData.seo_meta_description}
-                    onChange={handleChange}
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="SEO meta description"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar Column */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-500 mb-2">
                     Status
                   </label>
                   <select
                     name="status"
                     value={formData.status}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="draft">Draft</option>
+                    <option value="draft">Save Privately</option>
                     <option value="published">Published</option>
+                    <option value="scheduled">Schedule</option>
                   </select>
                 </div>
 
-                <div className="pt-4 border-t border-gray-200 space-y-3">
-                  <button
-                    type="button"
-                    onClick={handleScheduleClick}
-                    disabled={saving}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <Save className="w-4 h-4" />
-                    Schedule
-                  </button>
+                {formData.status === 'scheduled' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">
+                      Schedule Date & Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={scheduleDateTime}
+                      onChange={(e) => setScheduleDateTime(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleSave('published')}
-                    disabled={saving}
-                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <Save className="w-4 h-4" />
-                    {saving ? 'Publishing...' : 'Published'}
-                  </button>
+            <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={handleSaveAction}
+                  disabled={saving}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  {saving ? 'Saving...' : getSaveButtonText()}
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={() => handleSave('draft')}
-                    disabled={saving}
-                    className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <Save className="w-4 h-4" />
-                    {saving ? 'Saving...' : 'Save Privately'}
-                  </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete
-                  </button>
-
-                  <Link
-                    href="/admin/editions"
-                    className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-center flex items-center justify-center gap-2"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    Back
-                  </Link>
-                </div>
+                <Link
+                  href="/admin/editions"
+                  className="w-full px-4 py-2 border border-gray-300 text-gray-500 rounded-lg hover:bg-gray-50 transition-colors text-center flex items-center justify-center gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </Link>
               </div>
             </div>
           </div>
         </div>
       </form>
-
-
     </div>
   );
 }

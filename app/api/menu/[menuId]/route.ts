@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { menus } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 /**
  * GET /api/menu/:menuId - Get a specific menu with items
@@ -11,23 +13,11 @@ export async function GET(
   try {
     const { menuId } = params;
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('menus')
-      .select('*')
-      .eq('id', menuId)
-      .single();
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const [data] = await db
+      .select()
+      .from(menus)
+      .where(eq(menus.id, parseInt(menuId)))
+      .limit(1);
 
     if (!data) {
       return NextResponse.json({ error: 'Menu not found' }, { status: 404 });
@@ -55,13 +45,6 @@ export async function PUT(
     const body = await request.json();
     const { name } = body;
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
     if (!name || !name.trim()) {
       return NextResponse.json(
         { error: 'Menu name is required' },
@@ -69,17 +52,11 @@ export async function PUT(
       );
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('menus')
-      .update({ name: name.trim() })
-      .eq('id', menuId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const [data] = await db
+      .update(menus)
+      .set({ name: name.trim(), updated_at: new Date().toISOString() })
+      .where(eq(menus.id, parseInt(menuId)))
+      .returning();
 
     return NextResponse.json(data);
   } catch (error) {
@@ -101,22 +78,7 @@ export async function DELETE(
   try {
     const { menuId } = params;
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    const { error } = await supabaseAdmin
-      .from('menus')
-      .delete()
-      .eq('id', menuId);
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    await db.delete(menus).where(eq(menus.id, parseInt(menuId)));
 
     return NextResponse.json({ success: true });
   } catch (error) {

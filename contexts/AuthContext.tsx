@@ -1,6 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 interface User {
   id: number;
@@ -16,31 +18,43 @@ interface AuthContextType {
   loading: boolean;
   hasPermission: (permission: string) => boolean;
   isSuperAdmin: () => boolean;
-  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadUserSession();
-  }, []);
+    if (status === 'loading') return;
+    
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
 
-  const loadUserSession = async () => {
+    if (session?.user) {
+      loadUserFromSession();
+    }
+  }, [session, status, router]);
+
+  const loadUserFromSession = async () => {
     try {
-      // Check if user is logged in (from localStorage or session)
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-        
+      if (!session?.user?.email) return;
+      
+      // Fetch user details from database using session email
+      const response = await fetch(`/api/users/by-email?email=${session.user.email}`);
+      const data = await response.json();
+      
+      if (data.success && data.user) {
+        setUser(data.user);
         // Load permissions
-        await loadPermissions(userData.role_id);
+        await loadPermissions(data.user.role_id);
       }
     } catch (error) {
       console.error('Failed to load user session:', error);
@@ -63,37 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-      
-      if (data.success && data.user) {
-        setUser(data.user);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Load permissions
-        await loadPermissions(data.user.role_id);
-        
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Login error:', error);
-      return false;
-    }
-  };
-
-  const logout = () => {
+  const logout = async () => {
     setUser(null);
     setPermissions(new Set());
-    localStorage.removeItem('user');
+    await signOut({ callbackUrl: '/login' });
   };
 
   const hasPermission = (permission: string): boolean => {
@@ -115,7 +102,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         hasPermission,
         isSuperAdmin,
-        login,
         logout,
       }}
     >

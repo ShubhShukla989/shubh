@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, requireSupabaseAdmin } from '@/lib/supabase';
+import { writeFile, mkdir } from 'fs/promises';
+import { join, dirname } from 'path';
 
 export async function POST(request: NextRequest) {
   try {
-    const configError = requireSupabaseAdmin();
-    if (configError) return configError;
-
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const path = formData.get('path') as string;
@@ -21,30 +19,25 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Upload using supabaseAdmin (bypasses RLS)
-    const { data, error } = await supabaseAdmin!.storage
-      .from('page-assets')
-      .upload(path, buffer, {
-        contentType: file.type || 'image/jpeg',
-        cacheControl: '3600',
-        upsert: true,
-      });
+    // Save to local file system
+    const mediaPath = process.env.MEDIA_PATH || './public/media';
+    const fullPath = join(mediaPath, 'page-assets', path);
+    const dirPath = dirname(fullPath);
 
-    if (error) {
-      console.error('[Upload Page Image] Storage error:', error);
-      throw error;
-    }
+    // Ensure directory exists
+    await mkdir(dirPath, { recursive: true });
 
-    // Get public URL
-    const { data: urlData } = supabaseAdmin!.storage
-      .from('page-assets')
-      .getPublicUrl(path);
+    // Write file
+    await writeFile(fullPath, buffer);
+
+    // Generate public URL
+    const publicUrl = `/media/page-assets/${path}`;
 
     return NextResponse.json({
       success: true,
       data: {
-        path: data.path,
-        url: urlData.publicUrl,
+        path: path,
+        url: publicUrl,
       },
     });
   } catch (error) {

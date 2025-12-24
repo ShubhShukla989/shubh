@@ -12,6 +12,9 @@ interface Page {
   image_url: string;
   file_size: string;
   category: string;
+  title?: string;
+  alias?: string;
+  description?: string;
 }
 
 export default function EditionPagesPage() {
@@ -21,17 +24,7 @@ export default function EditionPagesPage() {
 
   const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showExtractModal, setShowExtractModal] = useState(false);
   const [uploadedPDF, setUploadedPDF] = useState<File | null>(null);
-  const [extractSettings, setExtractSettings] = useState({
-    resolution: 150,
-    jpgQuality: 80,
-    useAlternateEngine: false,
-    startPage: 1,
-    endPage: 1,
-    extractAll: true,
-    currentPage: 1,
-  });
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfZoom, setPdfZoom] = useState(100);
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null);
@@ -43,7 +36,23 @@ export default function EditionPagesPage() {
     title: '',
     alias: '',
     description: '',
-    category: '',
+  });
+
+  // Bulk actions state
+  const [selectedPages, setSelectedPages] = useState<number[]>([]);
+  const [bulkAction, setBulkAction] = useState('');
+
+  // Extract modal state
+  const [showExtractModal, setShowExtractModal] = useState(false);
+  const [extractSettings, setExtractSettings] = useState({
+    resolution: 150,
+    format: 'png',
+    jpgQuality: 90,
+    currentPage: 1,
+    useAlternateEngine: false,
+    startPage: 1,
+    endPage: 1,
+    extractAll: false
   });
 
   useEffect(() => {
@@ -134,6 +143,45 @@ export default function EditionPagesPage() {
     }
   };
 
+  // Extract pages from PDF using Ghostscript
+  const handleExtractPages = async () => {
+    if (!pdfUrl) {
+      alert('No PDF uploaded!');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('🚀 Starting PDF extraction...');
+
+      const response = await fetch(`/api/editions/${editionId}/extract-pages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resolution: extractSettings.resolution,
+          format: extractSettings.format,
+          quality: extractSettings.jpgQuality,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`✅ Successfully extracted ${result.data.pageCount} pages using ${result.data.engine}!`);
+        setShowExtractModal(false);
+        fetchPages(); // Refresh the page list
+      } else {
+        alert('❌ Extraction failed: ' + result.error);
+        console.error('Extraction error:', result.details);
+      }
+    } catch (error) {
+      console.error('Extract error:', error);
+      alert('Failed to extract pages from PDF');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="p-6">
       {/* Header */}
@@ -145,7 +193,7 @@ export default function EditionPagesPage() {
           >
             <ChevronLeft className="w-6 h-6" />
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-500">
             dobajedopahar - Pages
           </h1>
         </div>
@@ -157,9 +205,9 @@ export default function EditionPagesPage() {
         <Link href="/admin/editions" className="px-4 py-2 text-blue-600 text-sm font-medium rounded hover:bg-blue-50 transition-colors">
           All Editions »
         </Link>
-        <button className="px-4 py-2 text-blue-600 text-sm font-medium rounded hover:bg-blue-50 transition-colors">
+        <Link href={`/admin/editions/${editionId}/edit`} className="px-4 py-2 text-blue-600 text-sm font-medium rounded hover:bg-blue-50 transition-colors">
           Edit Edition »
-        </button>
+        </Link>
         <button className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded">
           Upload/Manage Pages »
         </button>
@@ -176,9 +224,67 @@ export default function EditionPagesPage() {
         {/* Action Buttons */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center gap-3 mb-4">
-            <button className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-2 text-sm">
+            <label className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-2 text-sm cursor-pointer">
               <Upload className="w-4 h-4" /> Upload JPGs...
-            </button>
+              <input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png"
+                multiple
+                className="hidden"
+                onChange={async (e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length === 0) return;
+
+                  if (!confirm(`Upload ${files.length} image(s) as pages?`)) {
+                    e.target.value = '';
+                    return;
+                  }
+
+                  try {
+                    setLoading(true);
+                    let uploadedCount = 0;
+
+                    for (let i = 0; i < files.length; i++) {
+                      const file = files[i];
+                      
+                      // Create FormData for image upload
+                      const formData = new FormData();
+                      formData.append('image', file);
+                      formData.append('page_number', (pages.length + i + 1).toString());
+
+                      try {
+                        const response = await fetch(`/api/editions/${editionId}/pages/upload-image`, {
+                          method: 'POST',
+                          body: formData,
+                        });
+
+                        const result = await response.json();
+                        if (result.success) {
+                          uploadedCount++;
+                        } else {
+                          console.error(`Failed to upload ${file.name}:`, result.error);
+                        }
+                      } catch (uploadError) {
+                        console.error(`Error uploading ${file.name}:`, uploadError);
+                      }
+                    }
+
+                    if (uploadedCount > 0) {
+                      alert(`Successfully uploaded ${uploadedCount} out of ${files.length} images`);
+                      fetchPages(); // Refresh the page list
+                    } else {
+                      alert('Failed to upload any images');
+                    }
+                  } catch (error) {
+                    console.error('Upload error:', error);
+                    alert('Failed to upload images');
+                  } finally {
+                    setLoading(false);
+                    e.target.value = ''; // Reset file input
+                  }
+                }}
+              />
+            </label>
             <label className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-2 text-sm cursor-pointer">
               <Upload className="w-4 h-4" /> Upload PDF...
               <input
@@ -190,9 +296,9 @@ export default function EditionPagesPage() {
                   if (file) {
                     setLoading(true);
                     try {
-                      // Direct upload to Supabase to bypass Vercel 4.5MB limit
-                      const { uploadPDFToSupabase } = await import('@/lib/upload-helpers');
-                      const result = await uploadPDFToSupabase(file, editionId);
+                      // Direct upload to local storage
+                      const { uploadPDFToLocal } = await import('@/lib/upload-helpers');
+                      const result = await uploadPDFToLocal(file, editionId);
                       
                       if (result.success) {
                         setUploadedPDF(file);
@@ -260,41 +366,72 @@ export default function EditionPagesPage() {
             </button>
             <button
               onClick={() => {
-                if (pdfUrl) {
-                  setShowExtractModal(true);
-                } else {
-                  alert('Please upload a PDF first');
-                }
-              }}
-              className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 flex items-center gap-2 text-sm"
-            >
-              🔄 Extract Pages
-            </button>
-            <button
-              onClick={() => {
                 setLoading(true);
                 fetchPages();
               }}
-              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-2 text-sm"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 text-sm"
             >
               🔄 Refresh Pages
             </button>
+            <button
+              onClick={() => setShowExtractModal(true)}
+              disabled={!pdfUrl}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              📄 Extract Pages
+            </button>
           </div>
 
-          {pdfUrl && (
-            <div className="bg-green-50 border border-green-200 rounded p-3 mb-4">
-              <p className="text-green-700 text-sm">
-                ✓ PDF is ready for extraction
-              </p>
-            </div>
-          )}
+
 
           <div className="flex items-center gap-2">
-            <select className="px-3 py-2 border border-gray-300 rounded text-sm">
-              <option>-- Bulk Actions --</option>
-              <option>Delete Selected</option>
+            <select 
+              value={bulkAction}
+              onChange={(e) => setBulkAction(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded text-sm"
+            >
+              <option value="">-- Bulk Actions --</option>
+              <option value="delete">Delete Selected</option>
             </select>
-            <button className="px-4 py-2 bg-blue-600 text-white rounded text-sm">
+            <button 
+              onClick={async () => {
+                if (!bulkAction) {
+                  alert('Please select an action');
+                  return;
+                }
+                
+                if (selectedPages.length === 0) {
+                  alert('Please select pages to perform action on');
+                  return;
+                }
+
+                if (bulkAction === 'delete') {
+                  if (!confirm(`Delete ${selectedPages.length} selected pages?`)) {
+                    return;
+                  }
+
+                  try {
+                    setLoading(true);
+                    for (const pageId of selectedPages) {
+                      await fetch(`/api/editions/${editionId}/pages/${pageId}`, {
+                        method: 'DELETE',
+                      });
+                    }
+                    alert(`${selectedPages.length} pages deleted successfully`);
+                    setSelectedPages([]);
+                    setBulkAction('');
+                    fetchPages();
+                  } catch (error) {
+                    console.error('Bulk delete error:', error);
+                    alert('Failed to delete pages');
+                  } finally {
+                    setLoading(false);
+                  }
+                }
+              }}
+              disabled={!bulkAction || selectedPages.length === 0}
+              className="px-4 py-2 bg-blue-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               Apply
             </button>
           </div>
@@ -306,21 +443,32 @@ export default function EditionPagesPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left">
-                  <input type="checkbox" className="rounded border-gray-300" />
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300"
+                    checked={selectedPages.length === pages.length && pages.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedPages(pages.map(p => p.id));
+                      } else {
+                        setSelectedPages([]);
+                      }
+                    }}
+                  />
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-500">
                   Actions
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-500">
                   Preview
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-500">
                   Page Title
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-500">
                   Page Category
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-500">
                   File Size
                 </th>
               </tr>
@@ -343,7 +491,18 @@ export default function EditionPagesPage() {
                 pages.map((page, index) => (
                   <tr key={page.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="px-4 py-3">
-                      <input type="checkbox" className="rounded border-gray-300" />
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300"
+                        checked={selectedPages.includes(page.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedPages([...selectedPages, page.id]);
+                          } else {
+                            setSelectedPages(selectedPages.filter(id => id !== page.id));
+                          }
+                        }}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
@@ -357,10 +516,9 @@ export default function EditionPagesPage() {
                           onClick={() => {
                             setEditingPage(page);
                             setPageFormData({
-                              title: `Page ${page.page_number}`,
-                              alias: `page-${page.page_number}`,
-                              description: '',
-                              category: page.category || '',
+                              title: page.title || `Page ${page.page_number}`,
+                              alias: page.alias || `page-${page.page_number}`,
+                              description: page.description || '',
                             });
                             setShowEditPageModal(true);
                           }}
@@ -413,7 +571,7 @@ export default function EditionPagesPage() {
                         />
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
+                    <td className="px-4 py-3 text-sm text-gray-500">
                       Page {page.page_number}
                     </td>
                     <td className="px-4 py-3">
@@ -493,7 +651,7 @@ export default function EditionPagesPage() {
           <div className="bg-white rounded-lg w-full max-w-6xl max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900">Extract Pages from PDF</h3>
+              <h3 className="text-xl font-bold text-gray-500">Extract Pages from PDF</h3>
               <button
                 onClick={() => setShowExtractModal(false)}
                 className="text-gray-400 hover:text-gray-600 text-2xl w-10 h-10 flex items-center justify-center border border-gray-300 rounded"
@@ -510,7 +668,7 @@ export default function EditionPagesPage() {
                   {/* Resolution & JPG Quality */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      <label className="block text-sm font-semibold text-gray-500 mb-2">
                         Resolution
                       </label>
                       <select
@@ -518,13 +676,14 @@ export default function EditionPagesPage() {
                         onChange={(e) => setExtractSettings({ ...extractSettings, resolution: Number(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="72">72</option>
-                        <option value="150">150</option>
-                        <option value="300">300</option>
+                        <option value="72">72 DPI (Low Quality)</option>
+                        <option value="150">150 DPI (Standard)</option>
+                        <option value="300">300 DPI (High Quality) ⭐</option>
+                        <option value="600">600 DPI (Ultra High Quality)</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      <label className="block text-sm font-semibold text-gray-500 mb-2">
                         Image Quality
                       </label>
                       <input
@@ -572,7 +731,7 @@ export default function EditionPagesPage() {
                   {/* Start & End Page */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      <label className="block text-sm font-semibold text-gray-500 mb-2">
                         Start Page
                       </label>
                       <input
@@ -584,7 +743,7 @@ export default function EditionPagesPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      <label className="block text-sm font-semibold text-gray-500 mb-2">
                         End Page
                       </label>
                       <input
@@ -605,97 +764,24 @@ export default function EditionPagesPage() {
                       onChange={(e) => setExtractSettings({ ...extractSettings, extractAll: e.target.checked })}
                       className="rounded border-gray-300"
                     />
-                    <span className="text-sm font-semibold text-gray-900">Extract All Pages (Maximum 30 Pages)</span>
+                    <span className="text-sm font-semibold text-gray-500">Extract All Pages (Maximum 30 Pages)</span>
                   </label>
 
                   {/* Extract Button */}
                   <button
-                    onClick={async () => {
-                      if (!pdfUrl) {
-                        alert('Please upload a PDF first');
-                        return;
-                      }
-                      
-                      const confirmMsg = extractSettings.extractAll 
-                        ? 'Extract all pages from the PDF?' 
-                        : `Extract pages ${extractSettings.startPage} to ${extractSettings.endPage}?`;
-                      
-                      if (!confirm(confirmMsg)) {
-                        return;
-                      }
-
-                      try {
-                        setLoading(true);
-                        const response = await fetch(`/api/editions/${editionId}/extract-pages`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            resolution: extractSettings.resolution,
-                            startPage: extractSettings.startPage,
-                            endPage: extractSettings.endPage,
-                            extractAll: extractSettings.extractAll,
-                          }),
-                        });
-                        const result = await response.json();
-                        
-                        if (result.success) {
-                          alert(`Success! Extracted ${result.data.extractedPages} pages out of ${result.data.totalPages} total pages.`);
-                          setShowExtractModal(false);
-                          setLoading(true);
-                          await fetchPages();
-                          setLoading(false);
-                        } else {
-                          alert('Error: ' + result.error + '\n\n' + (result.info?.message || ''));
-                          console.log('Extraction info:', result.info);
-                        }
-                      } catch (error) {
-                        console.error('Extraction error:', error);
-                        alert('Failed to extract pages');
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    disabled={loading || !pdfUrl}
-                    className="w-full px-4 py-3 bg-pink-500 text-white rounded hover:bg-pink-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    onClick={handleExtractPages}
+                    disabled={!pdfUrl || loading}
+                    className="w-full px-4 py-3 bg-green-600 text-white rounded hover:bg-green-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span>Extracting Pages...</span>
-                      </>
-                    ) : (
-                      'Extract Pages'
-                    )}
+                    {loading ? '🔄 Extracting...' : '📄 Extract Pages with Ghostscript'}
                   </button>
-                  
-                  {/* Loading Progress Indicator */}
-                  {loading && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <div className="flex items-center gap-3 mb-2">
-                        <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span className="text-sm font-semibold text-blue-900">Processing PDF...</span>
-                      </div>
-                      <p className="text-xs text-blue-700">
-                        Extracting pages from PDF. This may take a few moments depending on the number of pages and resolution.
-                      </p>
-                      <div className="mt-3 w-full bg-blue-200 rounded-full h-2 overflow-hidden">
-                        <div className="bg-blue-600 h-full rounded-full animate-pulse" style={{ width: '100%' }}></div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Right Column - Preview */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-900">Page:</span>
+                      <span className="text-sm font-semibold text-gray-500">Page:</span>
                       <input
                         type="number"
                         value={extractSettings.currentPage}
@@ -705,7 +791,7 @@ export default function EditionPagesPage() {
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-900">Zoom:</span>
+                      <span className="text-sm font-semibold text-gray-500">Zoom:</span>
                       <button
                         onClick={() => setPdfZoom(Math.max(50, pdfZoom - 10))}
                         className="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm font-bold"
@@ -817,7 +903,7 @@ export default function EditionPagesPage() {
           <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">Edit</h2>
+              <h2 className="text-2xl font-bold text-gray-500">Edit</h2>
               <button
                 onClick={() => {
                   setShowEditPageModal(false);
@@ -833,7 +919,7 @@ export default function EditionPagesPage() {
             <div className="p-6 space-y-6">
               {/* Page Title */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-500 mb-2">
                   Page Title
                 </label>
                 <input
@@ -847,7 +933,7 @@ export default function EditionPagesPage() {
 
               {/* Alias */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-500 mb-2">
                   Alias
                 </label>
                 <input
@@ -861,7 +947,7 @@ export default function EditionPagesPage() {
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-500 mb-2">
                   Description
                 </label>
                 <textarea
@@ -873,28 +959,9 @@ export default function EditionPagesPage() {
                 />
               </div>
 
-              {/* Page Category */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Page Category
-                </label>
-                <select
-                  value={pageFormData.category}
-                  onChange={(e) => setPageFormData({ ...pageFormData, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">--None--</option>
-                  <option value="front-page">Front Page</option>
-                  <option value="sports">Sports</option>
-                  <option value="business">Business</option>
-                  <option value="entertainment">Entertainment</option>
-                  <option value="local">Local News</option>
-                </select>
-              </div>
-
               {/* Page Preview */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-500 mb-2">
                   Page Preview
                 </label>
                 <div className="border border-gray-200 rounded p-4 bg-gray-50">
@@ -932,16 +999,16 @@ export default function EditionPagesPage() {
                   if (!editingPage) return;
                   
                   try {
-                    const response = await fetch(`/api/editions/${editionId}/pages/${editingPage.id}`, {
+                    const response = await fetch(`/api/editions/${editionId}/pages`, {
                       method: 'PUT',
                       headers: {
                         'Content-Type': 'application/json',
                       },
                       body: JSON.stringify({
+                        pageId: editingPage.id,
                         title: pageFormData.title,
                         alias: pageFormData.alias,
                         description: pageFormData.description,
-                        category: pageFormData.category,
                       }),
                     });
 

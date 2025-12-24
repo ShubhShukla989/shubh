@@ -140,7 +140,7 @@ export default function PermissionsPage() {
             <ChevronLeft className="w-6 h-6" />
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-gray-500 flex items-center gap-2">
               <Shield className="w-8 h-8 text-blue-600" />
               Admin Permissions
             </h1>
@@ -181,7 +181,7 @@ export default function PermissionsPage() {
                 <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
                   {/* Category Header */}
                   <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-500 flex items-center gap-2">
                       {category}
                       <span className="text-xs text-gray-500 font-normal">
                         ({categoryPerms.filter(p => adminPermissions.has(p.key)).length}/{categoryPerms.length} selected)
@@ -218,7 +218,7 @@ export default function PermissionsPage() {
                             className="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                           />
                           <div className="flex-1">
-                            <div className="font-medium text-gray-900 text-sm">
+                            <div className="font-medium text-gray-500 text-sm">
                               {permission.name}
                             </div>
                             <div className="text-xs text-gray-500 mt-1">
@@ -240,7 +240,7 @@ export default function PermissionsPage() {
       <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-700">
+            <p className="text-sm font-medium text-gray-500">
               Total Permissions Selected: {adminPermissions.size} / {permissions.length}
             </p>
             <p className="text-xs text-gray-500 mt-1">

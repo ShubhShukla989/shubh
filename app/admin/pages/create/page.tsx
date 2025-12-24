@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,11 +6,8 @@ import { ArrowLeft, Save, Image as ImageIcon, Layout } from 'lucide-react';
 import { pageService, PageFormData } from '@/lib/services/pageService';
 import SEOSection from '@/components/page-manager/SEOSection';
 import MediaBrowser from '@/components/page-manager/MediaBrowser';
-import AddToMenuModal from '@/components/page-manager/AddToMenuModal';
 import { LayoutBuilder } from '@/components/layout-builder/LayoutBuilder';
 import { LayoutStructure } from '@/components/layout-builder/types';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@/types/supabase';
 import dynamic from 'next/dynamic';
 
 // Dynamically import TinyMCE to avoid SSR issues
@@ -19,19 +16,27 @@ const Editor = dynamic(() => import('@tinymce/tinymce-react').then((mod) => mod.
   loading: () => (
     <div className="w-full h-96 border border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
       <div className="text-center">
-        <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
         <p className="text-sm text-gray-600">Loading editor...</p>
       </div>
     </div>
   ),
 });
 
-type Layout = Database['public']['Tables']['layouts']['Row'];
+type Layout = {
+  id: number;
+  name: string;
+  structure: any;
+  status: string;
+  created_at: Date;
+  updated_at: Date;
+  custom_css: string;
+  custom_js: string;
+};
 
 export default function CreatePage() {
   const router = useRouter();
   const editorRef = useRef<any>(null);
-  const supabase = createClientComponentClient<Database>();
   
   const [formData, setFormData] = useState<PageFormData>({
     title: '',
@@ -55,7 +60,6 @@ export default function CreatePage() {
   const [saving, setSaving] = useState(false);
   const [showMediaBrowser, setShowMediaBrowser] = useState(false);
   const [mediaTargetField, setMediaTargetField] = useState<string>('');
-  const [showAddToMenu, setShowAddToMenu] = useState(false);
   const [savedPageData, setSavedPageData] = useState<{ title: string; alias: string } | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -67,20 +71,41 @@ export default function CreatePage() {
   // Auto-generate alias from title
   useEffect(() => {
     if (formData.title && !formData.alias) {
-      const slug = pageService.generateSlug(formData.title);
-      setFormData((prev) => ({ ...prev, alias: slug }));
+      const generateUniqueAlias = async () => {
+        const baseSlug = pageService.generateSlug(formData.title);
+        let uniqueSlug = baseSlug;
+        let counter = 1;
+        
+        // Keep checking until we find an available alias
+        while (true) {
+          try {
+            const isAvailable = await pageService.checkAliasAvailability(uniqueSlug);
+            if (isAvailable) {
+              setFormData((prev) => ({ ...prev, alias: uniqueSlug }));
+              break;
+            }
+            uniqueSlug = `${baseSlug}-${counter}`;
+            counter++;
+          } catch (error) {
+            // If API fails, just use the base slug
+            setFormData((prev) => ({ ...prev, alias: baseSlug }));
+            break;
+          }
+        }
+      };
+      
+      generateUniqueAlias();
     }
   }, [formData.title]);
 
   const fetchLayouts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('layouts')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      setLayouts(data || []);
+      const response = await fetch('/api/layouts');
+      const result = await response.json();
+      
+      if (result.success) {
+        setLayouts(result.data || []);
+      }
     } catch (error) {
       console.error('Error fetching layouts:', error);
     }
@@ -96,18 +121,16 @@ export default function CreatePage() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('layouts')
-        .select('*')
-        .eq('name', layoutName)
-        .single();
+      const response = await fetch(`/api/layouts/${layoutName}`);
+      const result = await response.json();
 
-      if (error) throw error;
-
-      setSelectedLayoutName(layoutName);
-      setLayoutStructure(data.structure || { rows: [] });
-      setCustomCss(data.custom_css || '');
-      setCustomJs(data.custom_js || '');
+      if (result.success && result.data) {
+        const data = result.data;
+        setSelectedLayoutName(layoutName);
+        setLayoutStructure(typeof data.structure === 'string' ? JSON.parse(data.structure) : data.structure || { rows: [] });
+        setCustomCss(data.custom_css || '');
+        setCustomJs(data.custom_js || '');
+      }
     } catch (error) {
       console.error('Error loading layout:', error);
       alert('Failed to load layout');
@@ -183,27 +206,16 @@ export default function CreatePage() {
       setSuccessMessage(`Page "${formData.title}" saved successfully.`);
       setSavedPageData({ title: formData.title, alias: formData.alias });
       
-      // Show add to menu modal
+      // Redirect to pages list after successful creation
       setTimeout(() => {
-        setShowAddToMenu(true);
-      }, 500);
+        router.push('/admin/pages');
+      }, 1000);
     } catch (error) {
       console.error('Save failed:', error);
       alert(error instanceof Error ? error.message : 'Failed to save page');
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleMenuSuccess = (menuName: string) => {
-    setSuccessMessage(`"${savedPageData?.title}" added to "${menuName}".`);
-    setTimeout(() => {
-      router.push('/admin/pages');
-    }, 1500);
-  };
-
-  const handleSkipMenu = () => {
-    router.push('/admin/pages');
   };
 
   return (
@@ -220,7 +232,7 @@ export default function CreatePage() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Create A Page</h1>
+            <h1 className="text-2xl font-bold text-gray-500">Create A Page</h1>
             <p className="text-sm text-gray-600 mt-1">
               Add a new static page to your site
             </p>
@@ -237,7 +249,7 @@ export default function CreatePage() {
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving ? (
               <>
@@ -269,14 +281,14 @@ export default function CreatePage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Page Title */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Page Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.title}
               onChange={(e) => updateField('title', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter page title"
               required
             />
@@ -284,25 +296,25 @@ export default function CreatePage() {
 
           {/* Alias */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Alias <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.alias}
               onChange={(e) => updateField('alias', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
               placeholder="page-url-slug"
               required
             />
             <p className="text-xs text-gray-500 mt-1">
-              URL: /page/<span className="text-purple-600">{formData.alias || 'your-alias'}</span>
+              URL: /page/<span className="text-blue-600">{formData.alias || 'your-alias'}</span>
             </p>
           </div>
 
           {/* Content Mode Toggle */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
+            <label className="block text-sm font-medium text-gray-500 mb-3">
               Content Mode
             </label>
             <div className="flex gap-2">
@@ -311,8 +323,8 @@ export default function CreatePage() {
                 onClick={() => setContentMode('editor')}
                 className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
                   contentMode === 'editor'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}
               >
                 <ImageIcon className="w-4 h-4 inline mr-2" />
@@ -323,8 +335,8 @@ export default function CreatePage() {
                 onClick={() => setContentMode('designer')}
                 className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
                   contentMode === 'designer'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}
               >
                 <Layout className="w-4 h-4 inline mr-2" />
@@ -337,13 +349,13 @@ export default function CreatePage() {
           {contentMode === 'editor' ? (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-500">
                   Content
                 </label>
                 <button
                   type="button"
                   onClick={() => openMediaBrowser('content')}
-                  className="text-sm text-purple-600 hover:text-purple-700 flex items-center gap-1"
+                  className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
                 >
                   <ImageIcon className="w-4 h-4" />
                   Media Browser
@@ -378,13 +390,13 @@ export default function CreatePage() {
           ) : (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-500 mb-2">
                   Select Layout Template
                 </label>
                 <select
                   value={selectedLayoutName}
                   onChange={(e) => handleLayoutSelect(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Create New Layout</option>
                   {layouts.map((layout) => (
@@ -420,14 +432,14 @@ export default function CreatePage() {
         <div className="space-y-6">
           {/* Description */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Description
             </label>
             <textarea
               value={formData.description}
               onChange={(e) => updateField('description', e.target.value)}
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Admin note (not visible to public)"
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -437,13 +449,13 @@ export default function CreatePage() {
 
           {/* Status */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Status <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.status}
               onChange={(e) => updateField('status', e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             >
               <option value="Public">Public</option>
@@ -460,17 +472,6 @@ export default function CreatePage() {
         onClose={() => setShowMediaBrowser(false)}
         onSelect={handleMediaSelect}
       />
-
-      {/* Add to Menu Modal */}
-      {savedPageData && (
-        <AddToMenuModal
-          isOpen={showAddToMenu}
-          onClose={handleSkipMenu}
-          pageTitle={savedPageData.title}
-          pageAlias={savedPageData.alias}
-          onSuccess={handleMenuSuccess}
-        />
-      )}
     </div>
   );
 }

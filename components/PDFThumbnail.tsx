@@ -1,12 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
-
-// Set up the worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 interface PDFThumbnailProps {
   url: string;
@@ -15,41 +9,18 @@ interface PDFThumbnailProps {
 }
 
 export default function PDFThumbnail({ url, alt, className = '' }: PDFThumbnailProps) {
-  const [numPages, setNumPages] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
 
-  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
-    setNumPages(numPages);
-    setError(null);
-  }
-
-  function onDocumentLoadError(error: Error) {
-    console.error('PDF load error:', error);
-    setError('Failed to load PDF');
-  }
-
-  if (error) {
-    return (
-      <div className={`bg-gray-100 flex items-center justify-center text-xs text-gray-500 ${className}`}>
-        Error
-      </div>
-    );
-  }
+  // For PDF files, show a styled PDF icon with filename
+  const filename = url.split('/').pop() || 'PDF Document';
 
   return (
-    <div className={className}>
-      <Document
-        file={url}
-        onLoadSuccess={onDocumentLoadSuccess}
-        onLoadError={onDocumentLoadError}
-        loading={
-          <div className="bg-gray-100 flex items-center justify-center text-xs text-gray-500 w-full h-full">
-            Loading...
-          </div>
-        }
-      >
-        <Page pageNumber={1} width={64} renderTextLayer={false} renderAnnotationLayer={false} />
-      </Document>
+    <div className={`bg-red-50 border-2 border-red-200 rounded-lg flex flex-col items-center justify-center text-red-600 p-4 ${className}`}>
+      <svg className="w-12 h-12 mb-2" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+      </svg>
+      <span className="text-sm font-bold">PDF</span>
+      <span className="text-xs text-center mt-1 opacity-75 max-w-full truncate">{filename}</span>
     </div>
   );
 }

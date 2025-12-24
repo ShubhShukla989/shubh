@@ -1,69 +1,120 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, requireSupabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { editions, edition_pages, users } from '@/lib/schema';
+import { eq, desc, asc, and } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
   try {
-    const configError = requireSupabaseAdmin();
-    if (configError) return configError;
-
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status');
     const categoryId = searchParams.get('category_id');
+    const createdBy = searchParams.get('created_by');
 
-    // Build query
-    let query = supabaseAdmin!
-      .from('editions')
-      .select(`
-        *,
-        pages:edition_pages(
-          id,
-          page_number,
-          image_url
-        )
-      `)
-      .order('date', { ascending: false });
-
-    // Apply filters
+    // Build query conditions
+    const conditions = [];
     if (status) {
-      query = query.eq('status', status);
+      conditions.push(eq(editions.status, status));
     }
     if (categoryId) {
-      query = query.eq('category_id', parseInt(categoryId));
+      conditions.push(eq(editions.category_id, parseInt(categoryId)));
+    }
+    if (createdBy && createdBy !== 'all') {
+      conditions.push(eq(editions.created_by, parseInt(createdBy)));
     }
 
-    const { data, error } = await query;
+    // Get editions with user information
+    const createdByUser = users;
+    const updatedByUser = users;
+    
+    let editionsData;
+    
+    if (conditions.length > 0) {
+      editionsData = await db
+        .select({
+          id: editions.id,
+          title: editions.title,
+          alias: editions.alias,
+          date: editions.date,
+          category_id: editions.category_id,
+          pdf_url: editions.pdf_url,
+          description: editions.description,
+          status: editions.status,
+          created_by: editions.created_by,
+          updated_by: editions.updated_by,
+          created_at: editions.created_at,
+          updated_at: editions.updated_at,
+          is_featured: editions.is_featured,
+          seo_h1: editions.seo_h1,
+          seo_meta_description: editions.seo_meta_description,
+          scheduled_date: editions.scheduled_date,
+          created_by_name: createdByUser.fullname,
+        })
+        .from(editions)
+        .leftJoin(createdByUser, eq(editions.created_by, createdByUser.id))
+        .where(and(...conditions))
+        .orderBy(desc(editions.date));
+    } else {
+      editionsData = await db
+        .select({
+          id: editions.id,
+          title: editions.title,
+          alias: editions.alias,
+          date: editions.date,
+          category_id: editions.category_id,
+          pdf_url: editions.pdf_url,
+          description: editions.description,
+          status: editions.status,
+          created_by: editions.created_by,
+          updated_by: editions.updated_by,
+          created_at: editions.created_at,
+          updated_at: editions.updated_at,
+          is_featured: editions.is_featured,
+          seo_h1: editions.seo_h1,
+          seo_meta_description: editions.seo_meta_description,
+          scheduled_date: editions.scheduled_date,
+          created_by_name: createdByUser.fullname,
+        })
+        .from(editions)
+        .leftJoin(createdByUser, eq(editions.created_by, createdByUser.id))
+        .orderBy(desc(editions.date));
+    }
 
-    if (error) throw error;
+    // Get pages for each edition
+    const processedData = await Promise.all(
+      editionsData.map(async (edition) => {
+        const pages = await db
+          .select({
+            id: edition_pages.id,
+            page_number: edition_pages.page_number,
+            image_url: edition_pages.image_url,
+          })
+          .from(edition_pages)
+          .where(eq(edition_pages.edition_id, edition.id))
+          .orderBy(asc(edition_pages.page_number));
 
-    // Sort pages by page_number for each edition
-    const processedData = data?.map(edition => ({
-      ...edition,
-      pages: edition.pages?.sort((a: any, b: any) => a.page_number - b.page_number) || []
-    }));
+        return {
+          ...edition,
+          pages,
+        };
+      })
+    );
 
     return NextResponse.json({ success: true, data: processedData });
   } catch (error) {
-    if (error instanceof Error) {
-      console.error('[GET /api/editions] Error:', error.message);
-    } else {
-      console.error('[GET /api/editions] Unknown error:', error);
-    }
+    console.error('[GET /api/editions] Error:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch editions' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const configError = requireSupabaseAdmin();
-    if (configError) return configError;
-
     const raw = await request.json();
 
-    // Normalize and validate payload against schema
+    // Normalize and validate payload
     const title = typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : null;
     const alias = typeof raw.alias === 'string' && raw.alias.trim() ? raw.alias.trim() : null;
-    const date = typeof raw.date === 'string' && raw.date.trim() ? raw.date.trim() : null; // expects YYYY-MM-DD
+    const date = typeof raw.date === 'string' && raw.date.trim() ? raw.date.trim() : null;
     const category_id = raw.category_id ? Number(raw.category_id) : null;
     const description = typeof raw.description === 'string' && raw.description.trim() ? raw.description.trim() : null;
     const validStatuses = ['draft', 'processing', 'published', 'scheduled'];
@@ -81,40 +132,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const insertPayload = {
-      title,
-      alias,
-      date, // Supabase will coerce to DATE
-      category_id,
-      description,
-      status,
-      pdf_url,
-      scheduled_date,
-      seo_h1,
-      seo_meta_description,
-    } as const;
+    const [newEdition] = await db
+      .insert(editions)
+      .values({
+        title,
+        alias,
+        date,
+        category_id,
+        description,
+        status,
+        pdf_url,
+        scheduled_date: scheduled_date ? new Date(scheduled_date).toISOString() : null,
+        seo_h1,
+        seo_meta_description,
+      })
+      .returning();
 
-    console.log('[POST /api/editions] Insert payload:', insertPayload);
-
-    const { data, error } = await supabaseAdmin!
-      .from('editions')
-      .insert([insertPayload])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('[POST /api/editions] Database error:', error);
-      throw error;
-    }
-
-    return NextResponse.json({ success: true, data }, { status: 201 });
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error('[POST /api/editions] Error:', error.message);
-    } else {
-      console.error('[POST /api/editions] Unknown error:', error);
-    }
-    const message = error instanceof Error ? error.message : 'Failed to create edition';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return NextResponse.json({ success: true, data: newEdition }, { status: 201 });
+  } catch (error: any) {
+    console.error('[POST /api/editions] Error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Failed to create edition' },
+      { status: 500 }
+    );
   }
 }

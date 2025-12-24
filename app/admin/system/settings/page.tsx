@@ -58,35 +58,30 @@ export default function SettingsPage() {
 
   const loadSettings = async () => {
     try {
-      // Load site settings
       const siteRes = await fetch('/api/settings/site');
       const siteData = await siteRes.json();
       if (siteData.success) {
         setHomePage(siteData.data?.setting_value || 'website-homepage');
       }
 
-      // Load ads.txt
       const adsRes = await fetch('/api/settings/ads');
       const adsData = await adsRes.json();
       if (adsData.success) {
         setAdsContent(adsData.data?.content || '');
       }
 
-      // Load robots.txt
       const robotsRes = await fetch('/api/settings/robots');
       const robotsData = await robotsRes.json();
       if (robotsData.success) {
         setRobotsContent(robotsData.data?.content || '');
       }
 
-      // Load analytics
       const analyticsRes = await fetch('/api/settings/analytics');
       const analyticsData = await analyticsRes.json();
       if (analyticsData.success) {
         setAnalyticsId(analyticsData.data?.measurement_id || '');
       }
 
-      // Load epaper settings
       const epaperRes = await fetch('/api/settings/epaper');
       const epaperData = await epaperRes.json();
       if (epaperData.success) {
@@ -100,7 +95,6 @@ export default function SettingsPage() {
         setUseRandomPrefix(data.use_random_prefix || false);
       }
 
-      // Load watermark settings
       const watermarkRes = await fetch('/api/settings/area-map-watermark');
       const watermarkData = await watermarkRes.json();
       if (watermarkData.success) {
@@ -133,14 +127,16 @@ export default function SettingsPage() {
       const response = await fetch('/api/settings/site', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          home_page: homePage
-        }),
+        body: JSON.stringify({ home_page: homePage }),
       });
 
       const data = await response.json();
       if (data.success) {
-        alert('✅ Site settings saved successfully!');
+        // Trigger revalidation of homepage
+        await fetch('/api/revalidate?path=/', { method: 'POST' });
+        alert('✅ Site settings saved successfully! Homepage will update on next visit.');
+        // Force reload to clear any client-side cache
+        window.location.reload();
       } else {
         alert('❌ Error: ' + data.error);
       }
@@ -306,16 +302,15 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Left Sidebar */}
       <div className="w-64 bg-white border-r border-gray-200 p-4 overflow-y-auto">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Settings</h2>
+        <h2 className="text-lg font-semibold text-gray-500 mb-4">Settings</h2>
         <nav className="space-y-1">
           <button
             onClick={() => setActiveSidebar('basic')}
             className={`w-full text-left px-4 py-2 text-sm font-medium rounded-lg ${
               activeSidebar === 'basic'
                 ? 'text-white bg-blue-600'
-                : 'text-gray-700 hover:bg-gray-100'
+                : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             Basic Settings
@@ -325,7 +320,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
             className={`w-full text-left px-4 py-2 text-sm font-medium rounded-lg ${
               activeSidebar === 'epaper'
                 ? 'text-white bg-blue-600'
-                : 'text-gray-700 hover:bg-gray-100'
+                : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             Epaper Settings
@@ -333,12 +328,10 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
         </nav>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 overflow-auto">
         <div className="p-6">
-          {/* Header */}
           <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-gray-500">
               {activeSidebar === 'basic' ? 'Basic Settings' : 'Epaper Settings'}
             </h1>
             <p className="text-gray-600 mt-2">
@@ -348,9 +341,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
             </p>
           </div>
 
-          {/* Tabs */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            {/* Basic Settings Tabs */}
             {activeSidebar === 'basic' && (
               <div className="flex border-b border-gray-200 overflow-x-auto">
                 <button
@@ -358,7 +349,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                   className={`px-6 py-3 font-medium whitespace-nowrap ${
                     activeBasicTab === 'site'
                       ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-600 hover:text-gray-800'
+                      : 'text-gray-600 hover:text-gray-600'
                   }`}
                 >
                   Site Settings
@@ -368,7 +359,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                   className={`px-6 py-3 font-medium whitespace-nowrap ${
                     activeBasicTab === 'ads'
                       ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-600 hover:text-gray-800'
+                      : 'text-gray-600 hover:text-gray-600'
                   }`}
                 >
                   Adsense (ads.txt)
@@ -378,7 +369,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                   className={`px-6 py-3 font-medium whitespace-nowrap ${
                     activeBasicTab === 'robots'
                       ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-600 hover:text-gray-800'
+                      : 'text-gray-600 hover:text-gray-600'
                   }`}
                 >
                   Robot (robots.txt)
@@ -388,7 +379,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                   className={`px-6 py-3 font-medium whitespace-nowrap ${
                     activeBasicTab === 'analytics'
                       ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-600 hover:text-gray-800'
+                      : 'text-gray-600 hover:text-gray-600'
                   }`}
                 >
                   Google Analytics
@@ -396,7 +387,6 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
               </div>
             )}
 
-            {/* Epaper Settings Tabs */}
             {activeSidebar === 'epaper' && (
               <div className="flex border-b border-gray-200">
                 <button
@@ -404,7 +394,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                   className={`px-6 py-3 font-medium whitespace-nowrap ${
                     activeEpaperTab === 'epaper'
                       ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-600 hover:text-gray-800'
+                      : 'text-gray-600 hover:text-gray-600'
                   }`}
                 >
                   Epaper Settings
@@ -414,7 +404,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                   className={`px-6 py-3 font-medium whitespace-nowrap ${
                     activeEpaperTab === 'watermark'
                       ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-600 hover:text-gray-800'
+                      : 'text-gray-600 hover:text-gray-600'
                   }`}
                 >
                   Area Map Watermark
@@ -422,13 +412,11 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
               </div>
             )}
 
-            {/* Tab Content */}
             <div className="p-6">
-              {/* Basic Settings - Site Settings Tab */}
               {activeSidebar === 'basic' && activeBasicTab === 'site' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-500 mb-2">
                       Home Page
                     </label>
                     <select
@@ -441,7 +429,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                       <option value="epaper-display">Epaper Display</option>
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      Select which page should be displayed when users visit your site's homepage
+                      Select which page should be displayed when users visit your site&apos;s homepage
                     </p>
                   </div>
 
@@ -456,112 +444,109 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                 </div>
               )}
 
-              {/* Basic Settings - Ads.txt Tab */}
               {activeSidebar === 'basic' && activeBasicTab === 'ads' && (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-700">
-                The following content will be served from{' '}
-                <span className="font-mono bg-gray-100 px-2 py-1 rounded">
-                  {typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/ads.txt
-                </span>
-              </p>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Content
-                </label>
-                <textarea
-                  value={adsContent}
-                  onChange={(e) => setAdsContent(e.target.value)}
-                  className="w-full h-64 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0"
-                />
-              </div>
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-500">
+                    The following content will be served from{' '}
+                    <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+                      {typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/ads.txt
+                    </span>
+                  </p>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">
+                      Content
+                    </label>
+                    <textarea
+                      value={adsContent}
+                      onChange={(e) => setAdsContent(e.target.value)}
+                      className="w-full h-64 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0"
+                    />
+                  </div>
 
-              <button
-                onClick={handleSaveAds}
-                disabled={saving}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                <Save className="w-4 h-4" />
-                {saving ? 'Saving...' : 'Save Settings'}
-              </button>
-            </div>
-          )}
+                  <button
+                    onClick={handleSaveAds}
+                    disabled={saving}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    {saving ? 'Saving...' : 'Save Settings'}
+                  </button>
+                </div>
+              )}
 
-              {/* Basic Settings - Robots.txt Tab */}
               {activeSidebar === 'basic' && activeBasicTab === 'robots' && (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-700">
-                The following content will be served from{' '}
-                <span className="font-mono bg-gray-100 px-2 py-1 rounded">
-                  {typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/robots.txt
-                </span>
-              </p>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Content
-                </label>
-                <textarea
-                  value={robotsContent}
-                  onChange={(e) => setRobotsContent(e.target.value)}
-                  className="w-full h-96 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="User-agent: *&#10;Disallow: /admin/"
-                />
-              </div>
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-500">
+                    The following content will be served from{' '}
+                    <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+                      {typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/robots.txt
+                    </span>
+                  </p>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">
+                      Content
+                    </label>
+                    <textarea
+                      value={robotsContent}
+                      onChange={(e) => setRobotsContent(e.target.value)}
+                      className="w-full h-96 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="User-agent: *&#10;Disallow: /admin/"
+                    />
+                  </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={fillDefaultRobots}
-                  className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-                >
-                  Fill Default
-                </button>
-                <button
-                  onClick={handleSaveRobots}
-                  disabled={saving}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  {saving ? 'Saving...' : 'Save Settings'}
-                </button>
-              </div>
-            </div>
-          )}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={fillDefaultRobots}
+                      className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                      Fill Default
+                    </button>
+                    <button
+                      onClick={handleSaveRobots}
+                      disabled={saving}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      {saving ? 'Saving...' : 'Save Settings'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
-              {/* Basic Settings - Google Analytics Tab */}
               {activeSidebar === 'basic' && activeBasicTab === 'analytics' && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Google Analytics 4 Measurement ID (G-XXXXXXXXXX)
-                </label>
-                <input
-                  type="text"
-                  value={analyticsId}
-                  onChange={(e) => setAnalyticsId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="G-XXXXXXXXXX"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Enter your Google Analytics 4 Measurement ID. The tracking script will be automatically added to all pages.
-                </p>
-              </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">
+                      Google Analytics 4 Measurement ID (G-XXXXXXXXXX)
+                    </label>
+                    <input
+                      type="text"
+                      value={analyticsId}
+                      onChange={(e) => setAnalyticsId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="G-XXXXXXXXXX"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter your Google Analytics 4 Measurement ID. The tracking script will be automatically added to all pages.
+                    </p>
+                  </div>
 
-              <button
-                onClick={handleSaveAnalytics}
-                disabled={saving}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-              >
-                <Save className="w-4 h-4" />
-                {saving ? 'Saving...' : 'Save Settings'}
-              </button>
+                  <button
+                    onClick={handleSaveAnalytics}
+                    disabled={saving}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    {saving ? 'Saving...' : 'Save Settings'}
+                  </button>
 
-              {analyticsId && (
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Preview of tracking code:</p>
-                  <pre className="text-xs bg-white p-3 rounded border border-gray-200 overflow-x-auto">
+                  {analyticsId && (
+                    <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-sm font-medium text-gray-500 mb-2">Preview of tracking code:</p>
+                      <pre className="text-xs bg-white p-3 rounded border border-gray-200 overflow-x-auto">
 {`<!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=${analyticsId}"></script>
 <script>
@@ -570,17 +555,16 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
   gtag('js', new Date());
   gtag('config', '${analyticsId}');
 </script>`}
-                  </pre>
+                      </pre>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-              {/* Epaper Settings - Epaper Tab */}
               {activeSidebar === 'epaper' && activeEpaperTab === 'epaper' && (
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-500 mb-2">
                       Number of entries per page in archive
                     </label>
                     <input
@@ -600,7 +584,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                         onChange={(e) => setIncludeHeaderFooterMap(e.target.checked)}
                         className="w-4 h-4 text-blue-600 rounded"
                       />
-                      <span className="text-sm text-gray-700">Include Header/Footer in Map Display Layout</span>
+                      <span className="text-sm text-gray-500">Include Header/Footer in Map Display Layout</span>
                     </label>
 
                     <label className="flex items-center gap-2">
@@ -610,12 +594,12 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                         onChange={(e) => setIncludeHeaderFooterClip(e.target.checked)}
                         className="w-4 h-4 text-blue-600 rounded"
                       />
-                      <span className="text-sm text-gray-700">Include Header/Footer in Shared Clip Display Layout</span>
+                      <span className="text-sm text-gray-500">Include Header/Footer in Shared Clip Display Layout</span>
                     </label>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-500 mb-2">
                       Default Epaper Publishing Status
                     </label>
                     <select
@@ -638,11 +622,11 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                       onChange={(e) => setDisableRightClick(e.target.checked)}
                       className="w-4 h-4 text-blue-600 rounded"
                     />
-                    <span className="text-sm text-gray-700">Disable Right Click</span>
+                    <span className="text-sm text-gray-500">Disable Right Click</span>
                   </label>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-500 mb-2">
                       Keep Archive of (x) Days
                     </label>
                     <input
@@ -665,10 +649,10 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                         onChange={(e) => setUseRandomPrefix(e.target.checked)}
                         className="w-4 h-4 text-blue-600 rounded"
                       />
-                      <span className="text-sm text-gray-700">Use Random Prefix for PDF Files</span>
+                      <span className="text-sm text-gray-500">Use Random Prefix for PDF Files</span>
                     </label>
                     <p className="text-xs text-blue-600 mt-1 ml-6">
-                      This will add random prefix to PDF files. Hackers won't be able to guess the file names easily.
+                      This will add random prefix to PDF files. Hackers won&apos;t be able to guess the file names easily.
                     </p>
                   </div>
 
@@ -683,7 +667,6 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                 </div>
               )}
 
-              {/* Epaper Settings - Watermark Tab */}
               {activeSidebar === 'epaper' && activeEpaperTab === 'watermark' && (
                 <div className="space-y-6">
                   <label className="flex items-center gap-2">
@@ -693,11 +676,11 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                       onChange={(e) => setEnableWatermarking(e.target.checked)}
                       className="w-4 h-4 text-blue-600 rounded"
                     />
-                    <span className="text-sm font-medium text-gray-700">Enable Watermarking in Area Maps</span>
+                    <span className="text-sm font-medium text-gray-500">Enable Watermarking in Area Maps</span>
                   </label>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">Logo</label>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -714,7 +697,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
 
                   <div className="grid grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Opacity</label>
+                      <label className="block text-sm font-medium text-gray-500 mb-2">Opacity</label>
                       <input
                         type="number"
                         value={opacity}
@@ -725,17 +708,18 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Mode</label>
+                      <label className="block text-sm font-medium text-gray-500 mb-2">Mode</label>
                       <select
                         value={mode}
                         onChange={(e) => setMode(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       >
                         <option value="in_outerside">In Outerside</option>
+                        <option value="in_inside">In Inside</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Position</label>
+                      <label className="block text-sm font-medium text-gray-500 mb-2">Position</label>
                       <select
                         value={position}
                         onChange={(e) => setPosition(e.target.value)}
@@ -750,9 +734,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Minimum Width (px)
-                      </label>
+                      <label className="block text-sm font-medium text-gray-500 mb-2">Min Width (px)</label>
                       <input
                         type="number"
                         value={minWidthPx}
@@ -765,123 +747,107 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Background Color</label>
+                      <label className="block text-sm font-medium text-gray-500 mb-2">Background Color</label>
                       <input
                         type="color"
                         value={backgroundColor}
                         onChange={(e) => setBackgroundColor(e.target.value)}
-                        className="w-full h-10 border border-gray-300 rounded-lg"
+                        className="w-full h-10 px-1 py-1 border border-gray-300 rounded-lg"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Foreground Color</label>
+                      <label className="block text-sm font-medium text-gray-500 mb-2">Foreground Color</label>
                       <input
                         type="color"
                         value={foregroundColor}
                         onChange={(e) => setForegroundColor(e.target.value)}
-                        className="w-full h-10 border border-gray-300 rounded-lg"
+                        className="w-full h-10 px-1 py-1 border border-gray-300 rounded-lg"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="flex items-center gap-2 mb-3">
+                    <label className="flex items-center gap-2 mb-2">
                       <input
                         type="checkbox"
                         checked={enableBorder}
                         onChange={(e) => setEnableBorder(e.target.checked)}
                         className="w-4 h-4 text-blue-600 rounded"
                       />
-                      <span className="text-sm font-medium text-gray-700">Enable Border</span>
+                      <span className="text-sm font-medium text-gray-500">Enable Border</span>
                     </label>
-
                     {enableBorder && (
                       <div className="grid grid-cols-2 gap-4 ml-6">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Border Width</label>
-                          <select
+                          <label className="block text-sm font-medium text-gray-500 mb-2">Border Width</label>
+                          <input
+                            type="number"
                             value={borderWidth}
                             onChange={(e) => setBorderWidth(parseInt(e.target.value))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                          >
-                            <option value="2">2 - Default</option>
-                            <option value="1">1</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                          </select>
+                            min="1"
+                          />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Border Color</label>
+                          <label className="block text-sm font-medium text-gray-500 mb-2">Border Color</label>
                           <input
                             type="color"
                             value={borderColor}
                             onChange={(e) => setBorderColor(e.target.value)}
-                            className="w-full h-10 border border-gray-300 rounded-lg"
+                            className="w-full h-10 px-1 py-1 border border-gray-300 rounded-lg"
                           />
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <p className="text-sm text-blue-800 mb-2">This will appear only if you select mode: In Outerside</p>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Info Text</label>
-                        <input
-                          type="text"
-                          value={infoText}
-                          onChange={(e) => setInfoText(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                          placeholder="{category} Edition{newline}{date} - {page_title}"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Templates: {'{edition_title}'} {'{page_title}'} {'{date}'} {'{url}'} {'{newline}'}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Info Text Font</label>
-                        <select
-                          value={infoTextFont}
-                          onChange={(e) => setInfoTextFont(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        >
-                          <option value="English">English</option>
-                        </select>
-                      </div>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500 mb-2">Info Text</label>
+                    <input
+                      type="text"
+                      value={infoText}
+                      onChange={(e) => setInfoText(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Additional information text"
+                    />
                   </div>
 
                   <div>
-                    <label className="flex items-center gap-2 mb-3">
+                    <label className="block text-sm font-medium text-gray-500 mb-2">Info Text Font</label>
+                    <select
+                      value={infoTextFont}
+                      onChange={(e) => setInfoTextFont(e.target.value)}
+                      className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="English">English</option>
+                      <option value="Hindi">Hindi</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2 mb-2">
                       <input
                         type="checkbox"
                         checked={enableCenterWatermark}
                         onChange={(e) => setEnableCenterWatermark(e.target.checked)}
                         className="w-4 h-4 text-blue-600 rounded"
                       />
-                      <span className="text-sm font-medium text-gray-700">Enable Extra Watermark on Center</span>
+                      <span className="text-sm font-medium text-gray-500">Enable Center Watermark</span>
                     </label>
-
                     {enableCenterWatermark && (
-                      <div className="space-y-3 ml-6">
+                      <div className="ml-6 space-y-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Watermark Logo</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={centerWatermarkUrl}
-                              onChange={(e) => setCenterWatermarkUrl(e.target.value)}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
-                            />
-                            <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
-                              Upload...
-                            </button>
-                          </div>
+                          <label className="block text-sm font-medium text-gray-500 mb-2">Center Watermark URL</label>
+                          <input
+                            type="text"
+                            value={centerWatermarkUrl}
+                            onChange={(e) => setCenterWatermarkUrl(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            placeholder="https://example.com/center-watermark.png"
+                          />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Opacity</label>
+                          <label className="block text-sm font-medium text-gray-500 mb-2">Center Watermark Opacity</label>
                           <input
                             type="number"
                             value={centerWatermarkOpacity}

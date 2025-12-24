@@ -1,47 +1,40 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { db } from '@/lib/db';
+import { users, roles } from '@/lib/schema';
+import { eq, desc } from 'drizzle-orm';
 
 // GET /api/users - Get all users with their roles
 export async function GET() {
   try {
-    // First, get users
-    const { data: usersData, error: usersError } = await supabaseAdmin
-      .from('users')
-      .select('id, fullname, email, mobile, status, created_at, role_id')
-      .order('created_at', { ascending: false });
+    // Get users
+    const usersData = await db
+      .select({
+        id: users.id,
+        fullname: users.fullname,
+        email: users.email,
+        mobile: users.mobile,
+        status: users.status,
+        created_at: users.created_at,
+        role_id: users.role_id,
+      })
+      .from(users)
+      .orderBy(desc(users.created_at));
 
-    if (usersError) {
-      console.error('Users query error:', usersError);
-      throw usersError;
-    }
-
-    // Then get roles
-    const { data: rolesData, error: rolesError } = await supabaseAdmin
-      .from('roles')
-      .select('id, name');
-
-    if (rolesError) {
-      console.error('Roles query error:', rolesError);
-      throw rolesError;
-    }
+    // Get roles
+    const rolesData = await db.select().from(roles);
 
     // Create a role map
-    const roleMap = new Map(rolesData?.map(r => [r.id, r.name]) || []);
+    const roleMap = new Map(rolesData.map(r => [r.id, r.name]));
 
     // Format the data
-    const formattedUsers = usersData?.map(user => ({
+    const formattedUsers = usersData.map(user => ({
       id: user.id,
       fullname: user.fullname || 'N/A',
       email: user.email,
       mobile: user.mobile || '',
-      role: roleMap.get(user.role_id) || 'Admin',
-      regt_date: new Date(user.created_at).toLocaleDateString('en-US', {
+      role: roleMap.get(user.role_id || 2) || 'Admin',
+      regt_date: new Date(user.created_at!).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -50,7 +43,7 @@ export async function GET() {
         hour12: true
       }),
       status: user.status || 'Active',
-    })) || [];
+    }));
 
     return NextResponse.json({ success: true, data: formattedUsers });
   } catch (error) {
@@ -77,11 +70,11 @@ export async function POST(request: Request) {
     }
 
     // Check if email already exists
-    const { data: existingUser } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single();
+    const [existingUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
 
     if (existingUser) {
       return NextResponse.json(
@@ -91,13 +84,13 @@ export async function POST(request: Request) {
     }
 
     // Get role_id from role name
-    const { data: roleData, error: roleError } = await supabaseAdmin
-      .from('roles')
-      .select('id')
-      .eq('name', role)
-      .single();
+    const [roleData] = await db
+      .select()
+      .from(roles)
+      .where(eq(roles.name, role))
+      .limit(1);
 
-    if (roleError || !roleData) {
+    if (!roleData) {
       return NextResponse.json(
         { success: false, error: 'Invalid role' },
         { status: 400 }
@@ -108,25 +101,17 @@ export async function POST(request: Request) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insert new user
-    const { data: newUser, error: insertError } = await supabaseAdmin
-      .from('users')
-      .insert({
+    const [newUser] = await db
+      .insert(users)
+      .values({
         fullname,
         email,
         password_hash: hashedPassword,
         mobile: mobile || null,
         role_id: roleData.id,
         status: 'Active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('Insert error:', insertError);
-      throw insertError;
-    }
+      .returning();
 
     return NextResponse.json({ 
       success: true, 
@@ -156,15 +141,10 @@ export async function PUT(request: Request) {
     }
 
     // Update user status
-    const { error: updateError } = await supabaseAdmin
-      .from('users')
-      .update({ status })
-      .eq('id', id);
-
-    if (updateError) {
-      console.error('Update error:', updateError);
-      throw updateError;
-    }
+    await db
+      .update(users)
+      .set({ status, updated_at: new Date().toISOString() })
+      .where(eq(users.id, id));
 
     return NextResponse.json({ 
       success: true, 
@@ -193,15 +173,9 @@ export async function DELETE(request: Request) {
     }
 
     // Delete user
-    const { error: deleteError } = await supabaseAdmin
-      .from('users')
-      .delete()
-      .eq('id', parseInt(userId));
-
-    if (deleteError) {
-      console.error('Delete error:', deleteError);
-      throw deleteError;
-    }
+    await db
+      .delete(users)
+      .where(eq(users.id, parseInt(userId)));
 
     return NextResponse.json({ 
       success: true, 

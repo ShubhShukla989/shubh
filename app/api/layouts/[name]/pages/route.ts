@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { db } from '@/lib/db';
+import { pages } from '@/lib/schema';
+import { desc } from 'drizzle-orm';
 
 /**
  * GET /api/layouts/[name]/pages
@@ -17,21 +15,20 @@ export async function GET(
     const { name } = params;
 
     // Get all pages
-    const { data: pages, error } = await supabase
-      .from('pages')
-      .select('id, title, alias, content, status, created_at')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching pages:', error);
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
+    const allPages = await db
+      .select({
+        id: pages.id,
+        title: pages.title,
+        alias: pages.alias,
+        content: pages.content,
+        status: pages.status,
+        created_at: pages.created_at
+      })
+      .from(pages)
+      .orderBy(desc(pages.created_at));
 
     // Filter pages that use this layout
-    const connectedPages = (pages || []).filter(page => {
+    const connectedPages = allPages.filter(page => {
       try {
         const content = JSON.parse(page.content || '{}');
         return content.mode === 'designer' && content.layoutName === name;

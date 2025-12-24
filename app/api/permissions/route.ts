@@ -1,21 +1,15 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { db } from '@/lib/db';
+import { permissions } from '@/lib/schema';
+import { asc } from 'drizzle-orm';
 
 // GET /api/permissions - Get all available permissions
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('permissions')
-      .select('*')
-      .order('category', { ascending: true })
-      .order('name', { ascending: true });
-
-    if (error) throw error;
+    const data = await db
+      .select()
+      .from(permissions)
+      .orderBy(asc(permissions.category), asc(permissions.name));
 
     return NextResponse.json({ success: true, data: data || [] });
   } catch (error) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useEpaper } from '@/contexts/EpaperContext';
+import { useEpaperSafe } from '@/contexts/EpaperContext';
 import PageViewer from './PageViewer';
 import ShareModal from './ShareModal';
 
@@ -17,6 +17,33 @@ interface EpaperPageDisplayWidgetProps {
 }
 
 export function EpaperPageDisplayWidget({ config }: EpaperPageDisplayWidgetProps) {
+  const epaperContext = useEpaperSafe();
+  
+  // If no context (page designer mode), show preview
+  if (!epaperContext) {
+    return (
+      <div className={`p-4 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg text-center ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
+        {config.title && (
+          <h3 className="text-lg font-semibold mb-3">{config.title}</h3>
+        )}
+        <div className="bg-white rounded p-8 shadow-sm">
+          <div className="w-full h-64 bg-gray-200 rounded flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-4xl mb-2">📰</div>
+              <div className="text-gray-600 font-medium">Epaper Page Display</div>
+              <div className="text-gray-500 text-sm mt-1">Live epaper content will appear here</div>
+            </div>
+          </div>
+          <div className="flex justify-between items-center mt-4 text-sm text-gray-500">
+            <button className="px-3 py-1 bg-gray-200 rounded">← Prev</button>
+            <span>Page 1 of 12</span>
+            <button className="px-3 py-1 bg-gray-200 rounded">Next →</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const {
     editionId,
     currentPage,
@@ -27,13 +54,14 @@ export function EpaperPageDisplayWidget({ config }: EpaperPageDisplayWidgetProps
     isClipping,
     setIsClipping,
     loading,
-  } = useEpaper();
+  } = epaperContext;
 
   const [showShareModal, setShowShareModal] = useState(false);
   const [clippedImage, setClippedImage] = useState<string | null>(null);
 
   // Get current page data
   const pageData = pages.find(p => p.page_number === currentPage);
+  console.log('🔍 EpaperPageDisplayWidget - image_url preview:', pageData?.image_url?.substring(0, 100) + '...');
 
   const handlePrevPage = () => {
     if (currentPage > 1) {
@@ -66,7 +94,7 @@ export function EpaperPageDisplayWidget({ config }: EpaperPageDisplayWidgetProps
 
   const page = pageData ? {
     number: pageData.page_number,
-    imageUrl: pageData.image_url || `/media/epaper/${editionId}/page-${pageData.page_number}.jpg`,
+    imageUrl: pageData.image_url || '', // Ensure imageUrl is always a string
     id: pageData.id
   } : undefined;
 

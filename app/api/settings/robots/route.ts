@@ -1,23 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { db } from '@/lib/db';
+import { settings } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 // GET /api/settings/robots - Get robots.txt content
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('settings')
-      .select('value')
-      .eq('key', 'robots_txt')
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
+    const [data] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, 'robots_txt'))
+      .limit(1);
 
     return NextResponse.json({
       success: true,
@@ -37,15 +30,29 @@ export async function POST(request: NextRequest) {
   try {
     const { content } = await request.json();
 
-    const { error } = await supabaseAdmin
-      .from('settings')
-      .upsert({
-        key: 'robots_txt',
-        value: content || '',
-        updated_at: new Date().toISOString(),
-      });
+    // Check if exists
+    const [existing] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, 'robots_txt'))
+      .limit(1);
 
-    if (error) throw error;
+    if (existing) {
+      await db
+        .update(settings)
+        .set({
+          value: content || '',
+          updated_at: new Date().toISOString()
+        })
+        .where(eq(settings.key, 'robots_txt'));
+    } else {
+      await db
+        .insert(settings)
+        .values({
+          key: 'robots_txt',
+          value: content || ''
+        });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

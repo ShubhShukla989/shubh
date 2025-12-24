@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, requireSupabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { layout_backups } from '@/lib/schema';
+import { eq, desc } from 'drizzle-orm';
+import { v4 as uuidv4 } from 'uuid';
 
 // POST /api/layouts/backup - Create backup of current layouts
 export async function POST(request: NextRequest) {
   try {
-    const configError = requireSupabaseAdmin();
-    if (configError) return configError;
-
     const body = await request.json();
     const { layout_name, structure, custom_css, custom_js } = body;
 
@@ -17,19 +17,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data, error } = await supabaseAdmin!
-      .from('layout_backups')
-      .insert({
-        layout_name,
-        structure,
-        custom_css: custom_css || '',
-        custom_js: custom_js || '',
-        created_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const structureStr = typeof structure === 'string' ? structure : JSON.stringify(structure);
 
-    if (error) throw error;
+    const [data] = await db
+      .insert(layout_backups)
+      .values({
+        id: uuidv4(),
+        layout_name,
+        structure: structureStr,
+        timestamp: new Date().toISOString(),
+      })
+      .returning();
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
@@ -44,24 +42,22 @@ export async function POST(request: NextRequest) {
 // GET /api/layouts/backup - Get all backups
 export async function GET(request: NextRequest) {
   try {
-    const configError = requireSupabaseAdmin();
-    if (configError) return configError;
-
     const { searchParams } = new URL(request.url);
     const layoutName = searchParams.get('layout_name');
 
-    let query = supabaseAdmin!
-      .from('layout_backups')
-      .select('*')
-      .order('created_at', { ascending: false });
-
+    let data;
     if (layoutName) {
-      query = query.eq('layout_name', layoutName);
+      data = await db
+        .select()
+        .from(layout_backups)
+        .where(eq(layout_backups.layout_name, layoutName))
+        .orderBy(desc(layout_backups.timestamp));
+    } else {
+      data = await db
+        .select()
+        .from(layout_backups)
+        .orderBy(desc(layout_backups.timestamp));
     }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
 
     return NextResponse.json({ success: true, data });
   } catch (error) {

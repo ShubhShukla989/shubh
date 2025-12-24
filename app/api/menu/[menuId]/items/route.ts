@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { menu_items, pages } from '@/lib/schema';
+import { eq, asc } from 'drizzle-orm';
 
 /**
  * GET /api/menu/:menuId/items - Get all menu items
@@ -11,23 +13,25 @@ export async function GET(
   try {
     const { menuId } = params;
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('menu_items')
-      .select('*')
-      .eq('menu_id', menuId)
-      .order('position');
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const data = await db
+      .select({
+        id: menu_items.id,
+        menu_id: menu_items.menu_id,
+        title: menu_items.title,
+        type: menu_items.type,
+        url: menu_items.url,
+        page_id: menu_items.page_id,
+        category_id: menu_items.category_id,
+        position: menu_items.position,
+        parent_id: menu_items.parent_id,
+        created_at: menu_items.created_at,
+        updated_at: menu_items.updated_at,
+        pages: pages,
+      })
+      .from(menu_items)
+      .leftJoin(pages, eq(menu_items.page_id, pages.id))
+      .where(eq(menu_items.menu_id, parseInt(menuId)))
+      .orderBy(asc(menu_items.position));
 
     return NextResponse.json(data || []);
   } catch (error) {
@@ -58,13 +62,6 @@ export async function POST(
       );
     }
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
     // Create menu item
     const itemData: any = {
       menu_id: parseInt(menuId),
@@ -81,16 +78,7 @@ export async function POST(
       itemData.category_id = parseInt(category_id);
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('menu_items')
-      .insert([itemData])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const [data] = await db.insert(menu_items).values(itemData).returning();
 
     return NextResponse.json(data, { status: 201 });
   } catch (error) {

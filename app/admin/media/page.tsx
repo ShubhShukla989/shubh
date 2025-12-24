@@ -53,10 +53,14 @@ export default function MediaManagerPage() {
         url += `?searchBy=${search.searchBy || 'title'}&query=${encodeURIComponent(search.query)}`;
       }
       
-      console.log('Fetching media from:', url);
+      console.log('🔍 Fetching media from:', url);
       const response = await fetch(url);
       const result = await response.json();
-      console.log('Fetch media result:', result);
+      console.log('📦 Fetch media result:', result);
+      console.log('📁 Media files count:', result.data?.length || 0);
+      if (result.data?.length > 0) {
+        console.log('📄 First file:', result.data[0]);
+      }
       
       if (result.success) {
         console.log('Setting media files:', result.data);
@@ -425,7 +429,7 @@ export default function MediaManagerPage() {
       <div className="flex-1">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Media Manager</h1>
+          <h1 className="text-2xl font-bold text-gray-500">Media Manager</h1>
           {selectedMedia && (
             <button
               onClick={handleDeleteFromPanel}
@@ -449,7 +453,7 @@ export default function MediaManagerPage() {
         </button>
         <Link
           href="/admin/media/tags"
-          className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-100 transition-colors"
         >
           <Tag className="w-4 h-4" />
           Manage Media Tags
@@ -489,7 +493,7 @@ export default function MediaManagerPage() {
             className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
 
-          <button className="p-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
+          <button className="p-2 bg-gray-200 text-gray-500 rounded hover:bg-gray-300">
             <Search className="w-5 h-5" />
           </button>
 
@@ -534,6 +538,8 @@ export default function MediaManagerPage() {
                     fill
                     className="object-cover"
                     sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
+                    onLoad={() => console.log('✅ Image loaded:', file.url)}
+                    onError={(e) => console.error('❌ Image failed to load:', file.url, e)}
                   />
                   
                   {/* Hover Actions */}
@@ -607,7 +613,7 @@ export default function MediaManagerPage() {
 
           {/* Edit Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-500 mb-1">
               Edit Title
             </label>
             <input
@@ -622,7 +628,7 @@ export default function MediaManagerPage() {
 
           {/* Edit Caption */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-500 mb-1">
               Edit Caption
             </label>
             <textarea
@@ -637,7 +643,7 @@ export default function MediaManagerPage() {
           {/* Tags Section */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-500">
                 Tags (Separated By, Comma)
               </label>
               <button
@@ -724,7 +730,7 @@ export default function MediaManagerPage() {
 
             {/* Create New Tag */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-500 mb-2">
                 Create New Tag
               </label>
               <div className="flex gap-2">
@@ -746,7 +752,7 @@ export default function MediaManagerPage() {
 
             {/* Tags List */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-500 mb-2">
                 Existing Tags
               </label>
               <div className="space-y-2 max-h-64 overflow-y-auto">

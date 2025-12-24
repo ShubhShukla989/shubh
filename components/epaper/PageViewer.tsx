@@ -84,6 +84,8 @@ export default function PageViewer({
   const [editionData, setEditionData] = useState<any>(null);
   const [logoCache, setLogoCache] = useState<string | null>(null);
   const [mediaCache, setMediaCache] = useState<any>(null);
+  const [categoryLogoUrl, setCategoryLogoUrl] = useState<string | null>(null);
+  const [watermarkSettings, setWatermarkSettings] = useState<any>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -157,7 +159,10 @@ export default function PageViewer({
   };
 
   const fetchAreaMaps = async () => {
-    if (!page?.id || !editionId) return;
+    if (!page?.id || !editionId) {
+      console.warn('⚠️ Missing page.id or editionId:', { pageId: page?.id, editionId });
+      return;
+    }
     
     try {
       const url = `/api/editions/${editionId}/pages/${page.id}/area-maps`;
@@ -168,15 +173,26 @@ export default function PageViewer({
           'Cache-Control': 'no-cache',
         },
       });
+      
+      console.log('📡 Response status:', response.status, response.statusText);
+      
       const result = await response.json();
-      console.log('📍 Fetched area maps for page:', page.id, 'Count:', result.data?.length || 0, 'Data:', result.data);
+      console.log('📍 API Response:', result);
+      console.log('📊 Area maps count:', result.data?.length || 0);
+      
       if (result.success) {
-        setAreaMaps(result.data || []);
+        const maps = result.data || [];
+        console.log('✅ Setting area maps:', maps);
+        setAreaMaps(maps);
+        
+        if (maps.length === 0) {
+          console.log('⚠️ No area maps found for this page. Create some in admin panel first!');
+        }
       } else {
-        console.error('❌ Failed to fetch area maps:', result.error);
+        console.error('❌ API returned error:', result.error);
       }
     } catch (error) {
-      console.error('❌ Error fetching area maps:', error);
+      console.error('💥 Network error fetching area maps:', error);
     }
   };
 
@@ -188,6 +204,53 @@ export default function PageViewer({
       const result = await response.json();
       if (result.success) {
         setEditionData(result.data);
+        
+        // Fetch category watermark settings for logo and info text
+        if (result.data?.category_id) {
+          const categoryId = result.data.category_id;
+          
+          // Try category-specific settings first
+          const categoryResponse = await fetch(`/api/settings/category-watermark?category_id=${categoryId}`);
+          const categoryResult = await categoryResponse.json();
+          
+          let finalSettings = null;
+          let logoUrl = null;
+          
+          // Check if category has custom settings with logo
+          if (categoryResult.success && categoryResult.data) {
+            const data = categoryResult.data;
+            
+            if (data.enable_watermarking && (data.logo_url || data.center_watermark_url)) {
+              finalSettings = data;
+              logoUrl = data.logo_url || data.center_watermark_url;
+              console.log('✅ Using category-specific watermark settings for PageViewer');
+            }
+          }
+          
+          // Fallback to global area map watermark settings
+          if (!finalSettings || !logoUrl) {
+            const globalResponse = await fetch('/api/settings/area-map-watermark');
+            const globalResult = await globalResponse.json();
+            
+            if (globalResult.success && globalResult.data) {
+              const globalData = globalResult.data;
+              
+              if (globalData.enable_watermarking && (globalData.logo_url || globalData.center_watermark_url)) {
+                finalSettings = globalData;
+                logoUrl = globalData.logo_url || globalData.center_watermark_url;
+                console.log('✅ Using global watermark settings for PageViewer');
+              }
+            }
+          }
+          
+          // Set final settings and logo
+          if (finalSettings && logoUrl) {
+            setWatermarkSettings(finalSettings);
+            setCategoryLogoUrl(logoUrl);
+            setLogoCache(logoUrl); // Also set in logoCache for compatibility
+            console.log('✅ Watermark settings loaded for PageViewer:', finalSettings);
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to fetch edition data:', error);
@@ -274,10 +337,23 @@ export default function PageViewer({
     e.preventDefault();
     e.stopPropagation();
     
+    console.log('🎯 Area clicked!', {
+      areaId: area.id,
+      title: area.title,
+      position: { x: area.x, y: area.y },
+      size: { width: area.width, height: area.height },
+      linkedAreas: area.linked_area_ids
+    });
+    
     // Open area map modal
-    console.log('🔍 Opening area map modal:', area.id);
+    console.log('🔍 Opening area map modal for area ID:', area.id);
     setSelectedAreaMapId(area.id);
     setShowAreaMapModal(true);
+    
+    console.log('📱 Modal state updated:', {
+      showAreaMapModal: true,
+      selectedAreaMapId: area.id
+    });
   };
   
   const handleCloseAreaMapModal = () => {
@@ -449,7 +525,7 @@ export default function PageViewer({
     if (!canvasRef.current) return null;
 
     try {
-      console.time('⚡ Combined clip generation');
+      console.time('⚡ Simplified combined clip generation');
       
       // Fetch all linked area maps IN PARALLEL
       const linkedIds = mainArea.linked_area_ids || [];
@@ -472,16 +548,15 @@ export default function PageViewer({
       // Sort by page number if available
       allAreas.sort((a: any, b: any) => (a.page_number || 0) - (b.page_number || 0));
       
-      // Create combined canvas
+      // SIMPLIFIED APPROACH: Create clean combined canvas without complex header
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (!ctx) return null;
 
-      const headerHeight = 200;
       const spacing = 20; // Space between areas
       
-      // Calculate total height needed
-      let totalHeight = headerHeight;
+      // Calculate total height needed (NO HEADER - logo will be HTML overlay)
+      let totalHeight = 0;
       const areaImages: { area: any; img: HTMLImageElement; height: number }[] = [];
       
       // Load all area images
@@ -497,27 +572,12 @@ export default function PageViewer({
       // Find max width
       const maxWidth = Math.max(...areaImages.map(ai => ai.area.width));
       
-      // Set canvas size
+      // Set canvas size (NO HEADER SPACE)
       canvas.width = maxWidth;
       canvas.height = totalHeight;
       
-      // Draw header with light background
-      ctx.fillStyle = '#f9fafb'; // Very light gray instead of pure white
-      ctx.fillRect(0, 0, maxWidth, headerHeight);
-      
-      // Draw border at bottom of header
-      ctx.strokeStyle = '#e5e7eb';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, headerHeight);
-      ctx.lineTo(maxWidth, headerHeight);
-      ctx.stroke();
-      
-      // Draw logo
-      await drawHeaderWithLogo(ctx, maxWidth, headerHeight);
-      
-      // Draw all areas vertically
-      let currentY = headerHeight;
+      // Draw all areas vertically (CLEAN - NO HEADER)
+      let currentY = 0;
       for (const { area, img, height } of areaImages) {
         ctx.drawImage(
           img,
@@ -538,11 +598,12 @@ export default function PageViewer({
       }
       
       const dataUrl = canvas.toDataURL('image/png', 0.95);
-      console.timeEnd('⚡ Combined clip generation');
+      console.timeEnd('⚡ Simplified combined clip generation');
+      console.log('✅ Clean combined clip created - logo will be added via server-side watermarking');
       return dataUrl;
     } catch (error) {
-      console.error('Failed to create combined clip:', error);
-      console.timeEnd('⚡ Combined clip generation');
+      console.error('❌ Failed to create combined clip:', error);
+      console.timeEnd('⚡ Simplified combined clip generation');
       return null;
     }
   };
@@ -560,10 +621,11 @@ export default function PageViewer({
   };
 
   const drawHeaderWithLogo = async (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    // Use cached logo for faster rendering
+    // Use category logo from cache
     try {
-      if (logoCache) {
-        console.log('🎨 Drawing logo from cache...', logoCache);
+      const logoUrl = categoryLogoUrl || logoCache;
+      if (logoUrl) {
+        console.log('🎨 Drawing category logo from cache...', logoUrl);
         const logo = new Image();
         logo.crossOrigin = 'anonymous';
         
@@ -581,9 +643,9 @@ export default function PageViewer({
             const logoX = (width - logoWidth) / 2;
             const logoY = 15; // Slightly lower from top
             
-            // Draw logo
-            ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
-            console.log(`✅ Logo drawn: ${logoWidth}x${logoHeight} at (${logoX}, ${logoY})`);
+            // NO LOGO - Logo will be added by EpaperClipDisplayWidget later
+            // ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
+            console.log(`ℹ️ Skipping logo drawing in PageViewer - will be added by EpaperClipDisplayWidget`);
             resolve();
           };
           logo.onerror = (err) => {
@@ -591,10 +653,10 @@ export default function PageViewer({
             console.error('❌ Logo load error:', err);
             resolve();
           };
-          logo.src = logoCache;
+          logo.src = logoUrl;
         });
       } else {
-        console.warn('⚠️ No logo cache available');
+        console.warn('⚠️ No category logo available');
       }
     } catch (error) {
       console.error('❌ Failed to load logo:', error);
@@ -627,91 +689,25 @@ export default function PageViewer({
 
     const img = imageRef.current;
     
-    // Calculate actual pixel coordinates from area coordinates
-    const scaleX = img.naturalWidth / img.width;
-    const scaleY = img.naturalHeight / img.height;
-
     // Area coordinates are already in natural image coordinates
     const sourceX = area.x;
     const sourceY = area.y;
     const sourceWidth = area.width;
     const sourceHeight = area.height;
 
-    const headerHeight = 200;
-    
-    // Set canvas size to match the clipped area + header
+    // SIMPLIFIED APPROACH: NO HEADER - clean clip only
     canvas.width = sourceWidth;
-    canvas.height = sourceHeight + headerHeight;
+    canvas.height = sourceHeight;
 
-    // Draw header background (white)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, sourceWidth, headerHeight);
-
-    // Use cached logo for faster rendering
-    try {
-      if (logoCache) {
-        const logo = new Image();
-        logo.crossOrigin = 'anonymous';
-        
-        await new Promise<void>((resolve) => {
-          const timeout = setTimeout(() => resolve(), 1000); // 1s timeout
-          
-          logo.onload = () => {
-            clearTimeout(timeout);
-            const logoHeight = headerHeight * 0.65;
-            const logoWidth = (logo.width / logo.height) * logoHeight;
-            const logoX = (sourceWidth - logoWidth) / 2;
-            const logoY = 10;
-            ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
-            resolve();
-          };
-          logo.onerror = () => {
-            clearTimeout(timeout);
-            resolve();
-          };
-          logo.src = logoCache;
-        });
-      }
-    } catch (error) {
-      console.error('Failed to load logo:', error);
-    }
-
-    // Draw text info in center below logo
-    ctx.fillStyle = '#000000';
-    ctx.textAlign = 'center';
-    const centerX = sourceWidth / 2;
-
-    // Draw dynamic URL (current page URL)
-    ctx.font = '16px Arial';
-    const currentUrl = `${window.location.origin}/epaper/view/${editionId}`;
-    ctx.fillText(currentUrl, centerX, headerHeight - 45);
-
-    // Draw date and page number in one line
-    if (editionData?.date) {
-      ctx.font = '14px Arial';
-      const date = new Date(editionData.date).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-      });
-      const datePageText = `${date} - Page ${page?.number}`;
-      ctx.fillText(datePageText, centerX, headerHeight - 20);
-    } else {
-      ctx.font = '14px Arial';
-      ctx.fillText(`Page ${page?.number}`, centerX, headerHeight - 20);
-    }
-
-    // Reset text align
-    ctx.textAlign = 'left';
-
-    // Draw ONLY the selected area below header
+    // Draw ONLY the selected area (CLEAN - NO HEADER)
     ctx.drawImage(
       img,
       sourceX, sourceY, sourceWidth, sourceHeight,  // Source rectangle (what to clip)
-      0, headerHeight, sourceWidth, sourceHeight     // Destination rectangle (where to draw)
+      0, 0, sourceWidth, sourceHeight               // Destination rectangle (where to draw)
     );
 
     const dataUrl = canvas.toDataURL('image/png', 0.95);
+    console.log('✅ Clean clip created - logo will be added via server-side watermarking');
     return dataUrl;
   };
 
@@ -733,96 +729,33 @@ export default function PageViewer({
     const width = Math.abs(clipEnd.x - clipStart.x) * scaleX;
     const height = Math.abs(clipEnd.y - clipStart.y) * scaleY;
 
-    const headerHeight = 200;
+    // NO HEADER - Clean clip without header space
+    const headerHeight = 0; // No header needed since EpaperClipDisplayWidget will add logo/text
     canvas.width = width;
-    canvas.height = height + headerHeight;
+    canvas.height = height; // No extra header height needed
 
-    // Draw header background (white)
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, headerHeight);
+    // NO HEADER BACKGROUND - Clean clip only
 
-    // Try to load and draw logo from media manager
+    // NO BORDER - Clean clip only
+
+    // NO LOGO IN PAGEVIEWER - Logo will be added by EpaperClipDisplayWidget later
     let logoLoaded = false;
-    try {
-      // Fetch all media files to find logo
-      const mediaResponse = await fetch('/api/media');
-      const mediaData = await mediaResponse.json();
-      
-      if (mediaData.success && mediaData.data && Array.isArray(mediaData.data)) {
-        // Find the logo file (check title or name)
-        const logoFile = mediaData.data.find((file: any) => {
-          const title = file.title?.toLowerCase() || '';
-          const name = file.name?.toLowerCase() || '';
-          const altText = file.alt_text?.toLowerCase() || '';
-          return title === 'logo' || name.includes('logo') || altText === 'logo';
-        });
-        
-        if (logoFile?.url) {
-          const logo = new Image();
-          logo.crossOrigin = 'anonymous';
-          
-          await new Promise<void>((resolve) => {
-            const timeout = setTimeout(() => {
-              console.error('Logo load timeout');
-              resolve();
-            }, 3000);
-            
-            logo.onload = () => {
-              clearTimeout(timeout);
-              // Draw logo centered at top, taking 70% of header height
-              const logoHeight = headerHeight * 0.65;
-              const logoWidth = (logo.width / logo.height) * logoHeight;
-              const logoX = (width - logoWidth) / 2;
-              const logoY = 10;
-              ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
-              logoLoaded = true;
-              resolve();
-            };
-            logo.onerror = (err) => {
-              clearTimeout(timeout);
-              console.error('Logo load error:', err);
-              resolve(); // Continue even if logo fails
-            };
-            logo.src = logoFile.url;
-          });
-        } else {
-          console.warn('No logo file found in media');
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load logo:', error);
-    }
+    console.log('ℹ️ Skipping logo in PageViewer - will be added by EpaperClipDisplayWidget');
 
-    // Draw text info in center below logo
-    ctx.fillStyle = '#000000';
+    // Draw info text using watermark settings
+    ctx.fillStyle = watermarkSettings?.foreground_color || '#000000';
     ctx.textAlign = 'center';
     const centerX = width / 2;
 
-    // Draw dynamic URL (current page URL)
-    ctx.font = '16px Arial';
-    const currentUrl = `${window.location.origin}/epaper/view/${editionId}`;
-    ctx.fillText(currentUrl, centerX, headerHeight - 45);
-
-    // Draw date and page number in one line
-    if (editionData?.date) {
-      ctx.font = '14px Arial';
-      const date = new Date(editionData.date).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-      });
-      const datePageText = `${date} - Page ${page?.number}`;
-      ctx.fillText(datePageText, centerX, headerHeight - 20);
-    } else {
-      ctx.font = '14px Arial';
-      ctx.fillText(`Page ${page?.number}`, centerX, headerHeight - 20);
-    }
+    // NO TEXT IN PAGEVIEWER - Text will be added by EpaperClipDisplayWidget later
+    console.log('ℹ️ Skipping info text in PageViewer - will be added by EpaperClipDisplayWidget');
+    // NO FALLBACK TEXT - Clean clip without any text
 
     // Reset text align
     ctx.textAlign = 'left';
 
-    // Draw clipped portion below header
-    ctx.drawImage(img, x, y, width, height, 0, headerHeight, width, height);
+    // Draw clipped portion directly (no header offset needed)
+    ctx.drawImage(img, x, y, width, height, 0, 0, width, height);
 
     const dataUrl = canvas.toDataURL('image/png', 0.95);
     
@@ -1122,48 +1055,50 @@ export default function PageViewer({
             <X className="w-6 h-6 text-gray-900" />
           </button>
           
-          {/* White Paper Container with Image - Click to Zoom (only for area maps) */}
+          {/* Combined Image Container - CANVAS APPROACH */}
           <div 
-            className="bg-white rounded-lg shadow-2xl p-6 max-w-[90vw] max-h-[75vh] overflow-auto"
+            className="bg-white rounded-lg shadow-2xl max-w-[90vw] max-h-[75vh] overflow-auto"
             style={{
-              touchAction: 'pan-y pan-x', // Allow scrolling but prevent gestures
+              touchAction: 'pan-y pan-x',
               overscrollBehavior: 'contain'
             }}
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
           >
-            <img 
-              src={zoomModalImage} 
-              alt="Article"
-              className={`h-auto transition-transform duration-300 ease-in-out ${
-                selectedArea 
-                  ? (isZoomedIn ? 'w-auto cursor-zoom-out' : 'w-full cursor-zoom-in')
-                  : 'w-full cursor-default'
-              }`}
-              style={{
-                transform: isZoomedIn ? 'scale(1.5)' : 'scale(1)',
-                transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`
-              }}
-              onClick={(e) => {
-                // Only allow zoom if opened from area map
-                if (!selectedArea) return;
-                
-                e.stopPropagation();
-                
-                // Calculate cursor position relative to image
-                const rect = e.currentTarget.getBoundingClientRect();
-                const x = ((e.clientX - rect.left) / rect.width) * 100;
-                const y = ((e.clientY - rect.top) / rect.height) * 100;
-                
-                // Set zoom origin to cursor position
-                setZoomOrigin({ x, y });
-                
-                // Toggle zoom
-                setIsZoomedIn(!isZoomedIn);
-              }}
-              title={selectedArea ? (isZoomedIn ? 'Click to zoom out' : 'Click to zoom in') : ''}
-            />
+            <div className="p-6">
+              <img 
+                src={zoomModalImage} 
+                alt="Article"
+                className={`h-auto transition-transform duration-300 ease-in-out ${
+                  selectedArea 
+                    ? (isZoomedIn ? 'w-auto cursor-zoom-out' : 'w-full cursor-zoom-in')
+                    : 'w-full cursor-default'
+                }`}
+                style={{
+                  transform: isZoomedIn ? 'scale(1.5)' : 'scale(1)',
+                  transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`
+                }}
+                onClick={(e) => {
+                  // Only allow zoom if opened from area map
+                  if (!selectedArea) return;
+                  
+                  e.stopPropagation();
+                  
+                  // Calculate cursor position relative to image
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = ((e.clientX - rect.left) / rect.width) * 100;
+                  const y = ((e.clientY - rect.top) / rect.height) * 100;
+                  
+                  // Set zoom origin to cursor position
+                  setZoomOrigin({ x, y });
+                  
+                  // Toggle zoom
+                  setIsZoomedIn(!isZoomedIn);
+                }}
+                title={selectedArea ? (isZoomedIn ? 'Click to zoom out' : 'Click to zoom in') : ''}
+              />
+            </div>
           </div>
           
           {/* Action Buttons - Outside Paper, Below */}
@@ -1235,43 +1170,64 @@ function EpaperMapLayoutContent({ areaMapId, editionId, pageNumber }: { areaMapI
   const fetchLayout = async () => {
     try {
       setLoading(true);
+      console.log('🎨 Fetching Epaper Map layout...');
+      console.log('📊 Props passed to EpaperMapLayoutContent:', { areaMapId, editionId, pageNumber });
+      
       const response = await fetch(`/api/layouts/Epaper Map`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
         },
       });
+      
+      console.log('📡 Layout API response status:', response.status);
       const data = await response.json();
+      console.log('📄 Layout API response:', data);
       
       if (data.success) {
+        console.log('✅ Layout data received:', data.data);
+        console.log('🏗️ Layout structure preview:', data.data.structure ? 'Has structure' : 'No structure');
         setLayoutData(data.data);
+      } else {
+        console.error('❌ Layout API error:', data.error);
       }
     } catch (error) {
-      console.error('Error fetching layout:', error);
+      console.error('💥 Error fetching layout:', error);
     } finally {
       setLoading(false);
     }
   };
 
   if (loading) {
+    console.log('⏳ EpaperMapLayoutContent: Loading...');
     return (
       <div className="flex items-center justify-center p-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">Loading Epaper Map Layout...</p>
         </div>
       </div>
     );
   }
 
   if (!layoutData) {
+    console.log('❌ EpaperMapLayoutContent: No layout data');
     return (
-      <div className="bg-red-50 border border-red-200 rounded p-4">
-        <p className="text-red-800">Failed to load layout</p>
+      <div className="bg-red-50 border border-red-200 rounded p-4 text-center">
+        <h3 className="text-lg font-semibold text-red-800 mb-2">Layout Not Found</h3>
+        <p className="text-red-700">Failed to load "Epaper Map" layout</p>
+        <p className="text-sm text-red-600 mt-2">Check console for details</p>
       </div>
     );
   }
 
+  // Parse layout structure if it's a string
+  const layoutContent = typeof layoutData.structure === 'string' 
+    ? JSON.parse(layoutData.structure) 
+    : layoutData.structure || layoutData.content || layoutData;
+  
+  console.log('🏗️ Parsed layout content:', layoutContent);
+  
   return (
     <>
       {/* Custom CSS */}
@@ -1281,7 +1237,7 @@ function EpaperMapLayoutContent({ areaMapId, editionId, pageNumber }: { areaMapI
 
       {/* Render Layout Structure */}
       <div className="layout-renderer" data-layout="Epaper Map">
-        {layoutData.structure?.rows?.map((row: any) => (
+        {layoutContent.rows?.map((row: any) => (
           <div 
             key={row.id} 
             className={`layout-row ${row.properties?.cssClass || row.cssClass || ''}`}
@@ -1323,6 +1279,7 @@ function renderWidget(widget: any, areaMapId?: string, editionId?: string, pageN
       
     case 'epaper-area-map':
     case 'epaper-area-map-display':
+      console.log('🎯 Rendering EpaperAreaMapDisplayWidget with:', { areaMapId, editionId, pageNumber, config: widget.config });
       return <EpaperAreaMapDisplayWidget config={widget.config} areaMapId={areaMapId} editionId={editionId} pageNumber={pageNumber} />;
       
     case 'text':

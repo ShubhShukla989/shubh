@@ -41,30 +41,45 @@ export default function EpaperArchive() {
 
   const loadEditions = async () => {
     try {
+      // Fetch site settings to check if we should filter featured editions
+      const settingsResponse = await fetch('/api/settings/site');
+      const settingsData = await settingsResponse.json();
+      const isEpaperDisplay = settingsData.success && settingsData.data?.setting_value === 'epaper-display';
+
       // Fetch editions from your database
       const response = await fetch('/api/editions');
       const data = await response.json();
       
       if (data.success && data.data) {
+        let editionsToShow = data.data.filter((e: any) => e.status?.toLowerCase() === 'published');
+
+        // If epaper-display is set, filter for featured editions
+        if (isEpaperDisplay) {
+          const featuredEditions = editionsToShow.filter((e: any) => e.is_featured === true);
+          
+          // If featured editions exist, show only those; otherwise show all
+          if (featuredEditions.length > 0) {
+            editionsToShow = featuredEditions;
+          }
+        }
+
         // Map database editions to archive format
-        const loadedEditions: Edition[] = data.data
-          .filter((e: any) => e.status?.toLowerCase() === 'published') // Only show published editions
-          .map((e: any) => {
-            const date = new Date(e.date);
-            return {
-              id: e.id.toString(),
-              date: date.toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-              }),
-              title: e.title,
-              totalPages: 12, // You can add this to your database if needed
-              thumbnail: `/media/epaper/${e.id}/page-1.jpg`,
-              month: date.toLocaleDateString('en-US', { month: 'long' }),
-              year: date.getFullYear().toString()
-            };
-          });
+        const loadedEditions: Edition[] = editionsToShow.map((e: any) => {
+          const date = new Date(e.date);
+          return {
+            id: e.id.toString(),
+            date: date.toLocaleDateString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric'
+            }),
+            title: e.title,
+            totalPages: 12, // You can add this to your database if needed
+            thumbnail: `/media/epaper/${e.id}/page-1.jpg`,
+            month: date.toLocaleDateString('en-US', { month: 'long' }),
+            year: date.getFullYear().toString()
+          };
+        });
         
         setEditions(loadedEditions);
         setFilteredEditions(loadedEditions);
@@ -203,7 +218,7 @@ export default function EpaperArchive() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="bg-white rounded-lg shadow-md p-4 animate-pulse">
                 <div className="bg-gray-200 h-64 rounded mb-4"></div>
@@ -225,7 +240,7 @@ export default function EpaperArchive() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredEditions.map((edition) => (
               <div
                 key={edition.id}

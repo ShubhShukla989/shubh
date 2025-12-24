@@ -56,7 +56,7 @@ export default function CategoryWatermarkSettingsPage() {
   const fetchSettings = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/categories/${categoryId}/watermark-settings`);
+      const response = await fetch(`/api/settings/category-watermark?category_id=${categoryId}`);
       const result = await response.json();
       if (result.success) {
         setSettings(result.data);
@@ -71,22 +71,25 @@ export default function CategoryWatermarkSettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`/api/categories/${categoryId}/watermark-settings`, {
+      const response = await fetch(`/api/settings/category-watermark`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({
+          category_id: categoryId,
+          ...settings
+        }),
       });
 
       const result = await response.json();
       if (result.success) {
-        alert('Settings saved successfully!');
+        alert('✅ Settings saved successfully!');
         router.push('/admin/epaper/categories');
       } else {
-        alert('Failed to save settings');
+        alert('❌ Failed to save settings: ' + (result.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Error saving settings');
+      alert('❌ Error saving settings');
     } finally {
       setSaving(false);
     }
@@ -97,7 +100,7 @@ export default function CategoryWatermarkSettingsPage() {
       {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <h1 className="text-xl font-semibold text-gray-900">
+          <h1 className="text-xl font-semibold text-gray-500">
             Override Area Map Watermark/Clip Logo Settings for {categoryName}
           </h1>
         </div>
@@ -425,8 +428,10 @@ export default function CategoryWatermarkSettingsPage() {
         onSelect={(url) => {
           if (mediaTargetField === 'logo') {
             setSettings({ ...settings, logo_url: url });
+            alert('✅ Logo image selected successfully!');
           } else {
             setSettings({ ...settings, center_watermark_url: url });
+            alert('✅ Center watermark image selected successfully!');
           }
           setShowMediaBrowser(false);
         }}

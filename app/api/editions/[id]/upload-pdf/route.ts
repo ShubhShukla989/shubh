@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { editions } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
+    const editionId = parseInt(params.id);
     const formData = await request.formData();
     const file = formData.get('pdf') as File;
 
@@ -17,61 +21,35 @@ export async function POST(
       );
     }
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
     // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Upload to Supabase Storage
-    const fileName = `edition-${id}-${Date.now()}.pdf`;
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-      .from('editions')
-      .upload(fileName, buffer, {
-        contentType: 'application/pdf',
-        upsert: true,
-      });
+    // Use default media path if not configured
+    const mediaPath = process.env.MEDIA_PATH || './public/uploads';
+    const pdfDir = join(mediaPath, 'editions');
+    await mkdir(pdfDir, { recursive: true });
 
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      return NextResponse.json(
-        { success: false, error: uploadError.message },
-        { status: 500 }
-      );
-    }
+    // Save to file system
+    const fileName = `edition-${editionId}-${Date.now()}.pdf`;
+    const filePath = join(pdfDir, fileName);
+    await writeFile(filePath, buffer);
 
-    // Get public URL
-    const { data: urlData } = supabaseAdmin.storage
-      .from('editions')
-      .getPublicUrl(fileName);
-
-    const pdfUrl = urlData.publicUrl;
+    // Construct URL (matching the media path structure)
+    const pdfUrl = `/uploads/editions/${fileName}`;
 
     // Update edition with PDF URL
-    const { error: updateError } = await supabaseAdmin
-      .from('editions')
-      .update({ pdf_url: pdfUrl })
-      .eq('id', id);
-
-    if (updateError) {
-      console.error('Update error:', updateError);
-      return NextResponse.json(
-        { success: false, error: updateError.message },
-        { status: 500 }
-      );
-    }
+    await db
+      .update(editions)
+      .set({ pdf_url: pdfUrl })
+      .where(eq(editions.id, editionId));
 
     return NextResponse.json({
       success: true,
       data: { pdf_url: pdfUrl, file_name: file.name },
     });
   } catch (error) {
-    console.error('API error:', error);
+    console.error('Upload PDF error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to upload PDF' },
       { status: 500 }

@@ -14,7 +14,7 @@ const Editor = dynamic(() => import('@tinymce/tinymce-react').then((mod) => mod.
   loading: () => (
     <div className="w-full h-96 border border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
       <div className="text-center">
-        <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
         <p className="text-sm text-gray-600">Loading editor...</p>
       </div>
     </div>
@@ -185,7 +185,7 @@ export default function EditPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Loading page...</p>
         </div>
       </div>
@@ -206,7 +206,7 @@ export default function EditPage() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Edit Page</h1>
+            <h1 className="text-2xl font-bold text-gray-500">Edit Page</h1>
             <p className="text-sm text-gray-600 mt-1">
               Update page content and settings
             </p>
@@ -223,7 +223,7 @@ export default function EditPage() {
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {saving ? (
               <>
@@ -268,14 +268,14 @@ export default function EditPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Page Title */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Page Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.title}
               onChange={(e) => updateField('title', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter page title"
               required
             />
@@ -283,32 +283,32 @@ export default function EditPage() {
 
           {/* Alias */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Alias <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.alias}
               onChange={(e) => updateField('alias', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
               placeholder="page-url-slug"
               required
             />
             <p className="text-xs text-gray-500 mt-1">
-              URL: /page/<span className="text-purple-600">{formData.alias || 'your-alias'}</span>
+              URL: /page/<span className="text-blue-600">{formData.alias || 'your-alias'}</span>
             </p>
           </div>
 
           {/* Content Editor */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-500">
                 Content
               </label>
               <button
                 type="button"
                 onClick={() => openMediaBrowser('content')}
-                className="text-sm text-purple-600 hover:text-purple-700 flex items-center gap-1"
+                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
               >
                 <ImageIcon className="w-4 h-4" />
                 Media Browser
@@ -353,14 +353,14 @@ export default function EditPage() {
         <div className="space-y-6">
           {/* Description */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Description
             </label>
             <textarea
               value={formData.description}
               onChange={(e) => updateField('description', e.target.value)}
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Admin note (not visible to public)"
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -370,13 +370,13 @@ export default function EditPage() {
 
           {/* Status */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Status <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.status}
               onChange={(e) => updateField('status', e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             >
               <option value="Public">Public</option>

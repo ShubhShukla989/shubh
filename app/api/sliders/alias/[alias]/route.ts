@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { db } from '@/lib/db';
+import { sliders, slides } from '@/lib/schema';
+import { eq, and, asc } from 'drizzle-orm';
 
 /**
  * GET /api/sliders/alias/[alias]
@@ -14,29 +12,37 @@ export async function GET(
   { params }: { params: { alias: string } }
 ) {
   try {
-    const { data, error } = await supabase
-      .from('sliders')
-      .select('*, slides(*)')
-      .eq('alias', params.alias)
-      .eq('status', 'Active')
-      .single();
+    const [slider] = await db
+      .select()
+      .from(sliders)
+      .where(
+        and(
+          eq(sliders.alias, params.alias),
+          eq(sliders.status, 'Active')
+        )
+      )
+      .limit(1);
 
-    if (error) {
-      console.error('Error fetching slider by alias:', error);
+    if (!slider) {
       return NextResponse.json(
         { error: 'Slider not found' },
         { status: 404 }
       );
     }
 
-    // Filter only visible slides and sort by position
-    if (data.slides) {
-      data.slides = data.slides
-        .filter((slide: any) => slide.visible)
-        .sort((a: any, b: any) => a.position - b.position);
-    }
+    // Get only visible slides sorted by position
+    const sliderSlides = await db
+      .select()
+      .from(slides)
+      .where(
+        and(
+          eq(slides.slider_id, slider.id),
+          eq(slides.visible, true)
+        )
+      )
+      .orderBy(asc(slides.position));
 
-    return NextResponse.json(data);
+    return NextResponse.json({ ...slider, slides: sliderSlides });
   } catch (error) {
     console.error('Error in GET /api/sliders/alias/[alias]:', error);
     return NextResponse.json(

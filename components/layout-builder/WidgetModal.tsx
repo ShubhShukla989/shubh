@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Widget } from './types';
 import { MediaBrowserModal } from './MediaBrowserModal';
+import { DeviceVisibilitySelector } from './DeviceVisibilitySelector';
 
 // Tree node interface for hierarchical categories
 interface TreeNode {
@@ -896,6 +897,129 @@ function EpaperArchivePageForm({ config, onChange }: { config: any; onChange: (c
   );
 }
 
+// Featured Editions Form Component
+function FeaturedEditionsForm({ config, onChange }: { config: any; onChange: (config: any) => void }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Widget Title
+        </label>
+        <input
+          type="text"
+          value={config.title || ''}
+          onChange={(e) => onChange({ ...config, title: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Featured Editions"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Maximum Editions
+        </label>
+        <input
+          type="number"
+          value={config.maxEditions || 6}
+          onChange={(e) => onChange({ ...config, maxEditions: parseInt(e.target.value) })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          min="1"
+          max="20"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Thumbnail Width (px)
+          </label>
+          <input
+            type="number"
+            value={config.thumbnailWidth || 200}
+            onChange={(e) => onChange({ ...config, thumbnailWidth: parseInt(e.target.value) })}
+            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Thumbnail Height (px)
+          </label>
+          <input
+            type="number"
+            value={config.thumbnailHeight || 280}
+            onChange={(e) => onChange({ ...config, thumbnailHeight: parseInt(e.target.value) })}
+            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Editions Per Row
+        </label>
+        <select
+          value={config.perRowCount || 3}
+          onChange={(e) => onChange({ ...config, perRowCount: parseInt(e.target.value) })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value={1}>1</option>
+          <option value={2}>2</option>
+          <option value={3}>3</option>
+          <option value={4}>4</option>
+          <option value={5}>5</option>
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={config.showDate !== false}
+            onChange={(e) => onChange({ ...config, showDate: e.target.checked })}
+            className="mr-2"
+          />
+          Show Publication Date
+        </label>
+        <label className="flex items-center">
+          <input
+            type="checkbox"
+            checked={config.showDescription !== false}
+            onChange={(e) => onChange({ ...config, showDescription: e.target.checked })}
+            className="mr-2"
+          />
+          Show Description
+        </label>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          CSS Classes
+        </label>
+        <input
+          type="text"
+          value={config.cssClasses || ''}
+          onChange={(e) => onChange({ ...config, cssClasses: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="custom-class another-class"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Custom CSS Styles
+        </label>
+        <textarea
+          value={config.style || ''}
+          onChange={(e) => onChange({ ...config, style: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          rows={3}
+          placeholder="margin: 20px; padding: 10px;"
+        />
+      </div>
+    </div>
+  );
+}
+
 // Epaper Featured Categories Form Component
 function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onChange: (config: any) => void }) {
   const [categories, setCategories] = useState<any[]>([]);
@@ -1393,6 +1517,117 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
   );
 }
 
+// Menu Widget Form Component
+function MenuForm({ config, onChange }: { config: any; onChange: (config: any) => void }) {
+  const [menus, setMenus] = useState<any[]>([]);
+  const [loadingMenus, setLoadingMenus] = useState(false);
+
+  useEffect(() => {
+    fetchMenus();
+  }, []);
+
+  const fetchMenus = async () => {
+    try {
+      setLoadingMenus(true);
+      const response = await fetch('/api/menu');
+      const data = await response.json();
+      setMenus(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch menus:', error);
+      setMenus([]);
+    } finally {
+      setLoadingMenus(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Title */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+        <input
+          type="text"
+          value={config.title || ''}
+          onChange={(e) => onChange({ ...config, title: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Menu Title"
+        />
+      </div>
+
+      {/* Show Title */}
+      <div>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={config.showTitle !== false}
+            onChange={(e) => onChange({ ...config, showTitle: e.target.checked })}
+          />
+          <span className="text-sm font-medium text-gray-700">Show Title</span>
+        </label>
+      </div>
+
+      {/* Menu Selection */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Menu</label>
+        {loadingMenus ? (
+          <div className="text-gray-500 py-2">Loading menus...</div>
+        ) : (
+          <select
+            value={config.menuId || ''}
+            onChange={(e) => onChange({ ...config, menuId: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">-- Select Menu --</option>
+            {menus.map((menu) => (
+              <option key={menu.id} value={menu.id}>
+                {menu.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Display Style */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Display Style</label>
+        <select
+          value={config.displayStyle || 'vertical'}
+          onChange={(e) => onChange({ ...config, displayStyle: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="vertical">Vertical List</option>
+          <option value="horizontal">Horizontal List</option>
+          <option value="dropdown">Dropdown Select</option>
+        </select>
+      </div>
+
+      {/* CSS Classes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">CSS Classes</label>
+        <input
+          type="text"
+          value={config.cssClasses || ''}
+          onChange={(e) => onChange({ ...config, cssClasses: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="menu-widget sidebar-menu"
+        />
+      </div>
+
+      {/* Style */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Style</label>
+        <input
+          type="text"
+          value={config.style || ''}
+          onChange={(e) => onChange({ ...config, style: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="padding: 20px; background: #f8f9fa;"
+        />
+      </div>
+    </div>
+  );
+}
+
 // Navigation Bar Form Component
 function NavigationForm({ config, onChange }: { config: any; onChange: (config: any) => void }) {
   const [menus, setMenus] = useState<any[]>([]);
@@ -1621,6 +1856,7 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
     { type: 'epaper-zoom', label: 'Zoom Controls Widget', icon: '🔍', color: 'bg-indigo-700' },
     { type: 'social-sharing', label: 'Social Sharing Widget', icon: '🔗', color: 'bg-blue-600' },
     { type: 'epaper-featured', label: 'Featured Categories Widget', icon: '⭐', color: 'bg-cyan-700' },
+    { type: 'featured-editions', label: 'Featured Editions Widget', icon: '📰', color: 'bg-green-700' },
     { type: 'page-download', label: 'Page: Download Widget', icon: '📥', color: 'bg-red-600' },
     { type: 'epaper-area-map', label: 'Area Map Display Widget', icon: '🗺️', color: 'bg-amber-700' },
   ];
@@ -2027,6 +2263,16 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
                   config={editedWidget.config}
                   onChange={(config) => setEditedWidget({ ...editedWidget, config })}
                 />
+              ) : editedWidget.type === 'featured-editions' ? (
+                <FeaturedEditionsForm
+                  config={editedWidget.config}
+                  onChange={(config) => setEditedWidget({ ...editedWidget, config })}
+                />
+              ) : editedWidget.type === 'menu' ? (
+                <MenuForm
+                  config={editedWidget.config}
+                  onChange={(config) => setEditedWidget({ ...editedWidget, config })}
+                />
               ) : editedWidget.type === 'navigation' ? (
                 <NavigationForm
                   config={editedWidget.config}
@@ -2140,6 +2386,15 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
                   />
                 </div>
               )}
+
+              {/* Device Visibility Selector - Common for all widgets */}
+              <DeviceVisibilitySelector
+                value={editedWidget.deviceVisibility || 'both'}
+                onChange={(value) => setEditedWidget({
+                  ...editedWidget,
+                  deviceVisibility: value
+                })}
+              />
 
               <div className="flex justify-end gap-2 pt-4 border-t mt-6">
                 <button

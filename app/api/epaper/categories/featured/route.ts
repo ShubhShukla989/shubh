@@ -1,26 +1,20 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin, requireSupabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { epaper_categories } from '@/lib/schema';
+import { eq, asc } from 'drizzle-orm';
 
 export async function GET() {
   try {
     console.log('Featured categories API called');
-    const configError = requireSupabaseAdmin();
-    if (configError) {
-      console.log('Supabase admin config error');
-      return configError;
-    }
 
     console.log('Querying featured categories...');
-    const { data, error } = await supabaseAdmin!
-      .from('epaper_categories')
-      .select('*')
-      .eq('is_featured', true)
-      .order('display_order', { ascending: true });
+    const data = await db
+      .select()
+      .from(epaper_categories)
+      .where(eq(epaper_categories.is_featured, true))
+      .orderBy(asc(epaper_categories.display_order));
 
-    console.log('Query result:', { data, error });
-
-    if (error) throw error;
-
+    console.log('Query result:', { data });
     console.log('Returning data:', data);
     return NextResponse.json({ success: true, data: data || [] });
   } catch (error) {

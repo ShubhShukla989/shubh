@@ -85,7 +85,7 @@ export default function MenuManager() {
   return (
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Menu Manager</h1>
+        <h1 className="text-2xl font-bold text-gray-500">Menu Manager</h1>
 
       </div>
 
@@ -108,10 +108,10 @@ export default function MenuManager() {
           <table className="w-full">
             <thead className="bg-gray-100">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">
                   Actions
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-500">
                   Menu Name
                 </th>
               </tr>
@@ -151,7 +151,7 @@ export default function MenuManager() {
                         </button>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-900">{menu.name}</td>
+                    <td className="px-6 py-4 text-gray-500">{menu.name}</td>
                   </tr>
                 ))
               )}
@@ -166,7 +166,7 @@ export default function MenuManager() {
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h2 className="text-xl font-bold mb-4">Create New Menu</h2>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-500 mb-2">
                 Menu Name
               </label>
               <input
@@ -191,7 +191,7 @@ export default function MenuManager() {
                   setShowCreateModal(false);
                   setNewMenuName('');
                 }}
-                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-500 rounded hover:bg-gray-400"
               >
                 Cancel
               </button>

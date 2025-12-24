@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { media_file_tags, media_tags } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 // GET tags for a media file
 export async function GET(
@@ -9,24 +11,14 @@ export async function GET(
   try {
     const { id } = params;
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('media_file_tags')
-      .select('media_tag_id, media_tags(id, name, slug)')
-      .eq('media_file_id', id);
-
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
+    const data = await db
+      .select({
+        media_tag_id: media_file_tags.media_tag_id,
+        media_tags: media_tags,
+      })
+      .from(media_file_tags)
+      .leftJoin(media_tags, eq(media_file_tags.media_tag_id, media_tags.id))
+      .where(eq(media_file_tags.media_file_id, parseInt(id)));
 
     const tagIds = (data || []).map((item: any) => item.media_tag_id);
 
@@ -50,24 +42,12 @@ export async function PUT(
     const body = await request.json();
     const { tag_ids } = body;
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
     console.log('Deleting existing tags for media_file_id:', id);
     
     // Delete existing tags
-    const { error: deleteError } = await supabaseAdmin
-      .from('media_file_tags')
-      .delete()
-      .eq('media_file_id', id);
-
-    if (deleteError) {
-      console.error('Delete error:', deleteError);
-    }
+    await db
+      .delete(media_file_tags)
+      .where(eq(media_file_tags.media_file_id, parseInt(id)));
 
     // Insert new tags
     if (tag_ids && tag_ids.length > 0) {
@@ -78,17 +58,7 @@ export async function PUT(
 
       console.log('Inserting tags:', tagInserts);
 
-      const { error: insertError } = await supabaseAdmin
-        .from('media_file_tags')
-        .insert(tagInserts);
-
-      if (insertError) {
-        console.error('Insert error:', insertError);
-        return NextResponse.json(
-          { success: false, error: insertError.message },
-          { status: 500 }
-        );
-      }
+      await db.insert(media_file_tags).values(tagInserts);
     }
     
     console.log('Tags updated successfully');

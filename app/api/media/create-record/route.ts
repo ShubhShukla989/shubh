@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { media_files } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 /**
  * POST /api/media/create-record
@@ -7,13 +9,6 @@ import { supabaseAdmin } from '@/lib/supabase';
  */
 export async function POST(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
     const body = await request.json();
     const { filename, url, size, type } = body;
 
@@ -25,11 +20,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if record already exists
-    const { data: existing } = await supabaseAdmin
-      .from('media_files')
-      .select('id')
-      .eq('filename', filename)
-      .single();
+    const [existing] = await db
+      .select()
+      .from(media_files)
+      .where(eq(media_files.filename, filename))
+      .limit(1);
 
     if (existing) {
       return NextResponse.json({
@@ -40,9 +35,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new record
-    const { data, error } = await supabaseAdmin
-      .from('media_files')
-      .insert({
+    const [data] = await db
+      .insert(media_files)
+      .values({
         filename,
         original_name: filename,
         file_path: `media/${filename}`,
@@ -52,16 +47,7 @@ export async function POST(request: NextRequest) {
         title: filename,
         alt_text: '',
       })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
+      .returning();
 
     return NextResponse.json({
       success: true,

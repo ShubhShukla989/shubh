@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Minus, Star, Edit, Trash2, Settings } from 'lucide-react';
+import { Plus, Minus, Star, Settings } from 'lucide-react';
 import Link from 'next/link';
+import ActionIcons from '@/components/ActionIcons';
 
 interface Category {
   id: number;
@@ -120,7 +121,7 @@ export default function CategoriesPage() {
     <div className="p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Category Manager</h1>
+        <h1 className="text-2xl font-bold text-gray-500">Category Manager</h1>
         <Link
           href="/admin/epaper/categories/create"
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
@@ -146,49 +147,36 @@ export default function CategoriesPage() {
                 className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center gap-4 flex-1">
-                  {/* Edit Button */}
-                  <Link
-                    href={`/admin/epaper/categories/edit/${category.id}`}
-                    className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                    title="Edit"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Link>
-
-                  {/* Delete Button */}
-                  <button
-                    onClick={() => handleDelete(category.id, category.title)}
-                    className="p-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-
-                  {/* Watermark Settings Button */}
-                  <Link
-                    href={`/admin/epaper/categories/${category.id}/watermark-settings`}
-                    className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                    title="Watermark Settings"
-                  >
-                    <Settings className="w-4 h-4" />
-                  </Link>
+                  <ActionIcons.Group>
+                    <Link href={`/admin/epaper/categories/edit/${category.id}`}>
+                      <ActionIcons.Edit title="Edit Category" />
+                    </Link>
+                    <ActionIcons.Delete
+                      onClick={() => handleDelete(category.id, category.title)}
+                      title="Delete Category"
+                    />
+                    <Link href={`/admin/epaper/categories/${category.id}/watermark-settings`}>
+                      <button
+                        className="p-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors"
+                        title="Watermark Settings"
+                      >
+                        <Settings className="w-5 h-5" />
+                      </button>
+                    </Link>
+                  </ActionIcons.Group>
 
                   {/* Toggle Featured Button */}
-                  <button
-                    onClick={() => toggleCategory(category.id, category.is_featured, category.title)}
-                    className={`p-2 text-white rounded transition-colors ${
-                      category.is_featured
-                        ? 'bg-yellow-500 hover:bg-yellow-600'
-                        : 'bg-green-500 hover:bg-green-600'
-                    }`}
-                    title={category.is_featured ? 'Remove from Featured' : 'Add to Featured'}
-                  >
-                    {category.is_featured ? (
-                      <Minus className="w-4 h-4" />
-                    ) : (
-                      <Plus className="w-4 h-4" />
-                    )}
-                  </button>
+                  {category.is_featured ? (
+                    <ActionIcons.Remove
+                      onClick={() => toggleCategory(category.id, category.is_featured, category.title)}
+                      title="Remove from Featured"
+                    />
+                  ) : (
+                    <ActionIcons.Add
+                      onClick={() => toggleCategory(category.id, category.is_featured, category.title)}
+                      title="Add to Featured"
+                    />
+                  )}
 
                   {/* Featured Star */}
                   {category.is_featured && (
@@ -202,7 +190,7 @@ export default function CategoriesPage() {
 
                   {/* Category Info */}
                   <div className="flex-1">
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-gray-500">
                       {category.title}
                     </div>
                     <div className="text-sm text-gray-500">
@@ -217,7 +205,7 @@ export default function CategoriesPage() {
                         Active
                       </span>
                     ) : (
-                      <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">
+                      <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
                         Inactive
                       </span>
                     )}

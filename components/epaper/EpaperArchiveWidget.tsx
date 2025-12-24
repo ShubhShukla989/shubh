@@ -102,7 +102,7 @@ export function EpaperArchiveWidget({ config }: EpaperArchiveWidgetProps) {
       <div 
         className="grid gap-4 md:gap-6 px-4 md:px-8"
         style={{
-          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : `repeat(${perRow}, 1fr)`,
+          gridTemplateColumns: isMobile ? '1fr' : `repeat(${perRow}, 1fr)`,
         }}
       >
         {editions.map((edition) => {

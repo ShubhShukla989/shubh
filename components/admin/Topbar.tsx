@@ -1,10 +1,14 @@
 'use client';
 
-import { Bell, HelpCircle, User, LogOut, Settings } from 'lucide-react';
+import { LogOut, Menu } from 'lucide-react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function Topbar() {
+interface TopbarProps {
+  onMenuClick?: () => void;
+}
+
+export default function Topbar({ onMenuClick }: TopbarProps) {
   const router = useRouter();
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -14,48 +18,37 @@ export default function Topbar() {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+    <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 flex items-center justify-between">
       <div className="flex items-center gap-4">
-        <button className="px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition-colors">
-          Submit Feedback
-        </button>
+        {/* Mobile menu button */}
+        {onMenuClick && (
+          <button
+            onClick={onMenuClick}
+            className="lg:hidden w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors shadow-sm border border-gray-200"
+            aria-label="Open sidebar"
+          >
+            <Menu className="w-5 h-5 text-gray-700" />
+          </button>
+        )}
       </div>
-
-      <div className="flex items-center gap-4">
-        <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors relative">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
-
-        <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors">
-          <HelpCircle className="w-5 h-5" />
-        </button>
-
+      
+      <div className="flex items-center gap-2 lg:gap-4">
         <div className="relative">
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-2 lg:px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-medium">
+            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium text-sm">
               A
             </div>
-            <div className="text-left">
-              <div className="font-medium">Welcome!</div>
+            <div className="text-left hidden sm:block">
+              <div className="font-medium text-sm">Welcome!</div>
               <div className="text-xs text-gray-500">Administrator</div>
             </div>
           </button>
 
           {showDropdown && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
-              <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
-                <User className="w-4 h-4" />
-                Profile
-              </button>
-              <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2">
-                <Settings className="w-4 h-4" />
-                Settings
-              </button>
-              <hr className="my-1" />
               <button
                 onClick={handleLogout}
                 className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"

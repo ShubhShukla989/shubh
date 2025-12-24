@@ -1,69 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin, requireSupabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { media_files } from '@/lib/schema/media';
+import { desc } from 'drizzle-orm';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-export async function GET(request: NextRequest) {
+// GET /api/media - Get all media files
+export async function GET() {
   try {
-    const configError = requireSupabaseAdmin();
-    if (configError) return configError;
-
-    const { searchParams } = new URL(request.url);
-    const searchBy = searchParams.get('searchBy') || 'title';
-    const query = searchParams.get('query');
-
-    console.log('🔍 Fetching media files from database...');
-
-    // Fetch all media files from database
-    let dbQuery = supabaseAdmin!
-      .from('media_files')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (query) {
-      if (searchBy === 'title') {
-        dbQuery = dbQuery.ilike('title', `%${query}%`);
-      } else if (searchBy === 'filename') {
-        dbQuery = dbQuery.ilike('filename', `%${query}%`);
-      }
-    }
-
-    const { data, error } = await dbQuery;
-
-    console.log('📊 GET /api/media - Database returned:', data?.length, 'records');
-    console.log('IDs:', data?.map((f: any) => f.id));
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json(
-        { success: false, error: 'Failed to fetch media' },
-        { status: 500 }
-      );
-    }
-
-    // Map database fields to expected format
-    const mappedData = (data || []).map((file: any) => ({
-      id: file.id,
+    console.log('🔍 Media API called at:', new Date().toISOString());
+    const files = await db.select().from(media_files).orderBy(desc(media_files.created_at));
+    console.log('📁 Found files in database:', files.length);
+    
+    // Transform to match MediaBrowser expected format
+    const transformedFiles = files.map(file => ({
+      id: file.id.toString(),
       url: file.file_url,
-      name: file.filename,
-      title: file.title,
-      alt_text: file.alt_text,
-      size: file.file_size,
-      type: file.mime_type,
-      createdAt: file.created_at,
+      name: file.original_name || file.filename,
+      size: file.file_size || 0,
+      type: file.mime_type || 'image/jpeg',
+      createdAt: file.created_at || new Date().toISOString()
     }));
-
-    console.log('✅ Returning', mappedData.length, 'media files');
-
+    
+    console.log('📤 Returning files:', transformedFiles.map(f => f.name));
+    
     return NextResponse.json({
       success: true,
-      data: mappedData,
+      data: transformedFiles
+    }, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
   } catch (error) {
-    console.error('Media API error:', error);
+    console.error('Error fetching media:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch media' },
+      { success: false, error: 'Failed to fetch media files' },
       { status: 500 }
     );
   }

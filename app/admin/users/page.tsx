@@ -188,16 +188,16 @@ export default function UsersManagerPage() {
     <div className="p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Users Manager</h1>
+        <h1 className="text-2xl font-bold text-gray-500">Users Manager</h1>
       </div>
 
       {/* Action Buttons */}
       <div className="mb-4 flex gap-3">
         <button 
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded hover:bg-gray-900 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
         >
-          <ActionIcons.Add className="!p-0 !bg-transparent" />
+          <ActionIcons.Add className="!p-0 !bg-transparent !text-gray-700" />
           New User
         </button>
         <a
@@ -310,28 +310,28 @@ export default function UsersManagerPage() {
                   className="w-4 h-4"
                 />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Actions
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Fullname
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Email
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Mobile
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Role
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Regt Date
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Status
               </th>
             </tr>
@@ -359,12 +359,12 @@ export default function UsersManagerPage() {
                     />
                   </ActionIcons.Group>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-900">{user.id}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{user.fullname}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{user.email}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{user.mobile}</td>
+                <td className="px-4 py-3 text-sm text-gray-500">{user.id}</td>
+                <td className="px-4 py-3 text-sm text-gray-500">{user.fullname}</td>
+                <td className="px-4 py-3 text-sm text-gray-500">{user.email}</td>
+                <td className="px-4 py-3 text-sm text-gray-500">{user.mobile}</td>
                 <td className="px-4 py-3 text-sm font-medium text-red-600">{user.role}</td>
-                <td className="px-4 py-3 text-sm text-gray-900">{user.regt_date}</td>
+                <td className="px-4 py-3 text-sm text-gray-500">{user.regt_date}</td>
                 <td className="px-4 py-3 text-sm font-medium text-green-600">{user.status}</td>
               </tr>
             ))}
@@ -383,7 +383,7 @@ export default function UsersManagerPage() {
                   setShowEditModal(false);
                   setSelectedUser(null);
                 }}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-500"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -408,7 +408,7 @@ export default function UsersManagerPage() {
               </div>
 
               <div className="border-t pt-4 mt-4">
-                <p className="text-sm font-medium text-gray-700 mb-3">Change Status:</p>
+                <p className="text-sm font-medium text-gray-500 mb-3">Change Status:</p>
                 <div className="flex gap-3">
                   {selectedUser.status !== 'Suspended' && (
                     <button
@@ -439,7 +439,7 @@ export default function UsersManagerPage() {
                       setShowEditModal(false);
                       setSelectedUser(null);
                     }}
-                    className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                    className="flex-1 px-4 py-2 bg-gray-300 text-gray-500 rounded hover:bg-gray-400"
                   >
                     Cancel
                   </button>
@@ -458,7 +458,7 @@ export default function UsersManagerPage() {
               <h2 className="text-xl font-bold">Create New User</h2>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-500"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -469,7 +469,7 @@ export default function UsersManagerPage() {
             <form onSubmit={handleCreateUser}>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     Full Name *
                   </label>
                   <input
@@ -483,7 +483,7 @@ export default function UsersManagerPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     Email *
                   </label>
                   <input
@@ -497,7 +497,7 @@ export default function UsersManagerPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     Password *
                   </label>
                   <input
@@ -511,7 +511,7 @@ export default function UsersManagerPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     Mobile
                   </label>
                   <input
@@ -524,7 +524,7 @@ export default function UsersManagerPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-500 mb-1">
                     Role *
                   </label>
                   <select
@@ -549,7 +549,7 @@ export default function UsersManagerPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-500 rounded hover:bg-gray-400"
                 >
                   Cancel
                 </button>

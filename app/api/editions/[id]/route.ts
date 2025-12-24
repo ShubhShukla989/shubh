@@ -1,29 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { editions } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
+    const [data] = await db
+      .select()
+      .from(editions)
+      .where(eq(editions.id, parseInt(params.id)))
+      .limit(1);
 
-    if (!supabaseAdmin) {
+    if (!data) {
       return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('editions')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: 'Edition not found' },
         { status: 404 }
       );
     }
@@ -43,15 +36,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
     const body = await request.json();
-
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
 
     // Validate and normalize status if present
     if (body.status) {
@@ -75,17 +60,16 @@ export async function PUT(
       }
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('editions')
-      .update(body)
-      .eq('id', id)
-      .select()
-      .single();
+    const [data] = await db
+      .update(editions)
+      .set({ ...body, updated_at: new Date().toISOString() })
+      .where(eq(editions.id, parseInt(params.id)))
+      .returning();
 
-    if (error) {
+    if (!data) {
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
+        { success: false, error: 'Edition not found' },
+        { status: 404 }
       );
     }
 
@@ -104,26 +88,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
-
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    const { error } = await supabaseAdmin
-      .from('editions')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
+    await db
+      .delete(editions)
+      .where(eq(editions.id, parseInt(params.id)));
 
     return NextResponse.json({
       success: true,

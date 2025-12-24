@@ -96,7 +96,7 @@ export default function FeaturedCategoriesPage() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Featured Category Manager</h1>
+        <h1 className="text-2xl font-bold text-gray-500">Featured Category Manager</h1>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg">
@@ -128,7 +128,7 @@ export default function FeaturedCategoriesPage() {
                   <Minus className="w-4 h-4" />
                 </button>
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900">{category.title}</div>
+                  <div className="font-medium text-gray-500">{category.title}</div>
                   <div className="text-sm text-gray-500">Alias: {category.alias}</div>
                 </div>
               </div>

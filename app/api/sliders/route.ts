@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { db } from '@/lib/db';
+import { sliders, slides } from '@/lib/schema';
+import { eq, ilike, desc, sql } from 'drizzle-orm';
 
 /**
  * GET /api/sliders
@@ -17,37 +15,53 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    let query = supabase
-      .from('sliders')
-      .select('*, slides(*)', { count: 'exact' })
-      .order('created_at', { ascending: false });
-
-    // Apply filters
+    // Build query conditions
+    const conditions = [];
     if (search) {
-      query = query.ilike('title', `%${search}%`);
+      conditions.push(ilike(sliders.title, `%${search}%`));
     }
     if (status) {
-      query = query.eq('status', status);
+      conditions.push(eq(sliders.status, status));
     }
 
-    // Apply pagination
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-    query = query.range(from, to);
+    // Get total count
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(sliders)
+      .where(conditions.length > 0 ? sql`${sql.join(conditions, sql` AND `)}` : undefined);
 
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error('Error fetching sliders:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch sliders' },
-        { status: 500 }
-      );
+    // Get paginated data
+    const offset = (page - 1) * limit;
+    let data;
+    
+    if (conditions.length > 0) {
+      data = await db
+        .select()
+        .from(sliders)
+        .where(sql`${sql.join(conditions, sql` AND `)}`)
+        .orderBy(desc(sliders.created_at))
+        .limit(limit)
+        .offset(offset);
+    } else {
+      data = await db
+        .select()
+        .from(sliders)
+        .orderBy(desc(sliders.created_at))
+        .limit(limit)
+        .offset(offset);
     }
+
+    // Get slides for each slider
+    const slidersWithSlides = await Promise.all(
+      data.map(async (slider) => {
+        const sliderSlides = await db.select().from(slides).where(eq(slides.slider_id, slider.id));
+        return { ...slider, slides: sliderSlides };
+      })
+    );
 
     return NextResponse.json({
-      sliders: data,
-      total: count || 0,
+      sliders: slidersWithSlides,
+      total: countResult?.count || 0,
       page,
       limit,
     });
@@ -77,20 +91,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if alias already exists (skip error if table doesn't exist yet)
-    const { data: existing, error: checkError } = await supabase
-      .from('sliders')
-      .select('id')
-      .eq('alias', alias)
-      .maybeSingle();
-
-    if (checkError && checkError.code !== 'PGRST116') {
-      console.error('Error checking existing slider:', checkError);
-      return NextResponse.json(
-        { error: 'Database error: ' + checkError.message },
-        { status: 500 }
-      );
-    }
+    // Check if alias already exists
+    const [existing] = await db
+      .select()
+      .from(sliders)
+      .where(eq(sliders.alias, alias))
+      .limit(1);
 
     if (existing) {
       return NextResponse.json(
@@ -100,31 +106,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Create slider
-    const { data, error } = await supabase
-      .from('sliders')
-      .insert([
-        {
-          title,
-          alias,
-          description,
-          status: status || 'Active',
-          config: config || {},
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating slider:', error);
-      return NextResponse.json(
-        { 
-          error: 'Failed to create slider', 
-          details: error.message,
-          hint: error.hint || 'Make sure the sliders table exists in your database'
-        },
-        { status: 500 }
-      );
-    }
+    const [data] = await db
+      .insert(sliders)
+      .values({
+        title,
+        alias,
+        description,
+        status: status || 'Active',
+        config: config ? JSON.stringify(config) : '{}',
+      })
+      .returning();
 
     return NextResponse.json(data, { status: 201 });
   } catch (error) {

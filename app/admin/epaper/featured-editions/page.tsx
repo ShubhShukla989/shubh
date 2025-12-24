@@ -19,10 +19,12 @@ export default function FeaturedEditionsPage() {
 
   const fetchFeaturedEditions = async () => {
     try {
-      const response = await fetch('/api/editions/featured');
+      // Fetch ALL editions that are marked as featured (regardless of status)
+      const response = await fetch('/api/editions');
       const result = await response.json();
       if (result.success) {
-        const editionsData = result.data || [];
+        // Filter only featured editions
+        const editionsData = (result.data || []).filter((e: Edition) => e.is_featured);
         
         // Fetch first page image for each edition
         const editionsWithImages = await Promise.all(
@@ -93,7 +95,17 @@ export default function FeaturedEditionsPage() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Featured Edition Manager</h1>
+        <h1 className="text-2xl font-bold text-gray-500">Featured Edition Manager</h1>
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+        <div className="flex items-start gap-2">
+          <span className="text-blue-600 text-lg">ℹ️</span>
+          <div className="text-sm text-blue-800">
+            <strong>Note:</strong> Featured editions will only appear on the homepage when their status is <strong>Published</strong>. 
+            Draft or processing editions won't be visible to visitors even if marked as featured.
+          </div>
+        </div>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg">
@@ -137,10 +149,24 @@ export default function FeaturedEditionsPage() {
                   <Minus className="w-4 h-4" />
                 </button>
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900">{edition.title}</div>
+                  <div className="font-medium text-gray-500">
+                    {edition.title}
+                    <span className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${
+                      edition.status === 'published' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {edition.status?.toUpperCase()}
+                    </span>
+                  </div>
                   <div className="text-sm text-gray-500">
                     {new Date(edition.date).toLocaleDateString()}
                   </div>
+                  {edition.status !== 'published' && (
+                    <div className="text-xs text-orange-600 mt-1">
+                      ⚠️ This edition won't appear on homepage until published
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

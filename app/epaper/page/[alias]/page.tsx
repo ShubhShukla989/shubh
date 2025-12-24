@@ -1,8 +1,11 @@
 import { notFound } from 'next/navigation';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { pages } from '@/lib/schema';
+import { eq, and } from 'drizzle-orm';
 import { Metadata } from 'next';
 import PageWrapper from './PageWrapper';
 import { SliderWidget } from '@/components/SliderWidget';
+import { MenuWidget } from '@/components/MenuWidget';
 import { LayoutRenderer } from '@/components/layout-renderer/LayoutRenderer';
 
 interface PageProps {
@@ -40,31 +43,23 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 async function getPage(alias: string) {
-  if (!supabaseAdmin) {
-    console.error('Supabase not configured');
-    return null;
-  }
-
   try {
     console.log('Fetching page with alias:', alias);
     
-    const { data, error } = await supabaseAdmin
-      .from('pages')
-      .select('*')
-      .eq('alias', alias)
-      .eq('status', 'Public')
-      .single();
+    const [data] = await db
+      .select()
+      .from(pages)
+      .where(and(eq(pages.alias, alias), eq(pages.status, 'Public')))
+      .limit(1);
 
-    if (error) {
-      console.error('Error fetching page:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
+    if (!data) {
+      console.error('Page not found with alias:', alias);
       
-      // Try without status filter to debug
-      const { data: debugData } = await supabaseAdmin
-        .from('pages')
-        .select('alias, status')
-        .eq('alias', alias)
-        .single();
+      const [debugData] = await db
+        .select({ alias: pages.alias, status: pages.status })
+        .from(pages)
+        .where(eq(pages.alias, alias))
+        .limit(1);
       
       if (debugData) {
         console.log('Page exists but status is:', debugData.status);
@@ -107,39 +102,19 @@ export default async function PageView({ params }: PageProps) {
   return (
     <PageWrapper headerCode={page.header_code || undefined} footerCode={page.footer_code || undefined}>
       <div className="px-4 md:px-8 py-8">
-          <article className="bg-white">
+          <article>
             {/* Page Title */}
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
               {page.title}
             </h1>
-
-            {/* Page Meta */}
-            <div className="flex items-center gap-4 text-sm text-gray-500 mb-8 pb-8 border-b border-gray-200">
-              <time dateTime={page.created_at}>
-                Published: {new Date(page.created_at).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </time>
-              {page.updated_at !== page.created_at && (
-                <span>
-                  • Updated: {new Date(page.updated_at).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </span>
-              )}
-            </div>
+            {/* Orange Underline */}
+            <div className="w-20 h-1 bg-orange-500 mb-6"></div>
 
             {/* Page Content */}
             {(() => {
-              // Check if page has a layout assigned
-              if (page.layout_name) {
-                return <LayoutRenderer layoutName={page.layout_name} pageName={page.alias} />;
-              }
-
+              // Note: layout_name field removed from schema
+              // Pages now use content field for layout data
+              
               // Check if content is designer layout (old format)
               try {
                 const parsed = JSON.parse(page.content || '{}');
@@ -190,6 +165,9 @@ export default async function PageView({ params }: PageProps) {
                                       )}
                                       {widget.type === 'embed' && widget.code && (
                                         <div dangerouslySetInnerHTML={{ __html: widget.code }} />
+                                      )}
+                                      {widget.type === 'menu' && (
+                                        <MenuWidget config={widget.config || {}} />
                                       )}
                                     </div>
                                   ))}

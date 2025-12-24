@@ -1,22 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { db } from '@/lib/db';
+import { area_map_watermark_settings } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('area_map_watermark_settings')
-      .select('*')
-      .eq('id', 1)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
+    const [data] = await db
+      .select()
+      .from(area_map_watermark_settings)
+      .where(eq(area_map_watermark_settings.id, 1))
+      .limit(1);
 
     return NextResponse.json({
       success: true,
@@ -52,17 +45,32 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { data, error } = await supabaseAdmin
-      .from('area_map_watermark_settings')
-      .upsert({
-        id: 1,
-        ...body,
-        updated_at: new Date().toISOString()
-      })
+    // Check if settings exist
+    const [existing] = await db
       .select()
-      .single();
+      .from(area_map_watermark_settings)
+      .where(eq(area_map_watermark_settings.id, 1))
+      .limit(1);
 
-    if (error) throw error;
+    let data;
+    if (existing) {
+      [data] = await db
+        .update(area_map_watermark_settings)
+        .set({
+          ...body,
+          updated_at: new Date().toISOString()
+        })
+        .where(eq(area_map_watermark_settings.id, 1))
+        .returning();
+    } else {
+      [data] = await db
+        .insert(area_map_watermark_settings)
+        .values({
+          id: 1,
+          ...body
+        })
+        .returning();
+    }
 
     return NextResponse.json({
       success: true,

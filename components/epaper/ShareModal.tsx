@@ -1,7 +1,7 @@
 'use client';
 
 import { X, Download, ExternalLink } from 'lucide-react';
-import { ClipProvider } from '@/contexts/ClipContext';
+import { ClipProvider, useClip } from '@/contexts/ClipContext';
 import { LayoutRenderer } from '@/components/layout-renderer/LayoutRenderer';
 
 interface ShareModalProps {
@@ -11,30 +11,35 @@ interface ShareModalProps {
   onClose: () => void;
 }
 
-export default function ShareModal({
-  clippedImage,
-  editionId,
-  pageNumber,
-  onClose
-}: ShareModalProps) {
-  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/epaper/view/${editionId}?page=${pageNumber}`;
-
+function ShareModalContent() {
+  const { combinedImage, clipImage, clipUrl, editionId, pageNumber } = useClip();
+  
+  console.log('🔍 ShareModalContent rendering:', {
+    combinedImage: !!combinedImage,
+    clipImage: !!clipImage,
+    clipUrl,
+    editionId,
+    pageNumber
+  });
+  
   const handleDownload = () => {
-    if (!clippedImage) return;
+    // Use combined image if available, fallback to original clipped image
+    const imageToDownload = combinedImage || clipImage;
+    if (!imageToDownload) return;
     
     const link = document.createElement('a');
-    link.href = clippedImage;
-    link.download = `clip-${editionId}-page-${pageNumber}.png`;
+    link.href = imageToDownload;
+    link.download = `clip-with-logo-${editionId}-page-${pageNumber}.png`;
     link.click();
   };
 
   const handleOpen = () => {
-    window.open(shareUrl, '_blank');
+    window.open(clipUrl, '_blank');
   };
 
   const handleShare = async (platform: string) => {
     const text = 'Check out this article from Do Boje Dopahar';
-    const encodedUrl = encodeURIComponent(shareUrl);
+    const encodedUrl = encodeURIComponent(clipUrl);
     const encodedText = encodeURIComponent(text);
 
     let url = '';
@@ -60,6 +65,45 @@ export default function ShareModal({
   };
 
   return (
+    <>
+      {/* Dynamic Content - Admin Controlled via "Epaper Clip" Layout */}
+      <div className="p-5">
+        <LayoutRenderer layoutName="Epaper Clip" />
+      </div>
+
+      {/* Footer - FIXED */}
+      <div className="px-5 pb-5">
+        <div className="grid grid-cols-2 gap-3 border-t border-gray-200 pt-5">
+          <button
+            onClick={handleOpen}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors font-medium"
+          >
+            <ExternalLink className="w-5 h-5" />
+            Open
+          </button>
+
+          <button
+            onClick={handleDownload}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+          >
+            <Download className="w-5 h-5" />
+            Download
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default function ShareModal({
+  clippedImage,
+  editionId,
+  pageNumber,
+  onClose
+}: ShareModalProps) {
+  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/epaper/view/${editionId}?page=${pageNumber}`;
+
+  return (
     <div 
       className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 md:p-4 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
@@ -79,38 +123,14 @@ export default function ShareModal({
           </button>
         </div>
 
-        {/* Dynamic Content - Admin Controlled via "Epaper Clip" Layout */}
-        <div className="p-5">
-          <ClipProvider
-            clipImage={clippedImage}
-            clipUrl={shareUrl}
-            editionId={editionId}
-            pageNumber={pageNumber}
-          >
-            <LayoutRenderer layoutName="Epaper Clip" />
-          </ClipProvider>
-        </div>
-
-        {/* Footer - FIXED */}
-        <div className="px-5 pb-5">
-          <div className="grid grid-cols-2 gap-3 border-t border-gray-200 pt-5">
-            <button
-              onClick={handleOpen}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors font-medium"
-            >
-              <ExternalLink className="w-5 h-5" />
-              Open
-            </button>
-
-            <button
-              onClick={handleDownload}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
-            >
-              <Download className="w-5 h-5" />
-              Download
-            </button>
-          </div>
-        </div>
+        <ClipProvider
+          clipImage={clippedImage}
+          clipUrl={shareUrl}
+          editionId={editionId}
+          pageNumber={pageNumber}
+        >
+          <ShareModalContent />
+        </ClipProvider>
       </div>
     </div>
   );

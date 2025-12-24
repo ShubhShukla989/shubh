@@ -1,186 +1,87 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { media_files } from '@/lib/schema/media';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
+import { existsSync } from 'fs';
 
+// POST /api/media/upload - Upload media files
 export async function POST(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: 'Supabase not configured' },
-        { status: 500 }
-      );
-    }
-
+    console.log('📤 Upload API called');
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
-    const title = formData.get('title') as string;
-    const altText = formData.get('alt_text') as string;
-    const tagIds = formData.get('tag_ids') as string;
-
+    
+    console.log('📁 Files received:', files.length);
+    files.forEach((file, index) => {
+      console.log(`  ${index + 1}. ${file.name} (${file.size} bytes, ${file.type})`);
+    });
+    
     if (!files || files.length === 0) {
+      console.log('❌ No files provided');
       return NextResponse.json(
         { success: false, error: 'No files provided' },
         { status: 400 }
       );
     }
 
+    // Ensure upload directory exists
+    const uploadDir = join(process.cwd(), 'public', 'uploads');
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true });
+    }
+
     const uploadedFiles = [];
 
     for (const file of files) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        return NextResponse.json(
-          { success: false, error: `File ${file.name} is not an image` },
-          { status: 400 }
-        );
-      }
-
-      // Validate file size (max 10MB)
-      const maxSize = 10 * 1024 * 1024; // 10MB
-      if (file.size > maxSize) {
-        return NextResponse.json(
-          { success: false, error: `File ${file.name} is too large. Max size is 10MB` },
-          { status: 400 }
-        );
-      }
+      if (file.size === 0) continue;
 
       // Generate unique filename
       const timestamp = Date.now();
-      const randomString = Math.random().toString(36).substring(2, 15);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${timestamp}-${randomString}.${fileExt}`;
-      const filePath = `media/${fileName}`;
+      const filename = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const filePath = join(uploadDir, filename);
+      const fileUrl = `/uploads/${filename}`;
 
-      // Convert file to buffer
+      // Write file to disk
+      console.log(`💾 Writing file to: ${filePath}`);
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
-
-      // Upload to Supabase Storage
-      const { data, error } = await supabaseAdmin.storage
-        .from('page-assets')
-        .upload(filePath, buffer, {
-          contentType: file.type,
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (error) {
-        console.error('Upload error:', error);
-        return NextResponse.json(
-          { success: false, error: `Failed to upload ${file.name}: ${error.message}` },
-          { status: 500 }
-        );
-      }
-
-      // Get public URL
-      const { data: urlData } = supabaseAdmin.storage
-        .from('page-assets')
-        .getPublicUrl(filePath);
+      await writeFile(filePath, buffer);
+      console.log(`✅ File written successfully: ${filename}`);
 
       // Save to database
-      console.log('🔄 Attempting database insert:', {
-        filename: fileName,
+      console.log(`💽 Saving to database: ${filename}`);
+      const [insertedFile] = await db.insert(media_files).values({
+        filename,
         original_name: file.name,
         file_path: filePath,
+        file_url: fileUrl,
         file_size: file.size,
         mime_type: file.type,
-      });
-
-      const { data: dbFile, error: dbError } = await supabaseAdmin
-        .from('media_files')
-        .insert({
-          filename: fileName,
-          original_name: file.name,
-          file_path: filePath,
-          file_url: urlData.publicUrl,
-          file_size: file.size,
-          mime_type: file.type,
-          title: title || file.name,
-          alt_text: altText || '',
-        })
-        .select()
-        .single();
-
-      console.log('📊 Database insert result:', { 
-        success: !!dbFile,
-        hasError: !!dbError,
-        dbFile, 
-        dbError 
-      });
-      
-      if (dbError) {
-        console.error('❌ DATABASE ERROR:', {
-          error: dbError,
-          message: dbError.message,
-          details: dbError.details,
-          hint: dbError.hint,
-          code: dbError.code,
-          file: file.name
-        });
-        
-        // Delete uploaded file from storage if database insert fails
-        await supabaseAdmin.storage
-          .from('page-assets')
-          .remove([filePath]);
-        
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: `Failed to save ${file.name} to database: ${dbError.message}`,
-            details: dbError.details || dbError.hint || 'Check server console for more info'
-          },
-          { status: 500 }
-        );
-      }
-      
-      if (!dbFile) {
-        console.error('❌ NO DATABASE RECORD: No error but no data returned');
-        await supabaseAdmin.storage
-          .from('page-assets')
-          .remove([filePath]);
-        
-        return NextResponse.json(
-          { success: false, error: `Failed to create database record for ${file.name}` },
-          { status: 500 }
-        );
-      }
-      
-      console.log('✅ Database record created:', dbFile.id);
-
-      // Add tags if provided
-      if (dbFile && tagIds) {
-        const tagIdArray = tagIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
-        if (tagIdArray.length > 0) {
-          const tagInserts = tagIdArray.map(tagId => ({
-            media_file_id: dbFile.id,
-            media_tag_id: tagId,
-          }));
-
-          await supabaseAdmin
-            .from('media_file_tags')
-            .insert(tagInserts);
-        }
-      }
+        title: file.name.split('.')[0], // Use filename without extension as title
+      }).returning();
+      console.log(`✅ Database record created with ID: ${insertedFile.id}`);
 
       uploadedFiles.push({
-        id: dbFile?.id || fileName,
-        url: urlData.publicUrl,
+        id: insertedFile.id.toString(),
+        url: fileUrl,
         name: file.name,
         size: file.size,
         type: file.type,
-        createdAt: new Date().toISOString(),
+        createdAt: insertedFile.created_at
       });
     }
 
-    return NextResponse.json({ success: true, data: uploadedFiles }, { status: 200 });
+    console.log(`🎉 Upload completed successfully: ${uploadedFiles.length} files`);
+    return NextResponse.json({
+      success: true,
+      data: uploadedFiles
+    });
   } catch (error) {
-    console.error('API error:', error);
+    console.error('❌ Error uploading files:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { success: false, error: 'Failed to upload files' },
       { status: 500 }
     );
   }
 }
-
-// Configure for file uploads - Next.js 14 syntax
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';

@@ -57,7 +57,15 @@ class PageService {
     if (!response.ok) {
       throw new Error('Failed to fetch pages');
     }
-    return response.json();
+    const result = await response.json();
+    
+    // Transform API response to expected format
+    return {
+      pages: result.data || [],
+      total: result.data?.length || 0,
+      page: 1,
+      limit: 50
+    };
   }
 
   /**
@@ -80,11 +88,14 @@ class PageService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to create page');
+      throw new Error(error.error || 'Failed to create page');
     }
-    return response.json();
+    
+    const result = await response.json();
+    return result.data;
   }
 
   /**

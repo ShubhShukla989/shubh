@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { epaper_categories } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 import { LayoutRenderer } from '@/components/layout-renderer/LayoutRenderer';
 import { CategoryProvider } from '@/contexts/CategoryContext';
 
@@ -10,56 +12,50 @@ interface CategoryPageProps {
 }
 
 async function getCategory(alias: string) {
-  if (!supabaseAdmin) return null;
-
   try {
     // Check if alias is in format "id-123"
     if (alias.startsWith('id-')) {
       const id = parseInt(alias.replace('id-', ''));
-      const { data, error } = await supabaseAdmin
-        .from('epaper_categories')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const [data] = await db
+        .select()
+        .from(epaper_categories)
+        .where(eq(epaper_categories.id, id))
+        .limit(1);
 
-      if (error) return null;
-      return data;
+      return data || null;
     }
 
     // Otherwise fetch by alias
-    const { data, error } = await supabaseAdmin
-      .from('epaper_categories')
-      .select('*')
-      .eq('alias', alias)
-      .single();
+    const [data] = await db
+      .select()
+      .from(epaper_categories)
+      .where(eq(epaper_categories.alias, alias))
+      .limit(1);
 
-    if (error) return null;
-    return data;
+    return data || null;
   } catch (error) {
     return null;
   }
 }
 
 async function getCategoryLayout(categoryId: number) {
-  if (!supabaseAdmin) return null;
-
   try {
-    const { data, error } = await supabaseAdmin
-      .from('epaper_categories')
-      .select('archive_layout')
-      .eq('id', categoryId)
-      .single();
+    const [data] = await db
+      .select({ archive_layout: epaper_categories.archive_layout })
+      .from(epaper_categories)
+      .where(eq(epaper_categories.id, categoryId))
+      .limit(1);
 
     // If category has specific layout, use it
-    if (!error && data?.archive_layout) {
+    if (data?.archive_layout) {
       return data.archive_layout;
     }
 
     // Otherwise, use default category archive layout
-    return 'epaper-archive';
+    return 'Epaper Archive';
   } catch (error) {
     // Fallback to default layout
-    return 'epaper-archive';
+    return 'Epaper Archive';
   }
 }
 
@@ -77,8 +73,8 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const categoryLayout = await getCategoryLayout(category.id);
 
   // Always render with layout (either custom or default)
-  // Force use epaper-archive layout for now
-  const finalLayout = 'epaper-archive';
+  // Force use Epaper Archive layout for now
+  const finalLayout = 'Epaper Archive';
   
   return (
     <CategoryProvider

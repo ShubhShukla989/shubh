@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Newspaper,
   Sliders as SlidersIcon,
+  X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -35,12 +36,12 @@ const menuItems: MenuItemWithPermission[] = [
   {
     label: 'Dashboard',
     href: '/admin',
-    icon: <LayoutDashboard className="w-5 h-5" />,
+    icon: <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center"><LayoutDashboard className="w-4 h-4 text-blue-600" /></div>,
     permission: 'view_dashboard',
   },
   {
     label: 'Epaper',
-    icon: <Newspaper className="w-5 h-5" />,
+    icon: <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center"><Newspaper className="w-4 h-4 text-green-600" /></div>,
     permission: 'view_editions',
     children: [
       { label: 'All Editions', href: '/admin/editions', icon: null, permission: 'view_editions' },
@@ -52,60 +53,60 @@ const menuItems: MenuItemWithPermission[] = [
   {
     label: 'Pages',
     href: '/admin/pages',
-    icon: <FileText className="w-5 h-5" />,
+    icon: <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center"><FileText className="w-4 h-4 text-purple-600" /></div>,
     permission: 'view_pages',
   },
   {
     label: 'Slider',
     href: '/admin/sliders',
-    icon: <SlidersIcon className="w-5 h-5" />,
+    icon: <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center"><SlidersIcon className="w-4 h-4 text-orange-600" /></div>,
     permission: 'view_sliders',
   },
   {
     label: 'Media',
     href: '/admin/media',
-    icon: <Image className="w-5 h-5" />,
+    icon: <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center"><Image className="w-4 h-4 text-pink-600" /></div>,
     permission: 'view_media',
   },
   {
     label: 'Users',
     href: '/admin/users',
-    icon: <Users className="w-5 h-5" />,
+    icon: <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center"><Users className="w-4 h-4 text-indigo-600" /></div>,
     permission: 'view_users',
   },
   {
     label: 'System',
-    icon: <Settings className="w-5 h-5" />,
+    icon: <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center"><Settings className="w-4 h-4 text-gray-600" /></div>,
     permission: 'view_settings',
     children: [
       { label: 'Page Designer', href: '/admin/designer', icon: null, permission: 'view_designer' },
       { label: 'Menus', href: '/admin/menus', icon: null, permission: 'view_menus' },
       { label: 'Settings', href: '/admin/system/settings', icon: null, permission: 'view_settings' },
-      { label: 'Redirects', href: '/admin/system/redirects', icon: null, permission: 'view_settings' },
-    ],
-  },
-  {
-    label: 'Super Admin',
-    icon: <Settings className="w-5 h-5" />,
-    superAdminOnly: true,
-    children: [
-      { label: 'Audit Logs', href: '/admin/super-admin/logs', icon: null, superAdminOnly: true },
     ],
   },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export default function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { hasPermission, isSuperAdmin } = useAuth();
-  const [expandedItems, setExpandedItems] = useState<string[]>(['Epaper', 'System', 'Super Admin']);
+  const { hasPermission, isSuperAdmin, loading } = useAuth();
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   const toggleExpand = (label: string) => {
     setExpandedItems((prev) =>
-      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+      prev.includes(label) ? [] : [label]
     );
   };
 
   const canAccessMenuItem = (item: MenuItemWithPermission): boolean => {
+    // If still loading, show all items to avoid flash of incomplete menu
+    if (loading) {
+      return true;
+    }
+    
     // Super Admin can access everything
     if (isSuperAdmin()) return true;
     
@@ -146,12 +147,12 @@ export default function Sidebar() {
           <button
             onClick={() => toggleExpand(item.label)}
             className={cn(
-              'w-full flex items-center justify-between px-4 py-2.5 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors',
+              'w-full flex items-center justify-between px-4 py-2.5 text-gray-900 hover:bg-blue-50 hover:text-blue-500 transition-colors rounded-lg',
               level > 0 && 'pl-8'
             )}
           >
             <div className="flex items-center gap-3">
-              {item.icon}
+              <div className="flex-shrink-0">{item.icon}</div>
               <span className="text-sm font-medium">{item.label}</span>
             </div>
             {isExpanded ? (
@@ -161,7 +162,7 @@ export default function Sidebar() {
             )}
           </button>
           {isExpanded && item.children && (
-            <div className="bg-gray-800/50">
+            <div className="bg-blue-50/30">
               {item.children.map((child) => renderMenuItem(child, level + 1))}
             </div>
           )}
@@ -173,28 +174,45 @@ export default function Sidebar() {
       <Link
         key={item.label}
         href={item.href!}
+        onClick={onClose} // Close sidebar on mobile when link is clicked
         className={cn(
-          'flex items-center gap-3 px-4 py-2.5 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors',
-          isActive && 'bg-purple-600 text-white hover:bg-purple-700',
+          'flex items-center gap-3 px-4 py-2.5 text-gray-800 hover:bg-blue-50 hover:text-blue-500 transition-colors rounded-lg',
+          isActive && 'bg-blue-50 text-blue-600 hover:bg-blue-100',
           level > 0 && 'pl-12 text-sm'
         )}
       >
-        {item.icon}
+        <div className="flex-shrink-0">{item.icon}</div>
         <span className={cn('font-medium', level === 0 && 'text-sm')}>{item.label}</span>
       </Link>
     );
   };
 
   return (
-    <aside className="w-64 bg-gray-900 min-h-screen flex flex-col">
-      <div className="p-4 border-b border-gray-800">
-        <h1 className="text-xl font-bold text-white">ePaper CMS</h1>
-        <p className="text-xs text-gray-400 mt-1">Admin Panel</p>
+    <aside className="w-64 bg-white min-h-screen flex flex-col border-r border-gray-200 shadow-lg lg:shadow-sm">
+      {/* Header with close button for mobile */}
+      <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">Epaper CMS</h1>
+          <p className="text-xs text-gray-600 mt-1">Admin Panel</p>
+        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="lg:hidden w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors border border-gray-200"
+            aria-label="Close sidebar"
+          >
+            <X className="w-4 h-4 text-gray-700" />
+          </button>
+        )}
       </div>
-      <nav className="flex-1 py-4 overflow-y-auto">
+      
+      {/* Navigation */}
+      <nav className="flex-1 py-4 px-2 overflow-y-auto">
         {filteredMenuItems.map((item) => renderMenuItem(item))}
       </nav>
-      <div className="p-4 border-t border-gray-800 text-xs text-gray-500">
+      
+      {/* Footer */}
+      <div className="p-4 border-t border-gray-200 text-xs text-gray-400">
         Version 1.0.0
       </div>
     </aside>

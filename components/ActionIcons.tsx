@@ -8,75 +8,75 @@ interface ActionButtonProps {
   className?: string;
 }
 
-// View Icon - Dark Gray (#374151)
+// View Icon - Darker Blue
 export const ViewIcon: React.FC<ActionButtonProps> = ({ onClick, title = 'View', disabled, className = '' }) => (
   <button
     onClick={onClick}
     disabled={disabled}
     title={title}
-    className={`p-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    className={`p-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[32px] min-h-[32px] flex items-center justify-center ${className}`}
   >
-    <Eye className="w-5 h-5" />
+    <Eye className="w-4 h-4 lg:w-5 lg:h-5" />
   </button>
 );
 
-// Edit Icon - Teal/Green (#14B8A6)
+// Edit Icon - Darker Teal/Green
 export const EditIcon: React.FC<ActionButtonProps> = ({ onClick, title = 'Edit', disabled, className = '' }) => (
   <button
     onClick={onClick}
     disabled={disabled}
     title={title}
-    className={`p-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    className={`p-2 bg-teal-500 text-white rounded hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[32px] min-h-[32px] flex items-center justify-center ${className}`}
   >
-    <Edit className="w-5 h-5" />
+    <Edit className="w-4 h-4 lg:w-5 lg:h-5" />
   </button>
 );
 
-// Delete Icon - Pink/Red (#F43F5E)
+// Delete Icon - Darker Pink/Red
 export const DeleteIcon: React.FC<ActionButtonProps> = ({ onClick, title = 'Delete', disabled, className = '' }) => (
   <button
     onClick={onClick}
     disabled={disabled}
     title={title}
-    className={`p-2 bg-pink-500 text-white rounded hover:bg-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    className={`p-2 bg-pink-500 text-white rounded hover:bg-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[32px] min-h-[32px] flex items-center justify-center ${className}`}
   >
-    <Trash2 className="w-5 h-5" />
+    <Trash2 className="w-4 h-4 lg:w-5 lg:h-5" />
   </button>
 );
 
-// Upload Icon - Blue (#6366F1)
+// Upload Icon - Darker Blue
 export const UploadIcon: React.FC<ActionButtonProps> = ({ onClick, title = 'Upload', disabled, className = '' }) => (
   <button
     onClick={onClick}
     disabled={disabled}
     title={title}
-    className={`p-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    className={`p-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[32px] min-h-[32px] flex items-center justify-center ${className}`}
   >
-    <Upload className="w-5 h-5" />
+    <Upload className="w-4 h-4 lg:w-5 lg:h-5" />
   </button>
 );
 
-// Add/Plus Icon - Black
+// Add/Plus Icon - Light White/Gray
 export const AddIcon: React.FC<ActionButtonProps> = ({ onClick, title = 'Add', disabled, className = '' }) => (
   <button
     onClick={onClick}
     disabled={disabled}
     title={title}
-    className={`p-2 bg-black text-white rounded hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    className={`p-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[32px] min-h-[32px] flex items-center justify-center ${className}`}
   >
-    <Plus className="w-5 h-5" />
+    <Plus className="w-4 h-4 lg:w-5 lg:h-5" />
   </button>
 );
 
-// Remove/Minus Icon - Yellow (#FBBF24)
+// Remove/Minus Icon - Darker Yellow
 export const RemoveIcon: React.FC<ActionButtonProps> = ({ onClick, title = 'Remove', disabled, className = '' }) => (
   <button
     onClick={onClick}
     disabled={disabled}
     title={title}
-    className={`p-2 bg-yellow-400 text-white rounded hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    className={`p-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[32px] min-h-[32px] flex items-center justify-center ${className}`}
   >
-    <Minus className="w-5 h-5" />
+    <Minus className="w-4 h-4 lg:w-5 lg:h-5" />
   </button>
 );
 
@@ -87,7 +87,7 @@ interface ActionGroupProps {
 }
 
 export const ActionGroup: React.FC<ActionGroupProps> = ({ children, className = '' }) => (
-  <div className={`flex items-center gap-2 ${className}`}>
+  <div className={`flex items-center gap-1 lg:gap-2 ${className}`}>
     {children}
   </div>
 );

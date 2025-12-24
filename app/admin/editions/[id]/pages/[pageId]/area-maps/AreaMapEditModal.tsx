@@ -19,6 +19,7 @@ interface AvailableAreaMap {
   page_id: number;
   page_number: number;
   title: string;
+  linked_area_ids?: number[];
 }
 
 interface AreaMapEditModalProps {
@@ -36,7 +37,13 @@ export default function AreaMapEditModal({
   onSave,
   onClose,
 }: AreaMapEditModalProps) {
-  const [editedArea, setEditedArea] = useState<AreaMap>(area);
+  const [editedArea, setEditedArea] = useState<AreaMap>({
+    ...area,
+    // Ensure linked_area_ids is always an array of numbers
+    linked_area_ids: Array.isArray(area.linked_area_ids) 
+      ? area.linked_area_ids.map(id => typeof id === 'string' ? parseInt(id) : id)
+      : (area.linked_area_ids ? JSON.parse(area.linked_area_ids as string).map((id: any) => typeof id === 'string' ? parseInt(id) : id) : [])
+  });
   const [localAvailableAreas, setLocalAvailableAreas] = useState<AvailableAreaMap[]>(availableAreaMaps);
   
   // Dragging state
@@ -44,6 +51,51 @@ export default function AreaMapEditModal({
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const modalRef = useRef<HTMLDivElement>(null);
+
+  // Update local state when props change (important for fresh data)
+  useEffect(() => {
+    const processedLinkedIds = Array.isArray(area.linked_area_ids) 
+      ? area.linked_area_ids.map((id: any) => typeof id === 'string' ? parseInt(id) : id)
+      : (area.linked_area_ids ? JSON.parse(area.linked_area_ids as string).map((id: any) => typeof id === 'string' ? parseInt(id) : id) : []);
+    
+    // Clean up orphaned IDs - only keep IDs that exist in availableAreaMaps
+    const availableIds = availableAreaMaps.map((area: any) => Number(area.id));
+    const cleanedLinkedIds = processedLinkedIds.filter((id: any) => availableIds.includes(Number(id)));
+    
+    if (cleanedLinkedIds.length !== processedLinkedIds.length) {
+      const removedIds = processedLinkedIds.filter((id: any) => !cleanedLinkedIds.includes(id));
+      console.warn('🧹 Cleaned up orphaned linked IDs:', removedIds);
+      console.log('📋 Available IDs:', availableIds);
+      console.log('🔗 Original linked IDs:', processedLinkedIds);
+      console.log('✅ Cleaned linked IDs:', cleanedLinkedIds);
+      
+      // Auto-save the cleaned IDs to database if there were changes
+      if (area.id && removedIds.length > 0) {
+        console.log('💾 Auto-saving cleaned linked IDs to database...');
+        fetch(`/api/editions/${window.location.pathname.split('/')[3]}/area-maps/${area.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            linked_area_ids: cleanedLinkedIds
+          }),
+        }).then(response => response.json()).then(result => {
+          if (result.success) {
+            console.log('✅ Auto-cleanup successful');
+          } else {
+            console.error('❌ Auto-cleanup failed:', result.error);
+          }
+        }).catch(error => {
+          console.error('💥 Auto-cleanup error:', error);
+        });
+      }
+    }
+    
+    setEditedArea({
+      ...area,
+      // Use cleaned linked_area_ids
+      linked_area_ids: cleanedLinkedIds
+    });
+  }, [area, availableAreaMaps]);
 
   // Update local state when props change
   useEffect(() => {
@@ -100,7 +152,37 @@ export default function AreaMapEditModal({
   const linkableAreas = localAvailableAreas.filter(a => a.id !== area.id);
 
   const handleSave = () => {
-    onSave(editedArea);
+    console.log('💾 Modal: Saving area with data:', {
+      id: editedArea.id,
+      title: editedArea.title,
+      url: editedArea.url,
+      linked_area_ids: editedArea.linked_area_ids,
+      linked_area_ids_type: typeof editedArea.linked_area_ids,
+      linked_area_ids_length: editedArea.linked_area_ids?.length
+    });
+    
+    // Validate required fields
+    if (!editedArea.title.trim()) {
+      alert('Please enter a title for the area map.');
+      return;
+    }
+    
+    // Ensure linked_area_ids is always an array
+    const areaToSave = {
+      ...editedArea,
+      linked_area_ids: Array.isArray(editedArea.linked_area_ids) 
+        ? editedArea.linked_area_ids 
+        : []
+    };
+    
+    console.log('📤 Modal: Sending area data to parent:', areaToSave);
+    
+    // Show bidirectional linking info
+    if (areaToSave.linked_area_ids.length > 0) {
+      console.log('🔗 Bidirectional linking: These areas will also link back to this area:', areaToSave.linked_area_ids);
+    }
+    
+    onSave(areaToSave);
     onClose();
   };
 
@@ -132,7 +214,7 @@ export default function AreaMapEditModal({
         <div className="p-4 sm:p-6 space-y-4 overflow-auto max-h-[calc(90vh-140px)]">
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Title *
             </label>
             <input
@@ -146,7 +228,7 @@ export default function AreaMapEditModal({
 
           {/* URL */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               URL (optional)
             </label>
             <input
@@ -163,15 +245,31 @@ export default function AreaMapEditModal({
 
           {/* Linked Areas - Multiple Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-500 mb-2">
               Link to Other Areas (Multi-page Article)
             </label>
+            
             <div className="border border-gray-300 rounded p-3 max-h-60 overflow-y-auto space-y-2">
               {linkableAreas.length === 0 ? (
                 <p className="text-sm text-gray-500">No other areas available to link</p>
               ) : (
                 linkableAreas.map((linkArea) => {
-                  const isSelected = (editedArea.linked_area_ids || []).includes(linkArea.id);
+                  // Ensure both IDs are numbers for proper comparison
+                  const linkAreaId = typeof linkArea.id === 'string' ? parseInt(linkArea.id) : linkArea.id;
+                  const linkedIds = (editedArea.linked_area_ids || []).map(id => 
+                    typeof id === 'string' ? parseInt(id) : id
+                  );
+                  const isSelected = linkedIds.includes(linkAreaId);
+                  
+                  // Check if the other area also links back to this area (bidirectional)
+                  const otherArea = availableAreaMaps.find(a => Number(a.id) === linkAreaId);
+                  const otherAreaLinkedIds = otherArea?.linked_area_ids || [];
+                  const isBidirectional = Array.isArray(otherAreaLinkedIds) 
+                    ? otherAreaLinkedIds.includes(Number(area.id))
+                    : false;
+                  
+                  console.log(`🔍 Checkbox for Area ${linkAreaId}: ${isSelected ? 'CHECKED' : 'UNCHECKED'} (linkedIds: [${linkedIds.join(', ')}]) ${isBidirectional ? '↔ BIDIRECTIONAL' : ''}`);
+                  
                   return (
                     <label
                       key={linkArea.id}
@@ -181,10 +279,13 @@ export default function AreaMapEditModal({
                         type="checkbox"
                         checked={isSelected}
                         onChange={(e) => {
-                          const currentIds = editedArea.linked_area_ids || [];
+                          const currentIds = (editedArea.linked_area_ids || []).map(id => 
+                            typeof id === 'string' ? parseInt(id) : id
+                          );
                           const newIds = e.target.checked
-                            ? [...currentIds, linkArea.id]
-                            : currentIds.filter(id => id !== linkArea.id);
+                            ? [...currentIds, linkAreaId]
+                            : currentIds.filter(id => id !== linkAreaId);
+                          
                           setEditedArea({
                             ...editedArea,
                             linked_area_ids: newIds
@@ -192,10 +293,16 @@ export default function AreaMapEditModal({
                         }}
                         className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                       />
-                      <span className="text-sm">
+                      <span className="text-sm flex-1">
                         <span className="font-medium">Page {linkArea.page_number}</span>
                         {' - '}
                         <span className="text-gray-600">{linkArea.title || `Area #${linkArea.id}`}</span>
+                        <span className="text-xs text-gray-400 ml-1">(ID: {linkArea.id})</span>
+                        {isBidirectional && (
+                          <span className="ml-2 text-xs bg-green-100 text-green-700 px-1 rounded">
+                            ↔ Linked back
+                          </span>
+                        )}
                       </span>
                     </label>
                   );
@@ -205,20 +312,53 @@ export default function AreaMapEditModal({
             <p className="text-xs text-gray-500 mt-2">
               ✓ Select multiple areas to link together (e.g., article spanning 3+ pages)
               <br />
-              ✓ When user clicks this area, all linked areas will be shown together
+              ✓ When you link areas, they will automatically link back to each other
+              <br />
+              ✓ <strong>Bidirectional linking:</strong> Area A ↔ Area B (both ways)
             </p>
             {(editedArea.linked_area_ids || []).length > 0 && (
               <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
                 <p className="text-xs font-medium text-blue-800">
-                  {(editedArea.linked_area_ids || []).length} area(s) linked
+                  {(editedArea.linked_area_ids || []).length} area(s) linked bidirectionally
                 </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  These areas will automatically link back to this area
+                </p>
+                {/* Show cleanup info if there are orphaned IDs */}
+                {(() => {
+                  const availableIds = availableAreaMaps.map(area => Number(area.id));
+                  const orphanedIds = (editedArea.linked_area_ids || []).filter(id => !availableIds.includes(Number(id)));
+                  if (orphanedIds.length > 0) {
+                    return (
+                      <div className="mt-1 p-1 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-xs text-yellow-800">
+                          ⚠️ {orphanedIds.length} invalid link(s) detected: [{orphanedIds.join(', ')}]
+                        </p>
+                        <button
+                          onClick={() => {
+                            const cleanedIds = (editedArea.linked_area_ids || []).filter(id => availableIds.includes(Number(id)));
+                            setEditedArea({
+                              ...editedArea,
+                              linked_area_ids: cleanedIds
+                            });
+                            console.log('🧹 Manual cleanup: removed', orphanedIds);
+                          }}
+                          className="text-xs text-yellow-700 underline hover:text-yellow-900"
+                        >
+                          Clean up invalid links
+                        </button>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             )}
           </div>
 
           {/* Position Info (Read-only) */}
           <div className="bg-gray-50 p-4 rounded">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Position & Size</h3>
+            <h3 className="text-sm font-medium text-gray-500 mb-2">Position & Size</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-600">X:</span> {Math.round(editedArea.x)}px
@@ -240,7 +380,7 @@ export default function AreaMapEditModal({
         <div className="flex flex-col sm:flex-row items-center justify-end gap-3 p-4 sm:p-6 border-t bg-gray-50">
           <button
             onClick={onClose}
-            className="w-full sm:w-auto px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+            className="w-full sm:w-auto px-4 py-2 text-gray-500 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>

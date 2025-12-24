@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ChevronLeft, Plus, Save as SaveIcon, ChevronRight, Copy, Clipboard } from 'lucide-react';
+import { ChevronLeft, Plus, Save as SaveIcon, ChevronRight, Clipboard, Download, Upload } from 'lucide-react';
 import Link from 'next/link';
 import AreaMapEditModal from './AreaMapEditModal';
 import ResizeHandle from '@/components/admin/ResizeHandle';
@@ -29,6 +29,7 @@ interface AvailableAreaMap {
   y: number;
   width: number;
   height: number;
+  linked_area_ids?: number[];
 }
 
 export default function AreaMapsPage() {
@@ -53,6 +54,7 @@ export default function AreaMapsPage() {
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const drawingRectRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Use refs for drawing state to avoid re-renders
   const isDrawingRef = useRef(false);
@@ -81,12 +83,18 @@ export default function AreaMapsPage() {
   const [showPasteOptions, setShowPasteOptions] = useState(false);
   const [allPages, setAllPages] = useState<any[]>([]);
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
+  const [showImportFromPages, setShowImportFromPages] = useState(false);
+  const [showImportFullEdition, setShowImportFullEdition] = useState(false);
+  const [availableEditions, setAvailableEditions] = useState<any[]>([]);
+  const [savedTemplates, setSavedTemplates] = useState<any[]>([]);
 
   useEffect(() => {
     fetchPage();
     fetchAreaMaps();
     fetchAvailableAreaMaps();
     fetchAllPages();
+    fetchAvailableEditions();
+    loadSavedTemplates();
   }, [pageId]);
 
   // Cleanup debounce timeout on unmount
@@ -240,10 +248,53 @@ export default function AreaMapsPage() {
     }
   };
 
-  const handleSaveEditedArea = (updatedArea: AreaMap) => {
-    setAreaMaps(areaMaps.map(area => 
-      area === editingArea ? updatedArea : area
-    ));
+  const handleSaveEditedArea = async (updatedArea: AreaMap) => {
+    // Validate that the area has an ID (required for PUT request)
+    if (!updatedArea.id) {
+      console.error('❌ Cannot update area map: missing ID');
+      alert('Error: Area map ID is missing. Please refresh and try again.');
+      return;
+    }
+
+    // Save to database using the individual area map PUT endpoint
+    try {
+      setIsSaving(true);
+      console.log('💾 Saving area map with ID:', updatedArea.id);
+      console.log('🔗 Linked area IDs:', updatedArea.linked_area_ids);
+      
+      const response = await fetch(`/api/editions/${editionId}/area-maps/${updatedArea.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: updatedArea.title,
+          url: updatedArea.url,
+          linked_area_ids: updatedArea.linked_area_ids || [],
+          // Don't send position/size data as those are managed separately
+        }),
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        console.log('✅ Area map updated and saved successfully');
+        console.log('📊 Updated data:', result.data);
+        
+        // Always fetch fresh data from database to ensure consistency
+        // This ensures we have the latest linked_area_ids and all other data
+        await fetchAreaMaps();
+        await fetchAvailableAreaMaps();
+        
+        console.log('🔄 Fresh data loaded after save');
+      } else {
+        console.error('❌ Failed to save updated area map:', result.error);
+        alert('Error saving changes: ' + result.error);
+      }
+    } catch (error) {
+      console.error('💥 Save error:', error);
+      alert('Error saving changes. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+    
     setEditingArea(null);
     setShowEditModal(false);
   };
@@ -602,6 +653,16 @@ export default function AreaMapsPage() {
   const handleSaveAll = async () => {
     try {
       setIsSaving(true);
+      console.log('💾 Saving all area maps:', areaMaps.length, 'areas');
+      console.log('📊 Area maps data:', areaMaps);
+      
+      // Log linked area IDs for each area
+      areaMaps.forEach((area, index) => {
+        if (area.linked_area_ids && area.linked_area_ids.length > 0) {
+          console.log(`🔗 Area ${index + 1} (ID: ${area.id}) links to:`, area.linked_area_ids);
+        }
+      });
+      
       const response = await fetch(`/api/editions/${editionId}/pages/${pageId}/area-maps`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -610,14 +671,19 @@ export default function AreaMapsPage() {
       
       const result = await response.json();
       if (result.success) {
-        alert('All area maps saved successfully!');
-        fetchAreaMaps();
-        fetchAvailableAreaMaps(); // Refresh the available area maps list
+        console.log('✅ All area maps saved successfully:', result.data?.length || 0, 'areas');
+        console.log('📊 Saved areas with bidirectional links:', result.data);
+        alert('All area maps saved successfully with bidirectional linking!');
+        
+        // Refresh data to ensure UI is in sync with database
+        await fetchAreaMaps();
+        await fetchAvailableAreaMaps();
       } else {
+        console.error('❌ Save failed:', result.error);
         alert('Error: ' + result.error);
       }
     } catch (error) {
-      console.error('Save error:', error);
+      console.error('💥 Save error:', error);
       alert('Failed to save area maps');
     } finally {
       setIsSaving(false);
@@ -763,6 +829,368 @@ export default function AreaMapsPage() {
     }
   };
 
+  // Export area maps to JSON file
+  const handleExportAreaMaps = () => {
+    if (areaMaps.length === 0) {
+      alert('No area maps to export!');
+      return;
+    }
+
+    const exportData = {
+      pageNumber: page.page_number,
+      editionId: editionId,
+      exportDate: new Date().toISOString(),
+      areaMaps: areaMaps.map(area => ({
+        x: area.x,
+        y: area.y,
+        width: area.width,
+        height: area.height,
+        title: area.title,
+        url: area.url,
+        linked_area_ids: area.linked_area_ids || []
+      }))
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `area-maps-page-${page.page_number}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    alert(`Exported ${areaMaps.length} area maps from page ${page.page_number}!`);
+  };
+
+  // Import area maps from JSON file
+  const handleImportAreaMaps = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json')) {
+      alert('Please select a JSON file!');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const importData = JSON.parse(content);
+
+        // Validate import data structure
+        if (!importData.areaMaps || !Array.isArray(importData.areaMaps)) {
+          alert('Invalid file format! Please select a valid area maps export file.');
+          return;
+        }
+
+        // Validate each area map
+        const validAreaMaps = importData.areaMaps.filter((area: any) => {
+          return typeof area.x === 'number' && 
+                 typeof area.y === 'number' && 
+                 typeof area.width === 'number' && 
+                 typeof area.height === 'number' && 
+                 typeof area.title === 'string' && 
+                 typeof area.url === 'string';
+        });
+
+        if (validAreaMaps.length === 0) {
+          alert('No valid area maps found in the file!');
+          return;
+        }
+
+        // Ask for confirmation if current page has area maps
+        if (areaMaps.length > 0) {
+          if (!confirm(`This page already has ${areaMaps.length} area maps. Replace them with ${validAreaMaps.length} imported area maps?`)) {
+            return;
+          }
+        }
+
+        // Import the area maps
+        const importedAreaMaps = validAreaMaps.map((area: any, index: number) => ({
+          ...area,
+          isNew: true,
+          id: undefined // Remove ID so new ones will be created
+        }));
+
+        setAreaMaps(importedAreaMaps);
+        alert(`Successfully imported ${validAreaMaps.length} area maps!${importData.pageNumber ? ` (Originally from page ${importData.pageNumber})` : ''}\n\nDon't forget to click "Save All Area Maps" to save them.`);
+
+      } catch (error) {
+        console.error('Import error:', error);
+        alert('Failed to import area maps. Please check the file format.');
+      }
+    };
+
+    reader.readAsText(file);
+    
+    // Reset file input
+    event.target.value = '';
+  };
+
+  // Import area maps from existing page
+  const handleImportFromPage = async (sourcePageId: number) => {
+    try {
+      // Find the source page info
+      const sourcePage = allPages.find(p => p.id === sourcePageId);
+      const sourceAreaMaps = availableAreaMaps.filter(area => area.page_id === sourcePageId);
+      
+      if (sourceAreaMaps.length === 0) {
+        alert('No area maps found on the selected page!');
+        return;
+      }
+
+      // Ask for confirmation if current page has area maps
+      if (areaMaps.length > 0) {
+        if (!confirm(`This page already has ${areaMaps.length} area maps. Replace them with ${sourceAreaMaps.length} area maps from page ${sourcePage?.page_number}?`)) {
+          return;
+        }
+      }
+
+      // Convert available area maps to the format expected by the editor
+      const importedAreaMaps = sourceAreaMaps.map((area: any) => ({
+        x: area.x,
+        y: area.y,
+        width: area.width,
+        height: area.height,
+        title: area.title,
+        url: area.url,
+        linked_area_ids: area.linked_area_ids || [],
+        isNew: true, // Mark as new so they get saved properly
+        id: undefined // Remove ID so new ones will be created
+      }));
+
+      setAreaMaps(importedAreaMaps);
+      setShowImportFromPages(false); // Close the import panel
+      
+      alert(`Successfully imported ${sourceAreaMaps.length} area maps from page ${sourcePage?.page_number}!\n\nDon't forget to click "Save All Area Maps" to save them.`);
+
+    } catch (error) {
+      console.error('Import from page error:', error);
+      alert('Failed to import area maps from the selected page.');
+    }
+  };
+
+  // Fetch available editions for full edition import
+  const fetchAvailableEditions = async () => {
+    try {
+      const response = await fetch('/api/editions');
+      const result = await response.json();
+      if (result.success) {
+        setAvailableEditions(result.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch available editions:', error);
+    }
+  };
+
+  // Load saved templates from localStorage
+  const loadSavedTemplates = () => {
+    try {
+      const templates = localStorage.getItem('areaMapTemplates');
+      if (templates) {
+        setSavedTemplates(JSON.parse(templates));
+      }
+    } catch (error) {
+      console.error('Failed to load saved templates:', error);
+    }
+  };
+
+  // Save templates to localStorage
+  const saveTemplatesToStorage = (templates: any[]) => {
+    try {
+      localStorage.setItem('areaMapTemplates', JSON.stringify(templates));
+      setSavedTemplates(templates);
+    } catch (error) {
+      console.error('Failed to save templates to storage:', error);
+    }
+  };
+
+  // Import full edition area maps
+  const handleImportFullEdition = async (sourceEditionId: number) => {
+    try {
+      // Find the source edition
+      const sourceEdition = availableEditions.find(e => e.id === sourceEditionId);
+      if (!sourceEdition) {
+        alert('Source edition not found!');
+        return;
+      }
+
+      // Fetch all pages from the source edition
+      const pagesResponse = await fetch(`/api/editions/${sourceEditionId}/pages`);
+      const pagesResult = await pagesResponse.json();
+      
+      if (!pagesResult.success || !pagesResult.data) {
+        alert('Failed to fetch pages from source edition!');
+        return;
+      }
+
+      const sourcePages = pagesResult.data;
+      
+      // Fetch all area maps from the source edition
+      const areaMapsResponse = await fetch(`/api/editions/${sourceEditionId}/all-area-maps`);
+      const areaMapsResult = await areaMapsResponse.json();
+      
+      if (!areaMapsResult.success) {
+        alert('Failed to fetch area maps from source edition!');
+        return;
+      }
+
+      const sourceAreaMaps = areaMapsResult.data || [];
+      
+      if (sourceAreaMaps.length === 0) {
+        alert('No area maps found in the selected edition!');
+        return;
+      }
+
+      // Group area maps by page
+      const areaMapsByPage = sourceAreaMaps.reduce((acc: any, area: any) => {
+        const pageId = area.page_id;
+        if (!acc[pageId]) {
+          acc[pageId] = [];
+        }
+        acc[pageId].push(area);
+        return acc;
+      }, {});
+
+      // Create template data structure
+      const templateData = {
+        sourceEditionId,
+        sourceEditionTitle: sourceEdition.title,
+        sourceEditionDate: sourceEdition.date,
+        totalPages: Object.keys(areaMapsByPage).length,
+        totalAreaMaps: sourceAreaMaps.length,
+        pages: sourcePages
+          .filter((page: any) => areaMapsByPage[page.id])
+          .map((page: any) => ({
+            pageNumber: page.page_number,
+            areaMaps: areaMapsByPage[page.id].map((area: any) => ({
+              x: area.x,
+              y: area.y,
+              width: area.width,
+              height: area.height,
+              title: area.title,
+              url: area.url,
+              linked_area_ids: area.linked_area_ids || []
+            }))
+          }))
+      };
+
+      // Ask user if they want to save as template
+      const templateName = prompt(`Import complete! Found ${templateData.totalAreaMaps} area maps across ${templateData.totalPages} pages.\n\nEnter a name to save this as a template (or click Cancel to skip):`);
+      
+      if (templateName && templateName.trim()) {
+        // Save as template
+        const newTemplate = {
+          id: Date.now(),
+          name: templateName.trim(),
+          createdAt: new Date().toISOString(),
+          ...templateData
+        };
+
+        const updatedTemplates = [...savedTemplates, newTemplate];
+        saveTemplatesToStorage(updatedTemplates);
+        
+        alert(`Template "${templateName}" saved successfully!\n\nYou can now use this template to quickly apply the same area map layout to other editions.`);
+      }
+
+      // Close the import panel
+      setShowImportFullEdition(false);
+
+    } catch (error) {
+      console.error('Import full edition error:', error);
+      alert('Failed to import full edition area maps.');
+    }
+  };
+
+  // Import from saved template
+  const handleImportTemplate = async (templateId: number) => {
+    try {
+      const template = savedTemplates.find(t => t.id === templateId);
+      if (!template) {
+        alert('Template not found!');
+        return;
+      }
+
+      // Find the page in current edition that matches the template page structure
+      const currentPageNumber = page.page_number;
+      const templatePage = template.pages.find((p: any) => p.pageNumber === currentPageNumber);
+      
+      if (!templatePage) {
+        alert(`No area maps found for page ${currentPageNumber} in this template!`);
+        return;
+      }
+
+      // Ask for confirmation if current page has area maps
+      if (areaMaps.length > 0) {
+        if (!confirm(`This page already has ${areaMaps.length} area maps. Replace them with ${templatePage.areaMaps.length} area maps from template "${template.name}"?`)) {
+          return;
+        }
+      }
+
+      // Import the area maps
+      const importedAreaMaps = templatePage.areaMaps.map((area: any) => ({
+        ...area,
+        isNew: true,
+        id: undefined // Remove ID so new ones will be created
+      }));
+
+      setAreaMaps(importedAreaMaps);
+      setShowImportFullEdition(false);
+      
+      alert(`Successfully imported ${importedAreaMaps.length} area maps from template "${template.name}" for page ${currentPageNumber}!\n\nDon't forget to click "Save All Area Maps" to save them.`);
+
+    } catch (error) {
+      console.error('Import template error:', error);
+      alert('Failed to import from template.');
+    }
+  };
+
+  // Delete saved template
+  const handleDeleteTemplate = (templateId: number) => {
+    const template = savedTemplates.find(t => t.id === templateId);
+    if (!template) return;
+
+    if (confirm(`Delete template "${template.name}"? This cannot be undone.`)) {
+      const updatedTemplates = savedTemplates.filter(t => t.id !== templateId);
+      saveTemplatesToStorage(updatedTemplates);
+      alert(`Template "${template.name}" deleted successfully!`);
+    }
+  };
+
+  // Export template to JSON file
+  const handleExportTemplate = (templateId: number) => {
+    const template = savedTemplates.find(t => t.id === templateId);
+    if (!template) {
+      alert('Template not found!');
+      return;
+    }
+
+    const exportData = {
+      ...template,
+      exportedAt: new Date().toISOString(),
+      exportedBy: 'Area Maps Template System'
+    };
+
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `template-${template.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    alert(`Template "${template.name}" exported successfully!`);
+  };
+
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
@@ -782,7 +1210,7 @@ export default function AreaMapsPage() {
           >
             <ChevronLeft className="w-6 h-6" />
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-500">
             Create Area Maps - Page {page.page_number}
           </h1>
         </div>
@@ -793,9 +1221,9 @@ export default function AreaMapsPage() {
         <Link href="/admin/editions" className="px-4 py-2 text-blue-600 text-sm font-medium rounded hover:bg-blue-50">
           All Editions »
         </Link>
-        <button className="px-4 py-2 text-blue-600 text-sm font-medium rounded hover:bg-blue-50">
+        <Link href={`/admin/editions/${editionId}/edit`} className="px-4 py-2 text-blue-600 text-sm font-medium rounded hover:bg-blue-50">
           Edit Edition »
-        </button>
+        </Link>
         <Link href={`/admin/editions/${editionId}/pages`} className="px-4 py-2 text-blue-600 text-sm font-medium rounded hover:bg-blue-50">
           Upload/Manage Pages »
         </Link>
@@ -853,28 +1281,22 @@ export default function AreaMapsPage() {
 
         </div>
 
-        {/* Second Row - Navigation and Copy */}
+        {/* Second Row - Navigation and Import/Export */}
         <div className="flex flex-wrap gap-3 mb-3">
           <button
             onClick={handlePreviousPage}
-            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-2 text-sm font-medium"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 text-sm font-medium"
           >
             <ChevronLeft className="w-4 h-4" /> Previous Page
           </button>
           <button
             onClick={handleNextPage}
-            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-2 text-sm font-medium"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2 text-sm font-medium"
           >
             Next Page <ChevronRight className="w-4 h-4" />
           </button>
-          <button
-            onClick={handleCopyAreaMaps}
-            disabled={areaMaps.length === 0}
-            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-2 text-sm font-medium disabled:opacity-50"
-            title="Copy all area maps from this page"
-          >
-            <Copy className="w-4 h-4" /> Copy All Area Maps
-          </button>
+
+
         </div>
 
         {/* Third Row - Paste Options */}
@@ -899,6 +1321,8 @@ export default function AreaMapsPage() {
             </div>
           </div>
         )}
+
+
       </div>
 
       {/* Paste to Selected Pages Modal */}
@@ -971,13 +1395,13 @@ export default function AreaMapsPage() {
                   .map((p: any) => p.id);
                 setSelectedPages(otherPageIds);
               }}
-              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium"
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-100 text-sm font-medium"
             >
               Select All
             </button>
             <button
               onClick={() => setSelectedPages([])}
-              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium"
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-100 text-sm font-medium"
             >
               Clear All
             </button>
@@ -1057,6 +1481,13 @@ export default function AreaMapsPage() {
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
+                      
+                      // Prevent editing while saving or loading
+                      if (isSaving || loading) {
+                        console.log('⏳ Cannot edit while saving or loading');
+                        return;
+                      }
+                      
                       // Fetch latest available area maps before opening modal
                       try {
                         const response = await fetch(`/api/editions/${editionId}/all-area-maps`, {
@@ -1073,11 +1504,18 @@ export default function AreaMapsPage() {
                       } catch (error) {
                         console.error('Failed to fetch area maps:', error);
                       }
+                      console.log('🔧 Opening edit modal for area:', area);
+                      console.log('🔗 Area linked_area_ids:', area.linked_area_ids, typeof area.linked_area_ids);
                       setEditingArea(area);
                       setShowEditModal(true);
                     }}
-                    className="w-6 h-6 bg-green-500 hover:bg-green-600 rounded flex items-center justify-center shadow-md transition-colors"
-                    title="Edit"
+                    disabled={isSaving || loading}
+                    className={`w-6 h-6 rounded flex items-center justify-center shadow-md transition-colors ${
+                      isSaving || loading 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : 'bg-green-500 hover:bg-green-600'
+                    }`}
+                    title={isSaving || loading ? "Please wait..." : "Edit"}
                   >
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1171,7 +1609,7 @@ export default function AreaMapsPage() {
                 </div>
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Title</label>
                     <input
                       type="text"
                       value={area.title}
@@ -1185,7 +1623,7 @@ export default function AreaMapsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">URL</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">URL</label>
                     <input
                       type="text"
                       value={area.url}
@@ -1208,6 +1646,7 @@ export default function AreaMapsPage() {
       {/* Edit Modal */}
       {showEditModal && editingArea && (
         <AreaMapEditModal
+          key={`${editingArea.id}-${JSON.stringify(editingArea.linked_area_ids)}`}
           area={editingArea}
           availableAreaMaps={availableAreaMaps}
           currentPageId={pageId}

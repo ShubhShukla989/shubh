@@ -1,22 +1,15 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { db } from '@/lib/db';
+import { settings } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('settings')
-      .select('value')
-      .eq('key', 'robots_txt')
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
+    const [data] = await db
+      .select()
+      .from(settings)
+      .where(eq(settings.key, 'robots_txt'))
+      .limit(1);
 
     const content = data?.value || `User-agent: *
 Disallow: /admin/

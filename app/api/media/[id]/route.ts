@@ -1,71 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { media_files } from '@/lib/schema/media';
+import { eq } from 'drizzle-orm';
+import { unlink } from 'fs/promises';
+import { join } from 'path';
+import { existsSync } from 'fs';
 
+// DELETE /api/media/[id] - Delete media file
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    if (!supabaseAdmin) {
+    const fileId = parseInt(params.id);
+    
+    if (isNaN(fileId)) {
       return NextResponse.json(
-        { success: false, error: 'Supabase not configured' },
-        { status: 500 }
+        { success: false, error: 'Invalid file ID' },
+        { status: 400 }
       );
     }
 
-    const fileId = params.id;
-
-    console.log('🗑️ Deleting media file:', fileId);
-
-    // Get file info first
-    const { data: fileInfo, error: fetchError } = await supabaseAdmin
-      .from('media_files')
-      .select('file_path')
-      .eq('id', fileId)
-      .single();
-
-    if (fetchError || !fileInfo) {
-      console.error('File not found:', fetchError);
+    // Get file info before deleting
+    const [file] = await db.select().from(media_files).where(eq(media_files.id, fileId));
+    
+    if (!file) {
       return NextResponse.json(
         { success: false, error: 'File not found' },
         { status: 404 }
       );
     }
 
-    // Delete from storage
-    const { error: storageError } = await supabaseAdmin.storage
-      .from('page-assets')
-      .remove([fileInfo.file_path]);
+    // Delete from database
+    await db.delete(media_files).where(eq(media_files.id, fileId));
 
-    if (storageError) {
-      console.error('Storage delete error:', storageError);
-      // Continue anyway - database record is more important
+    // Delete physical file if it exists
+    try {
+      const filePath = join(process.cwd(), 'public', file.file_url);
+      if (existsSync(filePath)) {
+        await unlink(filePath);
+      }
+    } catch (fileError) {
+      console.warn('Failed to delete physical file:', fileError);
+      // Continue even if physical file deletion fails
     }
 
-    // Delete from database (this will cascade delete tags via foreign key)
-    const { error: dbError } = await supabaseAdmin
-      .from('media_files')
-      .delete()
-      .eq('id', fileId);
-
-    if (dbError) {
-      console.error('Database delete error:', dbError);
-      return NextResponse.json(
-        { success: false, error: 'Failed to delete from database' },
-        { status: 500 }
-      );
-    }
-
-    console.log('✅ Media file deleted:', fileId);
-
-    return NextResponse.json({ success: true }, { status: 200 });
+    return NextResponse.json({
+      success: true,
+      message: 'File deleted successfully'
+    });
   } catch (error) {
-    console.error('Delete API error:', error);
+    console.error('Error deleting file:', error);
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { success: false, error: 'Failed to delete file' },
       { status: 500 }
     );
   }
 }
-
-export const dynamic = 'force-dynamic';

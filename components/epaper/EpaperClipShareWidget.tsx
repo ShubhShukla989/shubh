@@ -30,12 +30,12 @@ export function EpaperClipShareWidget({ config }: EpaperClipShareWidgetProps) {
       style={parseInlineStyle(config.style)}
     >
       {config.title && !isFixed && (
-        <h3 className="text-lg font-semibold mb-3">{config.title}</h3>
+        <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">{config.title}</h3>
       )}
 
       <button
         onClick={handleClipClick}
-        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-all shadow-md hover:shadow-lg font-medium ${
+        className={`inline-flex items-center justify-center gap-1 sm:gap-2 px-3 py-2 sm:px-4 sm:py-2 rounded-lg transition-all shadow-md hover:shadow-lg font-medium text-xs sm:text-sm ${
           isClipping 
             ? 'bg-green-600 hover:bg-green-700 text-white' 
             : 'bg-blue-600 hover:bg-blue-700 text-white'

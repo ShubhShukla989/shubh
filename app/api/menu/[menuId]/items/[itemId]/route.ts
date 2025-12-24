@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { menu_items } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 /**
  * PUT /api/menu/:menuId/items/:itemId - Update a menu item
@@ -13,17 +15,11 @@ export async function PUT(
     const body = await request.json();
     const { title, type, url, page_id, category_id, parent_id } = body;
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
     // Build update data
     const updateData: any = {
       title,
       type,
+      updated_at: new Date().toISOString(),
     };
 
     if (type === 'external' && url) {
@@ -51,17 +47,11 @@ export async function PUT(
     }
 
     // Update menu item
-    const { data, error } = await supabaseAdmin
-      .from('menu_items')
-      .update(updateData)
-      .eq('id', itemId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const [data] = await db
+      .update(menu_items)
+      .set(updateData)
+      .where(eq(menu_items.id, parseInt(itemId)))
+      .returning();
 
     return NextResponse.json(data);
   } catch (error) {
@@ -83,23 +73,7 @@ export async function DELETE(
   try {
     const { itemId } = params;
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Delete menu item from menu_items table
-    const { error } = await supabaseAdmin
-      .from('menu_items')
-      .delete()
-      .eq('id', itemId);
-
-    if (error) {
-      console.error('Database error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    await db.delete(menu_items).where(eq(menu_items.id, parseInt(itemId)));
 
     return NextResponse.json({ success: true });
   } catch (error) {

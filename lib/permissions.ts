@@ -3,12 +3,9 @@
  * Use these to check if a user has specific permissions
  */
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { db } from '@/lib/db';
+import { users, roles, role_permissions, permissions } from '@/lib/schema';
+import { eq, and } from 'drizzle-orm';
 
 /**
  * Check if a user has a specific permission
@@ -21,31 +18,32 @@ export async function hasPermission(
   permissionKey: string
 ): Promise<boolean> {
   try {
-    // Get user's role
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('role_id, roles(name)')
-      .eq('id', userId)
-      .single();
+    // Get user with role
+    const [user] = await db
+      .select({
+        role_id: users.role_id,
+        role_name: roles.name
+      })
+      .from(users)
+      .leftJoin(roles, eq(users.role_id, roles.id))
+      .where(eq(users.id, userId))
+      .limit(1);
 
-    if (userError || !user) return false;
+    if (!user) return false;
 
     // Super Admin has all permissions
-    if ((user.roles as any)?.name === 'Super Admin') {
+    if (user.role_name === 'Super Admin') {
       return true;
     }
 
     // Check if role has this permission
-    const { data: rolePermission, error: permError } = await supabaseAdmin
-      .from('role_permissions')
-      .select('*')
-      .eq('role_id', user.role_id)
-      .eq('permission_key', permissionKey)
-      .single();
+    const [rolePermission] = await db
+      .select()
+      .from(role_permissions)
+      .where(and(eq(role_permissions.role_id, user.role_id!), eq(role_permissions.permission_key, permissionKey)))
+      .limit(1);
 
-    if (permError || !rolePermission) return false;
-
-    return true;
+    return !!rolePermission;
   } catch (error) {
     console.error('Permission check error:', error);
     return false;
@@ -61,30 +59,32 @@ export async function getUserPermissions(
   userId: number
 ): Promise<string[]> {
   try {
-    // Get user's role
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('role_id, roles(name)')
-      .eq('id', userId)
-      .single();
+    // Get user with role
+    const [user] = await db
+      .select({
+        role_id: users.role_id,
+        role_name: roles.name
+      })
+      .from(users)
+      .leftJoin(roles, eq(users.role_id, roles.id))
+      .where(eq(users.id, userId))
+      .limit(1);
 
-    if (userError || !user) return [];
+    if (!user) return [];
 
     // Super Admin has all permissions
-    if ((user.roles as any)?.name === 'Super Admin') {
-      const { data: allPerms } = await supabaseAdmin
-        .from('permissions')
-        .select('key');
-      return allPerms?.map(p => p.key) || [];
+    if (user.role_name === 'Super Admin') {
+      const allPerms = await db.select({ key: permissions.key }).from(permissions);
+      return allPerms.map(p => p.key);
     }
 
     // Get role permissions
-    const { data: rolePermissions } = await supabaseAdmin
-      .from('role_permissions')
-      .select('permission_key')
-      .eq('role_id', user.role_id);
+    const rolePermissions = await db
+      .select({ permission_key: role_permissions.permission_key })
+      .from(role_permissions)
+      .where(eq(role_permissions.role_id, user.role_id!));
 
-    return rolePermissions?.map(p => p.permission_key) || [];
+    return rolePermissions.map(p => p.permission_key);
   } catch (error) {
     console.error('Get user permissions error:', error);
     return [];
@@ -98,13 +98,14 @@ export async function getUserPermissions(
  */
 export async function isSuperAdmin(userId: number): Promise<boolean> {
   try {
-    const { data: user } = await supabaseAdmin
-      .from('users')
-      .select('roles(name)')
-      .eq('id', userId)
-      .single();
+    const [user] = await db
+      .select({ role_name: roles.name })
+      .from(users)
+      .leftJoin(roles, eq(users.role_id, roles.id))
+      .where(eq(users.id, userId))
+      .limit(1);
 
-    return (user?.roles as any)?.name === 'Super Admin';
+    return user?.role_name === 'Super Admin';
   } catch (error) {
     return false;
   }

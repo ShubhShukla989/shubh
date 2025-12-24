@@ -29,6 +29,7 @@ interface EpaperContextType {
   zoom: number;
   setZoom: (zoom: number) => void;
   loading: boolean;
+  refreshPages: () => void;
 }
 
 const EpaperContext = createContext<EpaperContextType | undefined>(undefined);
@@ -36,7 +37,7 @@ const EpaperContext = createContext<EpaperContextType | undefined>(undefined);
 export function EpaperProvider({ 
   children, 
   editionId,
-  categoryId = null
+  categoryId: initialCategoryId = null
 }: { 
   children: ReactNode;
   editionId: string;
@@ -50,13 +51,28 @@ export function EpaperProvider({
   const [currentPage, setCurrentPageState] = useState<number>(1);
   const [zoom, setZoom] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [categoryId, setCategoryId] = useState<number | null>(initialCategoryId);
 
-  // Fetch pages on mount
+  // Fetch edition details and pages on mount
   useEffect(() => {
     if (editionId) {
+      fetchEditionDetails();
       fetchPages();
     }
   }, [editionId]);
+
+  const fetchEditionDetails = async () => {
+    try {
+      const response = await fetch(`/api/editions/${editionId}`);
+      const data = await response.json();
+      if (data.success && data.data?.category_id) {
+        setCategoryId(data.data.category_id);
+        console.log('📰 Edition category_id:', data.data.category_id);
+      }
+    } catch (error) {
+      console.error('Failed to fetch edition details:', error);
+    }
+  };
 
   // Sync currentPage with URL
   useEffect(() => {
@@ -68,13 +84,25 @@ export function EpaperProvider({
   const fetchPages = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/editions/${editionId}/pages`);
+      // Fetch pages WITHOUT watermark (only for clips/area-maps)
+      const timestamp = Date.now();
+      const url = `/api/editions/${editionId}/pages?_t=${timestamp}`;
+      
+      console.log('🚀 EpaperContext - Fetching pages from:', url);
+      
+      const response = await fetch(url);
       const data = await response.json();
+      
+      console.log('📡 EpaperContext - API Response:', data);
+      
       if (data.success) {
+        console.log('📄 EpaperContext - Pages fetched:', data.data?.length);
         setPages(data.data || []);
+      } else {
+        console.error('❌ EpaperContext - API Error:', data.error);
       }
     } catch (error) {
-      console.error('Failed to fetch pages:', error);
+      console.error('💥 EpaperContext - Network Error:', error);
     } finally {
       setLoading(false);
     }
@@ -98,6 +126,7 @@ export function EpaperProvider({
         zoom,
         setZoom,
         loading,
+        refreshPages: fetchPages,
       }}
     >
       {children}
@@ -111,4 +140,14 @@ export function useEpaper() {
     throw new Error('useEpaper must be used within an EpaperProvider');
   }
   return context;
+}
+
+// Safe hook that doesn't throw error - for ContextAwareWidget
+export function useEpaperSafe() {
+  try {
+    const context = useContext(EpaperContext);
+    return context;
+  } catch {
+    return undefined;
+  }
 }

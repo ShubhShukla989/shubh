@@ -1,37 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { epaper_categories } from '@/lib/schema/categories';
+import { eq } from 'drizzle-orm';
 
-// GET single category
+// GET /api/epaper/categories/[id] - Get category by ID
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
-
-    if (!supabaseAdmin) {
+    const categoryId = parseInt(params.id);
+    
+    if (isNaN(categoryId)) {
       return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
+        { success: false, error: 'Invalid category ID' },
+        { status: 400 }
       );
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('epaper_categories')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const [category] = await db
+      .select()
+      .from(epaper_categories)
+      .where(eq(epaper_categories.id, categoryId));
 
-    if (error) {
+    if (!category) {
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
+        { success: false, error: 'Category not found' },
+        { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({
+      success: true,
+      data: category
+    });
   } catch (error) {
-    console.error('Get category error:', error);
+    console.error('Error fetching category:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch category' },
       { status: 500 }
@@ -39,71 +43,61 @@ export async function GET(
   }
 }
 
-// PUT update category
+// PUT /api/epaper/categories/[id] - Update category (including toggle)
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
-    const body = await request.json();
-
-    if (!supabaseAdmin) {
+    const categoryId = parseInt(params.id);
+    
+    if (isNaN(categoryId)) {
       return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
+        { success: false, error: 'Invalid category ID' },
+        { status: 400 }
       );
     }
 
-    const {
-      title,
-      alias,
-      description,
-      parent_id,
-      image_url,
-      meta_title,
-      meta_description,
-      meta_keywords,
-      robots,
-      is_active,
-      is_featured,
-      display_order,
-    } = body;
+    const body = await request.json();
+    const updateData: any = {};
+    
+    // Map all possible fields
+    if (body.title !== undefined) updateData.title = body.title;
+    if (body.alias !== undefined) updateData.alias = body.alias;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.is_active !== undefined) updateData.is_active = body.is_active;
+    if (body.is_featured !== undefined) updateData.is_featured = body.is_featured;
+    if (body.display_order !== undefined) updateData.display_order = body.display_order;
+    if (body.image_url !== undefined) updateData.image_url = body.image_url;
+    if (body.meta_title !== undefined) updateData.meta_title = body.meta_title;
+    if (body.meta_description !== undefined) updateData.meta_description = body.meta_description;
+    if (body.meta_keywords !== undefined) updateData.meta_keywords = body.meta_keywords;
+    if (body.robots !== undefined) updateData.robots = body.robots;
+    if (body.parent_id !== undefined) updateData.parent_id = body.parent_id;
+    
+    // Always update the updated_at timestamp
+    updateData.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabaseAdmin
-      .from('epaper_categories')
-      .update({
-        title,
-        alias,
-        description,
-        parent_id,
-        image_url,
-        meta_title,
-        meta_description,
-        meta_keywords,
-        robots,
-        is_active,
-        is_featured,
-        display_order,
-      })
-      .eq('id', id)
-      .select()
-      .single();
+    const [updatedCategory] = await db
+      .update(epaper_categories)
+      .set(updateData)
+      .where(eq(epaper_categories.id, categoryId))
+      .returning();
 
-    if (error) {
+    if (!updatedCategory) {
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
+        { success: false, error: 'Category not found' },
+        { status: 404 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      data,
-      message: 'Category updated successfully',
+      data: updatedCategory,
+      message: 'Category updated successfully'
     });
   } catch (error) {
-    console.error('Update category error:', error);
+    console.error('Error updating category:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update category' },
       { status: 500 }
@@ -111,39 +105,39 @@ export async function PUT(
   }
 }
 
-// DELETE category
+// DELETE /api/epaper/categories/[id] - Delete category
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
-
-    if (!supabaseAdmin) {
+    const categoryId = parseInt(params.id);
+    
+    if (isNaN(categoryId)) {
       return NextResponse.json(
-        { success: false, error: 'Database not configured' },
-        { status: 500 }
+        { success: false, error: 'Invalid category ID' },
+        { status: 400 }
       );
     }
 
-    const { error } = await supabaseAdmin
-      .from('epaper_categories')
-      .delete()
-      .eq('id', id);
+    const [deletedCategory] = await db
+      .delete(epaper_categories)
+      .where(eq(epaper_categories.id, categoryId))
+      .returning();
 
-    if (error) {
+    if (!deletedCategory) {
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
+        { success: false, error: 'Category not found' },
+        { status: 404 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Category deleted successfully',
+      message: 'Category deleted successfully'
     });
   } catch (error) {
-    console.error('Delete category error:', error);
+    console.error('Error deleting category:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete category' },
       { status: 500 }

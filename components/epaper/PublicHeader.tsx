@@ -131,16 +131,16 @@ export default function PublicHeader() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-red-400 transition-colors whitespace-nowrap"
+                    dangerouslySetInnerHTML={{ __html: item.title }}
                   >
-                    {item.title}
                   </a>
                 ) : (
                   <Link
                     key={item.id}
                     href={getMenuItemUrl(item)}
                     className="hover:text-red-400 transition-colors whitespace-nowrap"
+                    dangerouslySetInnerHTML={{ __html: item.title }}
                   >
-                    {item.title}
                   </Link>
                 )
               ))}
@@ -175,8 +175,8 @@ export default function PublicHeader() {
                   rel="noopener noreferrer"
                   className="block py-2 text-gray-700 hover:text-red-600 transition-colors"
                   onClick={() => setShowMenu(false)}
+                  dangerouslySetInnerHTML={{ __html: item.title }}
                 >
-                  {item.title}
                 </a>
               ) : (
                 <Link
@@ -184,8 +184,8 @@ export default function PublicHeader() {
                   href={getMenuItemUrl(item)}
                   className="block py-2 text-gray-700 hover:text-red-600 transition-colors"
                   onClick={() => setShowMenu(false)}
+                  dangerouslySetInnerHTML={{ __html: item.title }}
                 >
-                  {item.title}
                 </Link>
               )
             ))}

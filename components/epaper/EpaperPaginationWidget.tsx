@@ -85,87 +85,56 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
   return (
     <div className={config.cssClasses || ''} style={parseInlineStyle(config.style)}>
       {config.title && (
-        <h3 className="text-lg font-semibold mb-3">{config.title}</h3>
+        <h3 className="text-sm sm:text-lg font-semibold mb-1 sm:mb-3">{config.title}</h3>
       )}
 
       {/* Pagination Control (Full) */}
       {format === 'pagination-control' && (
-        <div className="inline-flex items-center gap-1">
+        <div className="inline-flex items-center gap-1 justify-center">
           {/* Previous button */}
           <button
             onClick={goToPrevious}
             disabled={currentPage === 1}
-            className="w-10 h-10 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="h-6 px-2 sm:h-8 sm:px-3 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex-shrink-0"
           >
-            <span className="text-lg">&#9664;&#9664;</span>
+            <span className="text-sm sm:text-base font-bold" style={{ lineHeight: '1' }}>‹‹</span>
           </button>
           
-          {/* Page numbers - Smart pagination (max 5 pages) */}
-          {(() => {
-            const totalPages = pages.length;
-            const maxVisible = 5;
-            let startPage = 1;
-            let endPage = totalPages;
-
-            if (totalPages > maxVisible) {
-              // Calculate range to keep current page in center
-              const halfVisible = Math.floor(maxVisible / 2);
-              startPage = Math.max(1, currentPage - halfVisible);
-              endPage = Math.min(totalPages, startPage + maxVisible - 1);
-              
-              // Adjust if we're near the end
-              if (endPage - startPage < maxVisible - 1) {
-                startPage = Math.max(1, endPage - maxVisible + 1);
-              }
-            }
-
-            return pages
-              .filter(p => p.page_number >= startPage && p.page_number <= endPage)
-              .map((page) => (
-                <button
-                  key={page.id}
-                  onClick={() => goToPage(page.page_number)}
-                  className={`w-10 h-10 flex items-center justify-center rounded transition-colors text-base font-semibold ${
-                    currentPage === page.page_number
-                      ? 'bg-red-600 text-white'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  {page.page_number}
-                </button>
-              ));
-          })()}
+          {/* Current page / Total pages */}
+          <div className="h-6 px-2 sm:h-8 sm:px-3 bg-gray-100 rounded text-sm sm:text-base font-bold text-gray-800 whitespace-nowrap flex-shrink-0 inline-flex items-center justify-center" style={{ lineHeight: '1', fontFamily: 'monospace' }}>
+            {currentPage}/{pages.length}
+          </div>
           
           {/* Next button */}
           <button
             onClick={goToNext}
             disabled={currentPage === pages.length}
-            className="w-10 h-10 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="h-6 px-2 sm:h-8 sm:px-3 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex-shrink-0"
           >
-            <span className="text-lg">&#9654;&#9654;</span>
+            <span className="text-sm sm:text-base font-bold" style={{ lineHeight: '1' }}>››</span>
           </button>
         </div>
       )}
 
       {/* Pagination Control (Mini) */}
       {format === 'pagination-control-mini' && (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-1 sm:gap-2">
           <button
             onClick={goToPrevious}
             disabled={currentPage === 1}
-            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+            className="px-2 py-1 sm:px-3 sm:py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-xs sm:text-sm"
           >
             &lt;&lt;
           </button>
           
-          <span className="px-3 py-1 bg-gray-100 rounded text-sm font-medium">
+          <span className="px-2 py-1 sm:px-3 sm:py-1 bg-gray-100 rounded text-xs sm:text-sm font-medium">
             {currentPage} / {pages.length}
           </span>
           
           <button
             onClick={goToNext}
             disabled={currentPage === pages.length}
-            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm"
+            className="px-2 py-1 sm:px-3 sm:py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-xs sm:text-sm"
           >
             &gt;&gt;
           </button>
@@ -177,7 +146,7 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
         <select
           value={currentPage}
           onChange={(e) => goToPage(parseInt(e.target.value))}
-          className="w-auto px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full sm:w-auto px-2 py-1 sm:px-3 sm:py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm md:text-base"
         >
           {pages.map((page) => (
             <option key={page.id} value={page.page_number}>
@@ -192,7 +161,7 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
         <select
           value={currentPage}
           onChange={(e) => goToPage(parseInt(e.target.value))}
-          className="w-auto px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full sm:w-auto px-2 py-1 sm:px-3 sm:py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm md:text-base"
         >
           {pages.map((page) => (
             <option key={page.id} value={page.page_number}>

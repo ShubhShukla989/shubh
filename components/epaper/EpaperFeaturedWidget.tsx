@@ -37,10 +37,18 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
   // State management for navigation
   const [currentView, setCurrentView] = useState<'groups' | 'cities'>('groups');
   const [selectedGroup, setSelectedGroup] = useState<TreeNode | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Debug log
-  console.log('EpaperFeaturedWidget config:', config);
-  console.log('Categories:', categories);
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   console.log('Current view:', currentView);
   console.log('Category tree:', config.categoryTree);
 
@@ -336,6 +344,20 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
   }
 
   const perRowCount = config.perRowCount || 3;
+  
+  // Calculate actual categories count for current view
+  const currentCategories = currentView === 'groups' ? getRootCategories() : getCitiesForGroup();
+  const actualCategoriesCount = currentCategories.length;
+  
+  // Calculate actual columns needed (responsive)
+  const maxColumns = isMobile ? 1 : perRowCount;
+  const actualColumns = Math.min(actualCategoriesCount, maxColumns);
+  
+  // Calculate container width based on actual content
+  const thumbnailWidth = config.thumbnailWidth || 180;
+  const gap = 12;
+  const padding = 32; // 16px * 2 for left and right padding
+  const containerWidth = (thumbnailWidth * actualColumns) + (gap * (actualColumns - 1)) + padding;
 
   return (
     <div className={`epaper-featured-widget ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
@@ -360,25 +382,26 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
         <div 
           className="border-2 border-gray-400 bg-gray-50 p-4 rounded-lg shadow-lg"
           style={{
-            display: 'inline-block',
+            width: `${containerWidth}px`,
+            height: 'fit-content',
           }}
         >
           <div 
             className="grid"
             style={{
-              gridTemplateColumns: `repeat(${perRowCount}, 1fr)`,
+              gridTemplateColumns: `repeat(${actualColumns}, 1fr)`,
               gap: '12px',
             }}
           >
             {currentView === 'groups' ? (
               // State 1: Show root categories (groups)
               getRootCategories().map((node, index) => 
-                renderCategoryCard(node, 0, false, index, getRootCategories().length, perRowCount, true)
+                renderCategoryCard(node, 0, false, index, getRootCategories().length, actualColumns, true)
               )
             ) : (
               // State 2: Show cities for selected group
               getCitiesForGroup().map((node, index) => 
-                renderCategoryCard(node, 0, false, index, getCitiesForGroup().length, perRowCount, false)
+                renderCategoryCard(node, 0, false, index, getCitiesForGroup().length, actualColumns, false)
               )
             )}
           </div>

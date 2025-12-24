@@ -83,7 +83,7 @@ export default function CreateCategoryPage() {
         >
           <ChevronLeft className="w-6 h-6" />
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Create Category</h1>
+        <h1 className="text-2xl font-bold text-gray-500">Create Category</h1>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -96,7 +96,7 @@ export default function CreateCategoryPage() {
               className={`px-6 py-3 font-medium ${
                 activeTab === 'basic'
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  : 'text-gray-500 hover:bg-gray-50'
               }`}
             >
               Basic
@@ -107,7 +107,7 @@ export default function CreateCategoryPage() {
               className={`px-6 py-3 font-medium ${
                 activeTab === 'seo'
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  : 'text-gray-500 hover:bg-gray-50'
               }`}
             >
               SEO
@@ -119,7 +119,7 @@ export default function CreateCategoryPage() {
         {activeTab === 'basic' && (
           <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-500 mb-1">
                 Category Title *
               </label>
               <input
@@ -134,7 +134,7 @@ export default function CreateCategoryPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-500 mb-1">
                 Alias *
               </label>
               <input
@@ -152,7 +152,7 @@ export default function CreateCategoryPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-500 mb-1">
                 Description
               </label>
               <textarea
@@ -166,7 +166,7 @@ export default function CreateCategoryPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-500 mb-1">
                 Image URL
               </label>
               <input
@@ -189,7 +189,7 @@ export default function CreateCategoryPage() {
                     onChange={handleChange}
                     className="w-4 h-4"
                   />
-                  <span className="text-sm font-medium text-gray-700">Active</span>
+                  <span className="text-sm font-medium text-gray-500">Active</span>
                 </label>
               </div>
 
@@ -202,12 +202,12 @@ export default function CreateCategoryPage() {
                     onChange={handleChange}
                     className="w-4 h-4"
                   />
-                  <span className="text-sm font-medium text-gray-700">Featured</span>
+                  <span className="text-sm font-medium text-gray-500">Featured</span>
                 </label>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-500 mb-1">
                   Display Order
                 </label>
                 <input
@@ -232,7 +232,7 @@ export default function CreateCategoryPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-500 mb-1">
                 Custom Title
               </label>
               <input
@@ -249,7 +249,7 @@ export default function CreateCategoryPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-500 mb-1">
                 Meta Description
               </label>
               <textarea
@@ -262,7 +262,7 @@ export default function CreateCategoryPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-500 mb-1">
                 Meta Keywords
               </label>
               <textarea
@@ -275,7 +275,7 @@ export default function CreateCategoryPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-500 mb-1">
                 Robots
               </label>
               <input
@@ -300,7 +300,7 @@ export default function CreateCategoryPage() {
           </button>
           <Link
             href="/admin/epaper/categories"
-            className="px-6 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+            className="px-6 py-2 bg-gray-200 text-gray-500 rounded hover:bg-gray-300 transition-colors"
           >
             Cancel
           </Link>

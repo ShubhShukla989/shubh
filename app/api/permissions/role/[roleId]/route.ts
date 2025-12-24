@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { db } from '@/lib/db';
+import { role_permissions } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 
 // GET /api/permissions/role/:roleId - Get permissions for a role
 export async function GET(
@@ -14,12 +11,10 @@ export async function GET(
   try {
     const roleId = parseInt(params.roleId);
 
-    const { data, error } = await supabaseAdmin
-      .from('role_permissions')
-      .select('*')
-      .eq('role_id', roleId);
-
-    if (error) throw error;
+    const data = await db
+      .select()
+      .from(role_permissions)
+      .where(eq(role_permissions.role_id, roleId));
 
     return NextResponse.json({ success: true, data: data || [] });
   } catch (error) {
@@ -41,12 +36,9 @@ export async function POST(
     const { permissions } = await request.json();
 
     // Delete existing permissions for this role
-    const { error: deleteError } = await supabaseAdmin
-      .from('role_permissions')
-      .delete()
-      .eq('role_id', roleId);
-
-    if (deleteError) throw deleteError;
+    await db
+      .delete(role_permissions)
+      .where(eq(role_permissions.role_id, roleId));
 
     // Insert new permissions
     if (permissions && permissions.length > 0) {
@@ -55,11 +47,9 @@ export async function POST(
         permission_key: permKey,
       }));
 
-      const { error: insertError } = await supabaseAdmin
-        .from('role_permissions')
-        .insert(permissionsData);
-
-      if (insertError) throw insertError;
+      await db
+        .insert(role_permissions)
+        .values(permissionsData);
     }
 
     return NextResponse.json({ success: true });
