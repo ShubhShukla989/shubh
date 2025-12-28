@@ -40,8 +40,9 @@ export async function optimizeImage(
     const originalSize = originalBuffer.length;
 
     // Build ENHANCED ImageMagick command for HIGH-QUALITY newspaper optimization
+    // Use ImageMagick v6 syntax for Ubuntu VPS compatibility
     const magickCommand = [
-      'magick',
+      'convert', // ImageMagick v6 uses 'convert' instead of 'magick'
       `"${inputPath}"`,
       
       // Resize if too large (maintain high resolution for newspapers)
@@ -220,8 +221,8 @@ async function analyzeImage(imagePath: string): Promise<{
   isLowDetail: boolean;
 }> {
   try {
-    // Use ImageMagick to analyze image characteristics
-    const { stdout } = await execAsync(`magick identify -verbose "${imagePath}"`);
+    // Use ImageMagick v6 'identify' command (works on both v6 and v7)
+    const { stdout } = await execAsync(`identify -verbose "${imagePath}"`);
     
     // Simple heuristics based on ImageMagick output
     const hasText = stdout.includes('Text') || stdout.includes('Monochrome');

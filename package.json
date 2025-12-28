@@ -18,7 +18,8 @@
     "setup:db": "node scripts/setup-database.js",
     "setup:admin": "node scripts/create-admin-user.js",
     "setup:prod": "node scripts/production-setup.js",
-    "build:prod": "NODE_ENV=production npm run build"
+    "build:prod": "NODE_ENV=production npm run build",
+    "test:imagemagick": "node scripts/test-imagemagick.js"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",

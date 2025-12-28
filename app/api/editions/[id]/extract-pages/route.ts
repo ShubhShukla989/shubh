@@ -71,56 +71,75 @@ export async function POST(
     const uploadsDir = join(process.cwd(), 'public', 'uploads');
     await mkdir(uploadsDir, { recursive: true });
 
-    // Get tool paths (Ghostscript + ImageMagick combination)
+    // Get tool paths (pdftoppm + ImageMagick v6 combination for Ubuntu VPS)
     const isWindows = process.platform === 'win32';
-    const gsPath = isWindows 
+    const isUbuntu = process.platform === 'linux';
+    
+    // Use pdftoppm for Ubuntu VPS (more reliable than Ghostscript)
+    const pdfTool = isUbuntu ? 'pdftoppm' : (isWindows 
       ? (process.env.GHOSTSCRIPT_PATH || 'C:\\Program Files\\gs\\gs10.03.1\\bin\\gswin64c.exe')
-      : (process.env.GHOSTSCRIPT_PATH || 'gs');
+      : (process.env.GHOSTSCRIPT_PATH || 'gs'));
     
-    const magickPath = isWindows
+    // Use ImageMagick v6 'convert' for Ubuntu VPS
+    const magickPath = isUbuntu ? 'convert' : (isWindows
       ? (process.env.IMAGEMAGICK_PATH || 'magick')
-      : (process.env.IMAGEMAGICK_PATH || 'convert');
+      : (process.env.IMAGEMAGICK_PATH || 'convert'));
     
-    // Extract all pages using Ghostscript + ImageMagick
-    const outputPattern = join(uploadsDir, `edition-${editionId}-page-%d.${format}`);
+    // Extract all pages using pdftoppm (Ubuntu) or Ghostscript (Windows/Mac)
+    const outputPattern = join(uploadsDir, `edition-${editionId}-page`);
     
-    // Build ENHANCED Ghostscript command for HIGH-QUALITY newspaper pages
-    const gsCommand = [
-      `"${gsPath}"`,
-      '-dNOPAUSE',
-      '-dBATCH',
-      '-dSAFER',
-      '-sDEVICE=' + (format === 'png' ? 'png16m' : 'jpeg'),
-      `-r${resolution}`,
-      
-      // ENHANCED JPEG optimization for newspapers
-      format === 'jpg' ? `-dJPEGQ=${quality}` : '',
-      format === 'jpg' ? '-dColorConversionStrategy=/LeaveColorUnchanged' : '',
-      format === 'jpg' ? '-dEncodeColorImages=true' : '',
-      format === 'jpg' ? '-dEncodeGrayImages=true' : '',
-      format === 'jpg' ? '-dOptimize=true' : '', // Enable optimization
-      format === 'jpg' ? '-dDownsampleColorImages=false' : '', // Don't downsample for quality
-      format === 'jpg' ? '-dDownsampleGrayImages=false' : '', // Don't downsample for quality
-      
-      // ENHANCED PNG optimization
-      format === 'png' ? '-dTextAlphaBits=4' : '',
-      format === 'png' ? '-dGraphicsAlphaBits=4' : '',
-      
-      // ENHANCED General optimizations for newspapers
-      '-dUseCropBox',
-      '-dPDFFitPage',
-      '-dAutoRotatePages=/None',
-      '-dPrinted=false', // Better quality for screen viewing
-      '-dMaxBitmap=500000000', // Allow larger bitmaps for quality
-      
-      `-sOutputFile="${outputPattern}"`,
-      `"${pdfPath}"`
-    ].filter(Boolean).join(' ');
+    let extractCommand: string;
+    
+    if (isUbuntu) {
+      // Ubuntu VPS: Use pdftoppm (more reliable)
+      extractCommand = [
+        'pdftoppm',
+        '-jpeg',
+        `-r ${resolution}`,
+        `-jpegopt quality=${quality}`,
+        `"${pdfPath}"`,
+        `"${outputPattern}"`
+      ].join(' ');
+    } else {
+      // Windows/Mac: Use Ghostscript
+      extractCommand = [
+        `"${pdfTool}"`,
+        '-dNOPAUSE',
+        '-dBATCH',
+        '-dSAFER',
+        '-sDEVICE=' + (format === 'png' ? 'png16m' : 'jpeg'),
+        `-r${resolution}`,
+        
+        // ENHANCED JPEG optimization for newspapers
+        format === 'jpg' ? `-dJPEGQ=${quality}` : '',
+        format === 'jpg' ? '-dColorConversionStrategy=/LeaveColorUnchanged' : '',
+        format === 'jpg' ? '-dEncodeColorImages=true' : '',
+        format === 'jpg' ? '-dEncodeGrayImages=true' : '',
+        format === 'jpg' ? '-dOptimize=true' : '', // Enable optimization
+        format === 'jpg' ? '-dDownsampleColorImages=false' : '', // Don't downsample for quality
+        format === 'jpg' ? '-dDownsampleGrayImages=false' : '', // Don't downsample for quality
+        
+        // ENHANCED PNG optimization
+        format === 'png' ? '-dTextAlphaBits=4' : '',
+        format === 'png' ? '-dGraphicsAlphaBits=4' : '',
+        
+        // ENHANCED General optimizations for newspapers
+        '-dUseCropBox',
+        '-dPDFFitPage',
+        '-dAutoRotatePages=/None',
+        '-dPrinted=false', // Better quality for screen viewing
+        '-dMaxBitmap=500000000', // Allow larger bitmaps for quality
+        
+        `-sOutputFile="${join(uploadsDir, `edition-${editionId}-page-%d.${format}`)}"`,
+        `"${pdfPath}"`
+      ].filter(Boolean).join(' ');
+    }
 
-    console.log('⚙️ Executing Ghostscript + ImageMagick extraction');
+    console.log('⚙️ Executing PDF extraction with platform-specific tools');
+    console.log('🔧 Tool:', isUbuntu ? 'pdftoppm' : 'Ghostscript');
 
-    // Execute Ghostscript
-    const { stdout, stderr } = await execAsync(gsCommand);
+    // Execute extraction command
+    const { stdout, stderr } = await execAsync(extractCommand);
     
     if (stderr && !stderr.includes('Warning')) {
       console.error('❌ Extraction error:', stderr);
@@ -133,17 +152,34 @@ export async function POST(
     await db.delete(edition_pages).where(eq(edition_pages.edition_id, editionId));
     console.log('🗑️ Cleared existing pages');
 
-    // Insert new pages into database (Ghostscript numbering: 1, 2, 3...)
+    // Insert new pages into database
     const newPages = [];
-    for (let i = 1; i <= pageCount; i++) {
-      const filename = `edition-${editionId}-page-${i}.${format}`;
-      const imagePath = `/uploads/${filename}`;
-      
-      newPages.push({
-        edition_id: editionId,
-        page_number: i,
-        image_url: imagePath,
-      });
+    
+    if (isUbuntu) {
+      // pdftoppm creates files like: edition-1-page-01.jpg, edition-1-page-02.jpg, etc.
+      for (let i = 1; i <= pageCount; i++) {
+        const pageNum = i.toString().padStart(2, '0'); // 01, 02, 03...
+        const filename = `edition-${editionId}-page-${pageNum}.jpg`;
+        const imagePath = `/uploads/${filename}`;
+        
+        newPages.push({
+          edition_id: editionId,
+          page_number: i,
+          image_url: imagePath,
+        });
+      }
+    } else {
+      // Ghostscript creates files like: edition-1-page-1.jpg, edition-1-page-2.jpg, etc.
+      for (let i = 1; i <= pageCount; i++) {
+        const filename = `edition-${editionId}-page-${i}.${format}`;
+        const imagePath = `/uploads/${filename}`;
+        
+        newPages.push({
+          edition_id: editionId,
+          page_number: i,
+          image_url: imagePath,
+        });
+      }
     }
 
     const insertedPages = await db.insert(edition_pages).values(newPages).returning();
@@ -156,19 +192,23 @@ export async function POST(
         pageCount,
         pages: insertedPages,
         settings: { resolution, format, quality },
-        tool: 'Ghostscript + ImageMagick'
+        tool: isUbuntu ? 'pdftoppm' : 'Ghostscript',
+        platform: process.platform
       }
     });
 
   } catch (error: any) {
     console.error('💥 PDF extraction failed:', error);
     
+    // Platform detection for error messages
+    const isUbuntu = process.platform === 'linux';
+    
     // Provide helpful error messages
     let errorMessage = 'Failed to extract PDF pages';
     
-    if (error.message?.includes('gs: command not found') || error.message?.includes('not recognized')) {
-      errorMessage = 'Ghostscript not found. Please install Ghostscript.';
-    } else if (error.message?.includes('magick: command not found')) {
+    if (error.message?.includes('pdftoppm: command not found') || error.message?.includes('gs: command not found') || error.message?.includes('not recognized')) {
+      errorMessage = isUbuntu ? 'pdftoppm not found. Please install poppler-utils: sudo apt install poppler-utils' : 'Ghostscript not found. Please install Ghostscript.';
+    } else if (error.message?.includes('convert: command not found') || error.message?.includes('magick: command not found')) {
       errorMessage = 'ImageMagick not found. Please install ImageMagick.';
     } else if (error.message?.includes('ENOENT')) {
       errorMessage = 'PDF file not found or extraction tools not found.';
@@ -181,7 +221,8 @@ export async function POST(
         success: false, 
         error: errorMessage,
         details: error.message,
-        tool: 'Ghostscript + ImageMagick'
+        tool: isUbuntu ? 'pdftoppm' : 'Ghostscript',
+        platform: process.platform
       },
       { status: 500 }
     );
