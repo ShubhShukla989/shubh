@@ -42,7 +42,7 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
   // Mobile detection
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      setIsMobile(window.innerWidth <= 768);
     };
     
     checkMobile();
@@ -168,12 +168,12 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     return config.categoryTree || [];
   };
 
-  // Get cities for selected group (Primary + Sub categories)
+  // Get cities for selected group (Only Sub categories, exclude parent)
   const getCitiesForGroup = () => {
     if (!selectedGroup) return [];
     
-    // Return Primary + All Sub categories together
-    return [selectedGroup, ...(selectedGroup.children || [])];
+    // Return only children, exclude the parent category
+    return selectedGroup.children || [];
   };
 
   const renderCategoryCard = (node: TreeNode, level: number = 0, showChildren: boolean = false, index: number = 0, totalCount: number = 1, perRow: number = 3, isGroupView: boolean = false) => {
@@ -181,8 +181,9 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     const thumbnail = getCategoryThumbnail(node.id);
     const edition = latestEditions[node.id];
     
-    const thumbnailWidth = config.thumbnailWidth || 180;
-    const thumbnailHeight = config.thumbnailHeight || 240;
+    // Mobile-first responsive dimensions
+    const thumbnailWidth = isMobile ? 350 : (config.thumbnailWidth || 180);
+    const thumbnailHeight = isMobile ? 500 : (config.thumbnailHeight || 240);
     const cropThumbnails = config.cropThumbnails !== 'no';
     const categoryNamePosition = config.categoryNamePosition || 'bottom';
     const datePosition = config.datePosition || 'none';
@@ -209,13 +210,15 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     return (
       <div 
         key={node.id} 
-        className="featured-category-item bg-white border border-gray-300 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+        className="featured-category-item bg-white border-4 border-gray-800 shadow-xl hover:shadow-2xl hover:border-blue-600 transition-all cursor-pointer transform hover:scale-105"
         style={{ 
           marginLeft: level > 0 ? '20px' : '0',
-          width: `${thumbnailWidth}px`,
-          height: cropThumbnails ? `${thumbnailHeight}px` : 'auto',
-          borderRadius: '6px',
+          width: isMobile ? '100%' : `${thumbnailWidth}px`,
+          height: `${thumbnailHeight}px`, // Fixed height for both mobile and desktop
+          borderRadius: '12px',
           overflow: 'hidden',
+          maxWidth: isMobile ? '350px' : 'none',
+          margin: isMobile ? '0 auto' : '0', // Center on mobile
         }}
         onClick={handleClick}
       >
@@ -292,7 +295,7 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
 
           {/* Category Name Bottom */}
           {categoryNamePosition === 'bottom' && (
-            <div className="absolute bottom-0 left-0 right-0 bg-white p-3 border-t">
+            <div className="absolute bottom-0 left-0 right-0 bg-white p-3 border-t-4 border-gray-800">
               <h3 className="font-bold text-sm text-gray-800 text-center leading-tight">{displayTitle}</h3>
               {datePosition === 'bottom' && edition && (
                 <p className="text-xs text-gray-500 text-center mt-1">
@@ -304,7 +307,7 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
 
           {/* Category Name Top */}
           {categoryNamePosition === 'top' && (
-            <div className="absolute top-0 left-0 right-0 bg-white p-3 border-b">
+            <div className="absolute top-0 left-0 right-0 bg-white p-3 border-b-4 border-gray-800">
               <h3 className="font-bold text-sm text-gray-800 text-center">{displayTitle}</h3>
               {datePosition === 'top' && edition && (
                 <p className="text-xs text-gray-500 text-center mt-1">
@@ -353,14 +356,16 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
   const maxColumns = isMobile ? 1 : perRowCount;
   const actualColumns = Math.min(actualCategoriesCount, maxColumns);
   
-  // Calculate container width based on actual content
-  const thumbnailWidth = config.thumbnailWidth || 180;
+  // Calculate container width based on actual content - Mobile responsive
+  const thumbnailWidth = isMobile ? 350 : (config.thumbnailWidth || 180);
   const gap = 12;
-  const padding = 32; // 16px * 2 for left and right padding
-  const containerWidth = (thumbnailWidth * actualColumns) + (gap * (actualColumns - 1)) + padding;
+  const padding = isMobile ? 16 : 32; // Less padding on mobile
+  const containerWidth = isMobile 
+    ? '100%' // Full width on mobile
+    : `${(thumbnailWidth * actualColumns) + (gap * (actualColumns - 1)) + padding}px`;
 
   return (
-    <div className={`epaper-featured-widget ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
+    <div className={`epaper-featured-widget ${config.cssClasses || ''}`} style={{...parseInlineStyle(config.style), width: '100%', maxWidth: '100%', overflow: 'hidden'}}>
       {config.title && <h2 className="text-2xl font-bold mb-6">{config.title}</h2>}
       
       {/* Back Button - Show only in cities view */}
@@ -378,17 +383,20 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
         </div>
       )}
       
-      <div className="flex justify-center">
+      <div className={isMobile ? "px-4" : "flex justify-center"}>
         <div 
-          className="border-2 border-gray-400 bg-gray-50 p-4 rounded-lg shadow-lg"
+          className={`bg-gray-50 rounded-lg ${isMobile ? 'p-3' : 'p-4'}`}
           style={{
-            width: `${containerWidth}px`,
+            width: containerWidth,
             height: 'fit-content',
+            maxWidth: isMobile ? '100%' : 'none',
+            overflow: 'hidden',
+            boxSizing: 'border-box',
           }}
         >
           <div 
-            className="grid"
-            style={{
+            className={isMobile ? "flex flex-col space-y-4" : "grid"}
+            style={isMobile ? {} : {
               gridTemplateColumns: `repeat(${actualColumns}, 1fr)`,
               gap: '12px',
             }}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+// Removed EpaperContext import - working independently now
 
 interface EpaperPaginationWidgetProps {
   config: {
@@ -19,6 +20,7 @@ interface Page {
 }
 
 export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) {
+  // Work independently without context
   const [pages, setPages] = useState<Page[]>([]);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [loading, setLoading] = useState(true);
@@ -26,13 +28,30 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
   const params = useParams();
   const editionId = (params?.editionId || params?.id) as string;
 
-  console.log('EpaperPaginationWidget rendered', { editionId, config, params });
-
+  // Fetch pages independently
   useEffect(() => {
     if (editionId) {
       fetchPages();
+      
+      // Get initial page from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const pageNum = parseInt(urlParams.get('page') || '1');
+      setCurrentPage(pageNum);
     }
   }, [editionId]);
+
+  // Listen for page changes from other widgets (like EpaperPageDisplayWidget)
+  useEffect(() => {
+    const handlePageChange = (event: CustomEvent) => {
+      setCurrentPage(event.detail.page);
+    };
+    
+    window.addEventListener('pagechange', handlePageChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('pagechange', handlePageChange as EventListener);
+    };
+  }, []);
 
   const fetchPages = async () => {
     try {
@@ -53,31 +72,72 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
   };
 
   const goToPage = (pageNumber: number) => {
+    // Update local state
     setCurrentPage(pageNumber);
-    const page = pages.find(p => p.page_number === pageNumber);
-    if (page) {
-      router.push(`/epaper/view/${editionId}?page=${pageNumber}`);
-    }
+    
+    // Update URL
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', pageNumber.toString());
+    window.history.replaceState({}, '', url.toString());
+    
+    // Notify other widgets (like EpaperPageDisplayWidget)
+    window.dispatchEvent(new CustomEvent('pagechange', { 
+      detail: { page: pageNumber } 
+    }));
   };
 
   const goToPrevious = () => {
     if (currentPage > 1) {
-      goToPage(currentPage - 1);
+      const newPage = currentPage - 1;
+      goToPage(newPage);
     }
   };
 
   const goToNext = () => {
     if (currentPage < pages.length) {
-      goToPage(currentPage + 1);
+      const newPage = currentPage + 1;
+      goToPage(newPage);
     }
   };
 
+  // Show placeholder if no edition ID
+  if (!editionId) {
+    return (
+      <div className={config.cssClasses || ''} style={parseInlineStyle(config.style)}>
+        {config.title && (
+          <h3 className="text-sm sm:text-lg font-semibold mb-1 sm:mb-3">{config.title}</h3>
+        )}
+        <div className="p-4 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg text-center">
+          <div className="text-2xl mb-2">📄</div>
+          <div className="text-blue-600 font-medium">Pagination Widget</div>
+          <div className="text-blue-500 text-sm mt-1">
+            Page navigation will appear here
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
-    return <div className="text-center py-2">Loading...</div>;
+    return (
+      <div className={config.cssClasses || ''} style={parseInlineStyle(config.style)}>
+        {config.title && (
+          <h3 className="text-sm sm:text-lg font-semibold mb-1 sm:mb-3">{config.title}</h3>
+        )}
+        <div className="text-center py-2">Loading...</div>
+      </div>
+    );
   }
 
   if (pages.length === 0) {
-    return null;
+    return (
+      <div className={config.cssClasses || ''} style={parseInlineStyle(config.style)}>
+        {config.title && (
+          <h3 className="text-sm sm:text-lg font-semibold mb-1 sm:mb-3">{config.title}</h3>
+        )}
+        <div className="text-center py-2 text-gray-500">No pages available</div>
+      </div>
+    );
   }
 
   const format = config.pagerFormat || 'pagination-control';

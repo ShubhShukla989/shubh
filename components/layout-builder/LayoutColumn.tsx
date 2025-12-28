@@ -138,7 +138,6 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
     {
       name: 'Interactive',
       widgets: [
-        { type: 'pwa-install' as const, label: 'PWA Install Prompt' },
         { type: 'youtube' as const, label: 'YouTube Channel Videos' },
         { type: 'rss' as const, label: 'RSS Display Widget' },
         { type: 'slideshow' as const, label: 'Slideshow' },
@@ -512,6 +511,12 @@ function getDefaultConfig(type: Widget['type']) {
       return { items: [] };
     case 'heading':
       return { text: 'Heading', level: 'h2' };
+    case 'heading-widget':
+      return { 
+        title: '', 
+        subtitle: 'Breaking News',
+        cssClasses: ''
+      };
     case 'video':
       return { url: '' };
     case 'audio':
@@ -538,8 +543,77 @@ function getDefaultConfig(type: Widget['type']) {
         shareIconSize: 20,
         linkTo: 'category-archive'
       };
-    case 'pwa-install':
-      return { text: 'Install App' };
+    case 'featured-editions':
+      return {
+        title: 'Featured Editions',
+        showTitle: true,
+        showDate: true,
+        limit: 6
+      };
+    case 'epaper-archive':
+      return {
+        showCalendar: true,
+        showSearch: true,
+        itemsPerPage: 12
+      };
+    case 'epaper-calendar':
+      return {
+        showMonthView: true,
+        showYearSelector: true
+      };
+    case 'epaper-display':
+    case 'epaper-page-display':
+      return {
+        showNavigation: true,
+        showZoom: true,
+        showFullscreen: true
+      };
+    case 'epaper-pagination':
+      return {
+        showPageNumbers: true,
+        showNavButtons: true
+      };
+    case 'epaper-pdf-download':
+      return {
+        buttonText: 'Download PDF',
+        showIcon: true
+      };
+    case 'page-download':
+      return {
+        buttonText: 'Download Page',
+        showIcon: true
+      };
+    case 'epaper-thumb-navigation':
+      return {
+        showPageNumbers: true,
+        thumbnailSize: 'medium'
+      };
+    case 'epaper-clip-share':
+      return {
+        showShareButtons: true,
+        platforms: ['facebook', 'twitter', 'whatsapp']
+      };
+    case 'epaper-clip-display':
+      return {
+        showFullImage: true,
+        enableZoom: true
+      };
+    case 'epaper-zoom':
+      return {
+        showZoomIn: true,
+        showZoomOut: true,
+        showReset: true
+      };
+    case 'social-sharing':
+      return {
+        platforms: ['facebook', 'twitter', 'whatsapp', 'linkedin'],
+        showLabels: true
+      };
+    case 'epaper-area-map':
+      return {
+        showClipDetails: true,
+        enableSharing: true
+      };
     case 'youtube':
       return { channelId: '' };
     case 'rss':

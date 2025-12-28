@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useEpaperSafe } from '@/contexts/EpaperContext';
+// Removed EpaperContext import - working independently now
 import { Download } from 'lucide-react';
 
 // Global cache outside component to persist across unmounts
@@ -13,6 +13,7 @@ interface EpaperAreaMapDisplayWidgetProps {
     title?: string;
     cssClasses?: string;
     style?: string;
+    editionId?: string;
   };
   areaMapId?: string;
   editionId?: string;
@@ -28,15 +29,13 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
     timestamp: new Date().toISOString()
   });
   
-  // Try to get context, but don't fail if not available
-  const epaperContext = useEpaperSafe();
-  const contextEditionId = epaperContext?.editionId;
-  
-  const editionId = propEditionId || contextEditionId;
+  // Get editionId from URL or props
+  const finalEditionId = config.editionId || propEditionId || (typeof window !== 'undefined' ? 
+    window.location.pathname.split('/').pop() : '');
   
   console.log('🔧 Final props for widget:', {
     areaMapId,
-    editionId,
+    editionId: finalEditionId,
     pageNumber: propPageNumber,
     hasConfig: !!config
   });
@@ -155,7 +154,7 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
             month: 'short', 
             year: 'numeric'
           }) : '')
-          .replace(/\{url\}/g, `${window.location.origin}/epaper/view/${editionId}`);
+          .replace(/\{url\}/g, `${window.location.origin}/epaper/view/${finalEditionId}`);
 
         if (processedText.trim()) {
           ctx.fillStyle = watermarkSettings.foreground_color || '#1f2937';
@@ -205,7 +204,7 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
       return;
     }
     
-    if (!editionId) {
+    if (!finalEditionId) {
       console.warn('EpaperAreaMapDisplayWidget: No editionId provided');
       setLoading(false);
       return;
@@ -229,7 +228,7 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
         setAreaMapData(areaData);
         
         // Fetch page data
-        const pageResponse = await fetch(`/api/editions/${editionId}/pages/${areaData.page_id}`);
+        const pageResponse = await fetch(`/api/editions/${finalEditionId}/pages/${areaData.page_id}`);
         const pageResult = await pageResponse.json();
         
         if (!pageResult.success) {
@@ -242,7 +241,7 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
         setPageData(page);
         
         // Fetch edition to get category_id and date
-        const editionResponse = await fetch(`/api/editions/${editionId}`);
+        const editionResponse = await fetch(`/api/editions/${finalEditionId}`);
         const editionResult = await editionResponse.json();
         
         if (editionResult.success && editionResult.data) {
@@ -363,7 +362,7 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
     };
     
     fetchAndCropImage();
-  }, [areaMapId, editionId]); // Only depend on areaMapId and editionId
+  }, [areaMapId, finalEditionId]); // Only depend on areaMapId and finalEditionId
   
   const createCroppedImage = async (area: any, page: any) => {
     if (!canvasRef.current) return;
@@ -434,7 +433,7 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
           const result = await response.json();
           if (result.success) {
             // Also fetch page data for this area
-            const pageResponse = await fetch(`/api/editions/${editionId}/pages/${result.data.page_id}`);
+            const pageResponse = await fetch(`/api/editions/${finalEditionId}/pages/${result.data.page_id}`);
             const pageResult = await pageResponse.json();
             if (pageResult.success) {
               return { area: result.data, page: pageResult.data };
@@ -453,7 +452,7 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
       // Add main area with its page (fetch if not available)
       let mainPage = pageData;
       if (!mainPage) {
-        const pageResponse = await fetch(`/api/editions/${editionId}/pages/${mainArea.page_id}`);
+        const pageResponse = await fetch(`/api/editions/${finalEditionId}/pages/${mainArea.page_id}`);
         const pageResult = await pageResponse.json();
         if (pageResult.success) {
           mainPage = pageResult.data;
@@ -544,7 +543,7 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
       let fallbackPage = pageData;
       if (!fallbackPage) {
         try {
-          const pageResponse = await fetch(`/api/editions/${editionId}/pages/${mainArea.page_id}`);
+          const pageResponse = await fetch(`/api/editions/${finalEditionId}/pages/${mainArea.page_id}`);
           const pageResult = await pageResponse.json();
           if (pageResult.success) {
             fallbackPage = pageResult.data;

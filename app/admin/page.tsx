@@ -251,7 +251,7 @@ export default function AdminDashboard() {
           <p className="text-gray-600 mt-1">Welcome to ePaper CMS Admin Panel</p>
         </div>
         <a
-          href="/epaper"
+          href="/"
           target="_blank"
           className="px-4 sm:px-6 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base"
         >

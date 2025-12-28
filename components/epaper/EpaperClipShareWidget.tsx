@@ -1,6 +1,7 @@
 'use client';
 
-import { useEpaper } from '@/contexts/EpaperContext';
+import { useState, useEffect } from 'react';
+// Removed EpaperContext import - working independently now
 
 interface EpaperClipShareWidgetProps {
   config: {
@@ -8,21 +9,51 @@ interface EpaperClipShareWidgetProps {
     buttonText?: string;
     zoomable?: boolean;
     dragMode?: 'none' | 'crop' | 'move';
-    shareButtonPosition?: 'stick-to-crop-area' | 'fixed-floating-bottom-right';
+    shareButtonPosition?: 'stick-to-crop-area';
     cssClasses?: string;
     style?: string;
   };
 }
 
 export function EpaperClipShareWidget({ config }: EpaperClipShareWidgetProps) {
-  const { isClipping, setIsClipping } = useEpaper();
+  // Work independently with local state
+  const [isClipping, setIsClipping] = useState(false);
+
+  // Listen for clipping completion to reset state
+  useEffect(() => {
+    const handleClipComplete = () => {
+      setIsClipping(false);
+      console.log('✅ Clipping completed, resetting clip button state');
+    };
+    
+    const handleClipCancel = () => {
+      setIsClipping(false);
+      console.log('❌ Clipping cancelled, resetting clip button state');
+    };
+    
+    window.addEventListener('clipcomplete', handleClipComplete as EventListener);
+    window.addEventListener('clipcancel', handleClipCancel as EventListener);
+    
+    return () => {
+      window.removeEventListener('clipcomplete', handleClipComplete as EventListener);
+      window.removeEventListener('clipcancel', handleClipCancel as EventListener);
+    };
+  }, []);
 
   const handleClipClick = () => {
-    setIsClipping(!isClipping);
+    const newClippingState = !isClipping;
+    setIsClipping(newClippingState);
+    
+    // Notify EpaperPageDisplayWidget about clipping state change
+    window.dispatchEvent(new CustomEvent('clippingchange', { 
+      detail: { isClipping: newClippingState } 
+    }));
+    
+    console.log('🎯 Clip button clicked, clipping:', newClippingState);
   };
 
   const shareButtonPosition = config.shareButtonPosition || 'stick-to-crop-area';
-  const isFixed = shareButtonPosition === 'fixed-floating-bottom-right';
+  const isFixed = false; // Disabled fixed positioning to remove bottom right popup
 
   return (
     <div 

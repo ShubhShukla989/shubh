@@ -1,5 +1,3 @@
-import sharp from 'sharp';
-import { createCanvas, loadImage, registerFont } from 'canvas';
 import { removeDBDLogo } from './remove-logo';
 
 export interface WatermarkSettings {
@@ -60,134 +58,6 @@ export function replaceTemplatePlaceholders(text: string, context: WatermarkCont
 }
 
 /**
- * Get font family based on language selection
- */
-function getFontFamily(font: string): string {
-  switch (font) {
-    case 'Hindi':
-      return 'Arial, sans-serif'; // Replace with Hindi font if available
-    case 'Gujarati':
-      return 'Arial, sans-serif'; // Replace with Gujarati font if available
-    default:
-      return 'Arial, sans-serif';
-  }
-}
-
-/**
- * Calculate position coordinates based on position setting
- */
-function calculatePosition(
-  imageWidth: number,
-  imageHeight: number,
-  watermarkWidth: number,
-  watermarkHeight: number,
-  position: string,
-  padding: number = 20
-): { x: number; y: number } {
-  let x = 0;
-  let y = 0;
-
-  switch (position) {
-    case 'top_left':
-      x = padding;
-      y = padding;
-      break;
-    case 'top_center':
-      x = (imageWidth - watermarkWidth) / 2;
-      y = padding;
-      break;
-    case 'top_right':
-      x = imageWidth - watermarkWidth - padding;
-      y = padding;
-      break;
-    case 'bottom_left':
-      x = padding;
-      y = imageHeight - watermarkHeight - padding;
-      break;
-    case 'bottom_center':
-      x = (imageWidth - watermarkWidth) / 2;
-      y = imageHeight - watermarkHeight - padding;
-      break;
-    case 'bottom_right':
-      x = imageWidth - watermarkWidth - padding;
-      y = imageHeight - watermarkHeight - padding;
-      break;
-  }
-
-  return { x, y };
-}
-
-/**
- * Create watermark overlay with logo and text
- */
-async function createWatermarkOverlay(
-  settings: WatermarkSettings,
-  context: WatermarkContext,
-  imageWidth: number
-): Promise<Buffer | null> {
-  try {
-    // Calculate watermark dimensions
-    const minWidth = settings.min_width_px || 200;
-    const watermarkWidth = Math.max(minWidth, imageWidth * 0.3);
-    const watermarkHeight = 80;
-
-    // Create canvas
-    const canvas = createCanvas(watermarkWidth, watermarkHeight);
-    const ctx = canvas.getContext('2d');
-
-    // Draw background
-    ctx.fillStyle = settings.background_color || '#ffffff';
-    ctx.fillRect(0, 0, watermarkWidth, watermarkHeight);
-
-    // Draw border if enabled
-    if (settings.enable_border) {
-      ctx.strokeStyle = settings.border_color || '#000000';
-      ctx.lineWidth = settings.border_width || 2;
-      ctx.strokeRect(0, 0, watermarkWidth, watermarkHeight);
-    }
-
-    let currentX = 10;
-
-    // Draw logo if provided
-    if (settings.logo_url) {
-      try {
-        const logo = await loadImage(settings.logo_url);
-        const logoHeight = watermarkHeight - 20;
-        const logoWidth = (logo.width / logo.height) * logoHeight;
-        ctx.drawImage(logo, currentX, 10, logoWidth, logoHeight);
-        currentX += logoWidth + 10;
-      } catch (error) {
-        console.error('Error loading logo:', error);
-      }
-    }
-
-    // Draw info text if provided
-    if (settings.info_text) {
-      const text = replaceTemplatePlaceholders(settings.info_text, context);
-      const fontFamily = getFontFamily(settings.info_text_font);
-      
-      ctx.fillStyle = settings.foreground_color || '#000000';
-      ctx.font = `16px ${fontFamily}`;
-      ctx.textBaseline = 'middle';
-      
-      const lines = text.split('\n');
-      const lineHeight = 20;
-      const startY = (watermarkHeight - (lines.length * lineHeight)) / 2 + lineHeight / 2;
-      
-      lines.forEach((line, index) => {
-        ctx.fillText(line, currentX, startY + (index * lineHeight));
-      });
-    }
-
-    // Convert canvas to buffer
-    return canvas.toBuffer('image/png');
-  } catch (error) {
-    console.error('Error creating watermark overlay:', error);
-    return null;
-  }
-}
-
-/**
  * Apply watermark to image - SIMPLIFIED HTML OVERLAY APPROACH
  */
 export async function applyWatermark(
@@ -197,10 +67,12 @@ export async function applyWatermark(
   removeDBDLogoFirst: boolean = true
 ): Promise<Buffer> {
   try {
+    // Dynamic import of sharp to avoid build issues
+    const sharp = (await import('sharp')).default;
+    
     // Step 1: Remove DBD logo if requested
     let processedBuffer = imageBuffer;
     if (removeDBDLogoFirst) {
-      console.log('🗑️ Removing DBD logo from image...');
       processedBuffer = await removeDBDLogo(imageBuffer);
     }
 
@@ -221,8 +93,6 @@ export async function applyWatermark(
     // SIMPLIFIED APPROACH: Only add category logo (REPLACE Aadhaar logo position - top center)
     if (settings.logo_url) {
       try {
-        console.log('🎨 Adding category logo to clip (replacing Aadhaar logo):', settings.logo_url);
-        
         // Make logo bigger - 60% of image width (150% increase from 40%)
         const logoMaxWidth = Math.floor(imageWidth * 0.6);
         const categoryLogo = await sharp(settings.logo_url)
@@ -252,10 +122,8 @@ export async function applyWatermark(
           top: logoY,
           left: logoX
         });
-        
-        console.log(`✅ Category logo added to clip at TOP CENTER (${logoX}, ${logoY}) - ${logoWidth}x${logoHeight} - REPLACING Aadhaar logo`);
       } catch (error) {
-        console.error('❌ Error adding category logo to clip:', error);
+        // Handle error silently
       }
     }
 
@@ -282,24 +150,19 @@ export async function applyWatermark(
           top: centerY,
           left: centerX
         });
-        
-        console.log('✅ Center watermark added to clip');
       } catch (error) {
-        console.error('❌ Error adding center watermark to clip:', error);
+        // Handle error silently
       }
     }
 
     // Apply all composites to image
     if (composites.length > 0) {
       const result = await image.composite(composites).toBuffer();
-      console.log('✅ Clip watermarking completed successfully');
       return result;
     }
 
-    console.log('ℹ️ No watermarks applied to clip');
     return processedBuffer;
   } catch (error) {
-    console.error('❌ Error applying watermark to clip:', error);
     return imageBuffer; // Return original image on error
   }
 }
@@ -324,7 +187,6 @@ export async function applyWatermarkToBase64(
     // Convert back to base64
     return `data:image/png;base64,${watermarkedBuffer.toString('base64')}`;
   } catch (error) {
-    console.error('Error applying watermark to base64:', error);
     return base64Image; // Return original on error
   }
 }

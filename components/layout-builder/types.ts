@@ -1,6 +1,6 @@
 export interface Widget {
   id: string;
-  type: 'ticker' | 'social' | 'image' | 'text' | 'button' | 'menu' | 'embed' | 'navigation' | 'slideshow' | 'html' | 'tinymce' | 'page-content' | 'infobox' | 'cards' | 'heading' | 'video' | 'audio' | 'datetime' | 'reusable' | 'epaper-category' | 'epaper-gallery' | 'epaper-featured' | 'featured-editions' | 'pwa-install' | 'youtube' | 'rss' | 'epaper-archive' | 'epaper-calendar' | 'epaper-pagination' | 'epaper-pdf-download' | 'epaper-thumb-navigation' | 'epaper-clip-share' | 'epaper-clip-display' | 'epaper-display' | 'epaper-zoom' | 'social-sharing' | 'page-download' | 'epaper-area-map';
+  type: 'ticker' | 'social' | 'image' | 'text' | 'button' | 'menu' | 'embed' | 'navigation' | 'slideshow' | 'html' | 'tinymce' | 'page-content' | 'infobox' | 'cards' | 'heading' | 'heading-widget' | 'video' | 'audio' | 'datetime' | 'reusable' | 'epaper-category' | 'epaper-gallery' | 'epaper-featured' | 'featured-editions' | 'youtube' | 'rss' | 'epaper-archive' | 'epaper-calendar' | 'epaper-pagination' | 'epaper-pdf-download' | 'epaper-thumb-navigation' | 'epaper-clip-share' | 'epaper-clip-display' | 'epaper-display' | 'epaper-page-display' | 'epaper-zoom' | 'social-sharing' | 'page-download' | 'epaper-area-map';
   config: any;
   deviceVisibility?: 'both' | 'mobile-only' | 'desktop-only';
 }

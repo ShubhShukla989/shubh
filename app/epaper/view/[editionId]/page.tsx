@@ -1,7 +1,6 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { EpaperProvider } from '@/contexts/EpaperContext';
 import { LayoutRenderer } from '@/components/layout-renderer/LayoutRenderer';
 
 export default function EpaperViewerPage() {
@@ -9,10 +8,8 @@ export default function EpaperViewerPage() {
   const editionId = params?.editionId as string;
 
   return (
-    <EpaperProvider editionId={editionId}>
-      <div className="min-h-screen bg-gray-200">
-        <LayoutRenderer layoutName="Epaper Display" />
-      </div>
-    </EpaperProvider>
+    <div className="min-h-screen bg-gray-200">
+      <LayoutRenderer layoutName="Epaper Display" />
+    </div>
   );
 }

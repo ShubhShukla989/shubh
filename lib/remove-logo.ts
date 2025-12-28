@@ -1,11 +1,12 @@
-import sharp from 'sharp';
-
 /**
  * Remove DBD logo from newspaper page by covering it with white rectangle
  * Logo is typically at top center of the page
  */
 export async function removeDBDLogo(imageBuffer: Buffer): Promise<Buffer> {
   try {
+    // Dynamic import of sharp to avoid build issues
+    const sharp = (await import('sharp')).default;
+    
     const image = sharp(imageBuffer);
     const metadata = await image.metadata();
     const width = metadata.width || 800;

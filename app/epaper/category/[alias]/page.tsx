@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 import { db } from '@/lib/db';
 import { epaper_categories } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { LayoutRenderer } from '@/components/layout-renderer/LayoutRenderer';
 import { CategoryProvider } from '@/contexts/CategoryContext';
+import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 
 interface CategoryPageProps {
   params: {
@@ -83,7 +85,18 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       categoryTitle={category.title}
     >
       <div className="category-archive-page">
-        <LayoutRenderer layoutName={finalLayout} />
+        <Suspense fallback={
+          <div className="space-y-4 p-4">
+            <SkeletonLoader variant="text" width="40%" height="32px" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <SkeletonLoader variant="card" height="300px" />
+              <SkeletonLoader variant="card" height="300px" />
+              <SkeletonLoader variant="card" height="300px" />
+            </div>
+          </div>
+        }>
+          <LayoutRenderer layoutName={finalLayout} />
+        </Suspense>
       </div>
     </CategoryProvider>
   );

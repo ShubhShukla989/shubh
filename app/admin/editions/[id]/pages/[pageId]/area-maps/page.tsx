@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ChevronLeft, Plus, Save as SaveIcon, ChevronRight, Clipboard, Download, Upload } from 'lucide-react';
 import Link from 'next/link';
 import AreaMapEditModal from './AreaMapEditModal';
+import AreaMapTemplateManager from '@/components/admin/AreaMapTemplateManager';
 import ResizeHandle from '@/components/admin/ResizeHandle';
 import ActionIcons from '@/components/ActionIcons';
 
@@ -1191,6 +1192,8 @@ export default function AreaMapsPage() {
     alert(`Template "${template.name}" exported successfully!`);
   };
 
+
+
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
@@ -1296,7 +1299,14 @@ export default function AreaMapsPage() {
             Next Page <ChevronRight className="w-4 h-4" />
           </button>
 
-
+          {/* Template Manager */}
+          <AreaMapTemplateManager
+            currentPageNumber={page.page_number}
+            currentAreaMaps={areaMaps}
+            onImportTemplate={(importedMaps) => {
+              setAreaMaps(importedMaps.map(map => ({ ...map, isNew: true })));
+            }}
+          />
         </div>
 
         {/* Third Row - Paste Options */}

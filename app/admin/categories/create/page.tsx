@@ -4,57 +4,56 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useFormValidation, getFieldError, hasFieldError } from '@/hooks/useFormValidation';
+import { categorySchema, type CategoryFormData } from '@/lib/validations/category';
 
 export default function CreateCategoryPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('basic');
 
-  const [formData, setFormData] = useState({
-    title: '',
-    alias: '',
-    description: '',
-    parent_id: null,
-    image_url: '',
-    meta_title: '',
-    meta_description: '',
-    meta_keywords: '',
-    robots: 'index, follow',
-    is_active: true,
-    is_featured: false,
-    display_order: 0,
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isValid },
+    setValue,
+    watch,
+  } = useFormValidation(categorySchema, {
+    defaultValues: {
+      title: '',
+      alias: '',
+      description: '',
+      image_url: '',
+      meta_title: '',
+      meta_description: '',
+      meta_keywords: '',
+      robots: 'index, follow' as const,
+      is_active: true,
+      is_featured: false,
+      display_order: 0,
+    },
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value, type } = e.target;
-    const checked = (e.target as HTMLInputElement).checked;
+  const watchedTitle = watch('title');
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-
-    // Auto-generate alias from title
-    if (name === 'title' && !formData.alias) {
-      const alias = value
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
-      setFormData((prev) => ({ ...prev, alias }));
-    }
+  // Auto-generate alias from title
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const title = e.target.value;
+    const alias = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    setValue('alias', alias);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: CategoryFormData) => {
     setLoading(true);
 
     try {
       const response = await fetch('/api/epaper/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(data),
       });
 
       const result = await response.json();
@@ -63,7 +62,10 @@ export default function CreateCategoryPage() {
         alert('Category created successfully!');
         router.push('/admin/epaper/categories');
       } else {
-        alert('Error: ' + result.error);
+        alert('Error: ' + (result.error || 'Unknown error'));
+        if (result.details) {
+          console.error('Validation errors:', result.details);
+        }
       }
     } catch (error) {
       console.error('Submit error:', error);
@@ -86,7 +88,7 @@ export default function CreateCategoryPage() {
         <h1 className="text-2xl font-bold text-gray-500">Create Category</h1>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit(onSubmit)}>
         {/* Tabs */}
         <div className="bg-white border border-gray-200 rounded-lg mb-4">
           <div className="flex border-b border-gray-200">
@@ -124,13 +126,17 @@ export default function CreateCategoryPage() {
               </label>
               <input
                 type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                {...register('title', {
+                  onChange: handleTitleChange,
+                })}
+                className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  hasFieldError(errors, 'title') ? 'border-red-500' : 'border-gray-300'
+                }`}
                 placeholder="e.g., Mumbai Edition"
               />
+              {hasFieldError(errors, 'title') && (
+                <p className="text-red-500 text-sm mt-1">{getFieldError(errors, 'title')}</p>
+              )}
             </div>
 
             <div>
@@ -139,13 +145,15 @@ export default function CreateCategoryPage() {
               </label>
               <input
                 type="text"
-                name="alias"
-                value={formData.alias}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                {...register('alias')}
+                className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  hasFieldError(errors, 'alias') ? 'border-red-500' : 'border-gray-300'
+                }`}
                 placeholder="e.g., mumbai"
               />
+              {hasFieldError(errors, 'alias') && (
+                <p className="text-red-500 text-sm mt-1">{getFieldError(errors, 'alias')}</p>
+              )}
               <p className="text-xs text-gray-500 mt-1">
                 URL-friendly identifier (auto-generated from title)
               </p>
@@ -156,13 +164,16 @@ export default function CreateCategoryPage() {
                 Description
               </label>
               <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
+                {...register('description')}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  hasFieldError(errors, 'description') ? 'border-red-500' : 'border-gray-300'
+                }`}
                 placeholder="Brief description of this category"
               />
+              {hasFieldError(errors, 'description') && (
+                <p className="text-red-500 text-sm mt-1">{getFieldError(errors, 'description')}</p>
+              )}
             </div>
 
             <div>
@@ -171,12 +182,15 @@ export default function CreateCategoryPage() {
               </label>
               <input
                 type="text"
-                name="image_url"
-                value={formData.image_url}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                {...register('image_url')}
+                className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  hasFieldError(errors, 'image_url') ? 'border-red-500' : 'border-gray-300'
+                }`}
                 placeholder="https://example.com/image.jpg"
               />
+              {hasFieldError(errors, 'image_url') && (
+                <p className="text-red-500 text-sm mt-1">{getFieldError(errors, 'image_url')}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-4">
@@ -184,9 +198,7 @@ export default function CreateCategoryPage() {
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    name="is_active"
-                    checked={formData.is_active}
-                    onChange={handleChange}
+                    {...register('is_active')}
                     className="w-4 h-4"
                   />
                   <span className="text-sm font-medium text-gray-500">Active</span>
@@ -197,9 +209,7 @@ export default function CreateCategoryPage() {
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    name="is_featured"
-                    checked={formData.is_featured}
-                    onChange={handleChange}
+                    {...register('is_featured')}
                     className="w-4 h-4"
                   />
                   <span className="text-sm font-medium text-gray-500">Featured</span>
@@ -212,11 +222,14 @@ export default function CreateCategoryPage() {
                 </label>
                 <input
                   type="number"
-                  name="display_order"
-                  value={formData.display_order}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  {...register('display_order', { valueAsNumber: true })}
+                  className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    hasFieldError(errors, 'display_order') ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
+                {hasFieldError(errors, 'display_order') && (
+                  <p className="text-red-500 text-sm mt-1">{getFieldError(errors, 'display_order')}</p>
+                )}
               </div>
             </div>
           </div>
@@ -237,12 +250,15 @@ export default function CreateCategoryPage() {
               </label>
               <input
                 type="text"
-                name="meta_title"
-                value={formData.meta_title}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                {...register('meta_title')}
+                className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  hasFieldError(errors, 'meta_title') ? 'border-red-500' : 'border-gray-300'
+                }`}
                 placeholder="This title will be used in <title> </title> tag"
               />
+              {hasFieldError(errors, 'meta_title') && (
+                <p className="text-red-500 text-sm mt-1">{getFieldError(errors, 'meta_title')}</p>
+              )}
               <p className="text-xs text-gray-500 mt-1">
                 This title will be used in &lt;title&gt; &lt;/title&gt; tag
               </p>
@@ -253,12 +269,15 @@ export default function CreateCategoryPage() {
                 Meta Description
               </label>
               <textarea
-                name="meta_description"
-                value={formData.meta_description}
-                onChange={handleChange}
+                {...register('meta_description')}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  hasFieldError(errors, 'meta_description') ? 'border-red-500' : 'border-gray-300'
+                }`}
               />
+              {hasFieldError(errors, 'meta_description') && (
+                <p className="text-red-500 text-sm mt-1">{getFieldError(errors, 'meta_description')}</p>
+              )}
             </div>
 
             <div>
@@ -266,25 +285,35 @@ export default function CreateCategoryPage() {
                 Meta Keywords
               </label>
               <textarea
-                name="meta_keywords"
-                value={formData.meta_keywords}
-                onChange={handleChange}
+                {...register('meta_keywords')}
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  hasFieldError(errors, 'meta_keywords') ? 'border-red-500' : 'border-gray-300'
+                }`}
               />
+              {hasFieldError(errors, 'meta_keywords') && (
+                <p className="text-red-500 text-sm mt-1">{getFieldError(errors, 'meta_keywords')}</p>
+              )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-500 mb-1">
                 Robots
               </label>
-              <input
-                type="text"
-                name="robots"
-                value={formData.robots}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <select
+                {...register('robots')}
+                className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  hasFieldError(errors, 'robots') ? 'border-red-500' : 'border-gray-300'
+                }`}
+              >
+                <option value="index, follow">Index, Follow</option>
+                <option value="noindex, nofollow">No Index, No Follow</option>
+                <option value="index, nofollow">Index, No Follow</option>
+                <option value="noindex, follow">No Index, Follow</option>
+              </select>
+              {hasFieldError(errors, 'robots') && (
+                <p className="text-red-500 text-sm mt-1">{getFieldError(errors, 'robots')}</p>
+              )}
             </div>
           </div>
         )}
@@ -293,8 +322,8 @@ export default function CreateCategoryPage() {
         <div className="mt-6 flex gap-3">
           <button
             type="submit"
-            disabled={loading}
-            className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
+            disabled={loading || !isValid}
+            className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Creating...' : 'Create Category'}
           </button>

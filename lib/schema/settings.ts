@@ -38,7 +38,7 @@ export const epaper_settings = sqliteTable('epaper_settings', {
 export const area_map_watermark_settings = sqliteTable('area_map_watermark_settings', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   enable_watermarking: integer('enable_watermarking', { mode: 'boolean' }).default(false),
-  logo_url: text('logo_url'),
+  logo_url: text('logo_url'), // Single logo for all watermarking
   opacity: integer('opacity').default(100),
   mode: text('mode').default('in_outerside'),
   position: text('position').default('top_center'),
@@ -62,7 +62,7 @@ export const category_watermark_settings = sqliteTable('category_watermark_setti
   category_id: integer('category_id').notNull().unique(),
   override_global_settings: integer('override_global_settings', { mode: 'boolean' }).default(false),
   enable_watermarking: integer('enable_watermarking', { mode: 'boolean' }).default(false),
-  logo_url: text('logo_url'),
+  logo_url: text('logo_url'), // Single logo for all watermarking
   opacity: integer('opacity').default(100),
   mode: text('mode').default('in_outerside'),
   position: text('position').default('top_center'),

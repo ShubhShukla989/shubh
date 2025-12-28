@@ -84,7 +84,6 @@ function EpaperClipShareForm({ config, onChange }: { config: any; onChange: (con
           className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="stick-to-crop-area">Stick to Crop Area</option>
-          <option value="fixed-floating-bottom-right">Fixed Floating - Bottom Right</option>
         </select>
       </div>
 
@@ -131,43 +130,31 @@ function EpaperDisplayForm({ config, onChange }: { config: any; onChange: (confi
         />
       </div>
 
-      {/* Popup */}
+      {/* Widget Width */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Popup</label>
-        <select
-          value={config.popup || 'dialog'}
-          onChange={(e) => onChange({ ...config, popup: e.target.value })}
+        <label className="block text-sm font-medium text-gray-700 mb-1">Widget Width</label>
+        <input
+          type="text"
+          value={config.width || ''}
+          onChange={(e) => onChange({ ...config, width: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="popup">Popup</option>
-          <option value="dialog">Dialog</option>
-          <option value="new-tab">New Tab</option>
-        </select>
-      </div>
-
-      {/* Popup/Dialog Width */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Popup/Dialog Width</label>
-        <input
-          type="text"
-          value={config.popupWidth || '900'}
-          onChange={(e) => onChange({ ...config, popupWidth: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded"
-          placeholder="900"
+          placeholder="1000px or auto"
         />
       </div>
 
-      {/* Popup/Dialog Height */}
+      {/* Widget Height */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Popup/Dialog Height</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Widget Height</label>
         <input
           type="text"
-          value={config.popupHeight || '600'}
-          onChange={(e) => onChange({ ...config, popupHeight: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded"
-          placeholder="600"
+          value={config.height || ''}
+          onChange={(e) => onChange({ ...config, height: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="1200px or auto"
         />
       </div>
+
+
 
       {/* Display Navigation Buttons On */}
       <div>
@@ -1844,6 +1831,7 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
     { type: 'navigation', label: 'Navigation Bar Widget', icon: '🧭', color: 'bg-slate-600' },
     { type: 'embed', label: 'Embed Widget', icon: '🔗', color: 'bg-pink-500' },
     { type: 'heading', label: 'Heading Widget', icon: '📌', color: 'bg-red-500' },
+    { type: 'heading-widget', label: 'Custom Heading Widget', icon: '🎯', color: 'bg-red-600' },
     { type: 'html', label: 'HTML Widget', icon: '💻', color: 'bg-indigo-500' },
     { type: 'epaper-archive', label: 'Archive Widget', icon: '📚', color: 'bg-purple-800' },
     { type: 'epaper-calendar', label: 'Calendar Widget', icon: '📅', color: 'bg-green-700' },
@@ -1853,6 +1841,7 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
     { type: 'epaper-clip-share', label: 'Clip & Share Widget', icon: '✂️', color: 'bg-pink-700' },
     { type: 'epaper-clip-display', label: 'Epaper: Clip Page: Clip Display', icon: '📋', color: 'bg-purple-600' },
     { type: 'epaper-display', label: 'Epaper Display Widget', icon: '📰', color: 'bg-slate-800' },
+    { type: 'epaper-page-display', label: 'Epaper Page Display Widget', icon: '📄', color: 'bg-slate-700' },
     { type: 'epaper-zoom', label: 'Zoom Controls Widget', icon: '🔍', color: 'bg-indigo-700' },
     { type: 'social-sharing', label: 'Social Sharing Widget', icon: '🔗', color: 'bg-blue-600' },
     { type: 'epaper-featured', label: 'Featured Categories Widget', icon: '⭐', color: 'bg-cyan-700' },
@@ -1921,8 +1910,13 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
                         config: { ...editedWidget.config, title: e.target.value }
                       })}
                       className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Heading Text (Leave Blank for Current Page Title)"
+                      placeholder="Custom heading text (Leave blank for auto-context)"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Leave blank for automatic context-aware headings:
+                      <br />• Archive pages: Category name
+                      <br />• Epaper display: Edition title + page number
+                    </p>
                   </div>
 
                   <div>
@@ -1994,6 +1988,50 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
                       })}
                       className="w-full px-3 py-2 border border-gray-300 rounded"
                       placeholder="color: #333; margin-bottom: 20px;"
+                    />
+                  </div>
+                </div>
+              ) : editedWidget.type === 'heading-widget' ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Main Title</label>
+                    <input
+                      type="text"
+                      value={editedWidget.config.title || ''}
+                      onChange={(e) => setEditedWidget({
+                        ...editedWidget,
+                        config: { ...editedWidget.config, title: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter main title"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Subtitle (Red Underlined Text)</label>
+                    <input
+                      type="text"
+                      value={editedWidget.config.subtitle || ''}
+                      onChange={(e) => setEditedWidget({
+                        ...editedWidget,
+                        config: { ...editedWidget.config, subtitle: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter subtitle text"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">CSS Classes</label>
+                    <input
+                      type="text"
+                      value={editedWidget.config.cssClasses || ''}
+                      onChange={(e) => setEditedWidget({
+                        ...editedWidget,
+                        config: { ...editedWidget.config, cssClasses: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded"
+                      placeholder="Additional CSS classes"
                     />
                   </div>
                 </div>
@@ -2209,6 +2247,11 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
                   onChange={(config) => setEditedWidget({ ...editedWidget, config })}
                 />
               ) : editedWidget.type === 'epaper-display' ? (
+                <EpaperDisplayForm
+                  config={editedWidget.config}
+                  onChange={(config) => setEditedWidget({ ...editedWidget, config })}
+                />
+              ) : editedWidget.type === 'epaper-page-display' ? (
                 <EpaperDisplayForm
                   config={editedWidget.config}
                   onChange={(config) => setEditedWidget({ ...editedWidget, config })}

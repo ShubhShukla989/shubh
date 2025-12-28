@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { Upload, Download, Trash2, Edit, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import PDFThumbnail from '@/components/PDFThumbnail';
+import SimplePDFViewer from '@/components/SimplePDFViewer';
+import ProgressModal from '@/components/admin/ProgressModal';
 
 interface Page {
   id: number;
@@ -52,7 +54,18 @@ export default function EditionPagesPage() {
     useAlternateEngine: false,
     startPage: 1,
     endPage: 1,
-    extractAll: false
+    extractAll: false,
+    optimizationPreset: 'balanced'
+  });
+
+  // Progress modal state
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [progressData, setProgressData] = useState({
+    title: '',
+    fileName: '',
+    fileSize: '',
+    progress: 0,
+    status: '',
   });
 
   useEffect(() => {
@@ -76,27 +89,18 @@ export default function EditionPagesPage() {
 
   const fetchPages = async () => {
     try {
-      // Fetch pages for this edition
-      console.log('[fetchPages] Fetching pages for edition:', editionId);
       const response = await fetch(`/api/editions/${editionId}/pages`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
         },
       });
-      console.log('[fetchPages] Response status:', response.status);
       const result = await response.json();
-      console.log('[fetchPages] Pages API response:', result);
-      console.log('[fetchPages] Pages count:', result.data?.length);
-      console.log('[fetchPages] First page:', result.data?.[0]);
       if (result.success) {
-        console.log('[fetchPages] Setting pages:', result.data);
         setPages(result.data || []);
-      } else {
-        console.error('[fetchPages] API returned error:', result.error);
       }
     } catch (error) {
-      console.error('[fetchPages] Failed to fetch pages:', error);
+      // Handle error silently or show user-friendly message
     } finally {
       setLoading(false);
     }
@@ -137,22 +141,31 @@ export default function EditionPagesPage() {
         fetchPages();
       }
     } catch (error) {
-      console.error('Reorder error:', error);
       alert('Failed to reorder page');
       fetchPages(); // Revert on error
     }
   };
 
-  // Extract pages from PDF using Ghostscript
+  // Extract pages from PDF using GraphicsMagick
   const handleExtractPages = async () => {
     if (!pdfUrl) {
       alert('No PDF uploaded!');
       return;
     }
 
+    // Show progress modal
+    setProgressData({
+      title: 'Extracting & Optimizing Pages',
+      fileName: uploadedPDF?.name || 'PDF File',
+      fileSize: uploadedPDF ? `${(uploadedPDF.size / (1024 * 1024)).toFixed(2)} MB` : '',
+      progress: 0,
+      status: 'Preparing extraction...',
+    });
+    setShowProgressModal(true);
+    setShowExtractModal(false);
+
     try {
-      setLoading(true);
-      console.log('🚀 Starting PDF extraction...');
+      setProgressData(prev => ({ ...prev, progress: 10, status: 'Processing PDF...' }));
 
       const response = await fetch(`/api/editions/${editionId}/extract-pages`, {
         method: 'POST',
@@ -164,21 +177,136 @@ export default function EditionPagesPage() {
         }),
       });
 
+      setProgressData(prev => ({ ...prev, progress: 40, status: 'Extracting pages...' }));
+
       const result = await response.json();
       
       if (result.success) {
-        alert(`✅ Successfully extracted ${result.data.pageCount} pages using ${result.data.engine}!`);
-        setShowExtractModal(false);
-        fetchPages(); // Refresh the page list
+        setProgressData(prev => ({ ...prev, progress: 60, status: 'Optimizing images for smaller file size...' }));
+        
+        // Auto-optimize extracted pages
+        try {
+          const optimizeResponse = await fetch(`/api/editions/${editionId}/optimize-pages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preset: extractSettings.optimizationPreset }),
+          });
+
+          setProgressData(prev => ({ ...prev, progress: 90, status: 'Finalizing optimization...' }));
+
+          const optimizeResult = await optimizeResponse.json();
+          
+          if (optimizeResult.success) {
+            setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction & optimization complete!' }));
+            
+            setTimeout(() => {
+              setShowProgressModal(false);
+              alert(
+                `✅ Successfully extracted & optimized ${result.data.pageCount} pages!\n\n` +
+                `📄 Extracted: ${result.data.pageCount} pages using ${result.data.engine}\n` +
+                `🎯 Optimized: ${optimizeResult.data.optimizedPages} pages\n` +
+                `📊 File size reduced by ${optimizeResult.data.totalSavings}\n` +
+                `📁 Final size: ${optimizeResult.data.optimizedSize}\n\n` +
+                `⚙️ Settings: ${extractSettings.resolution} DPI, ${extractSettings.optimizationPreset} preset`
+              );
+              fetchPages(); // Refresh the page list
+            }, 500);
+          } else {
+            // Extraction succeeded but optimization failed
+            setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction complete, optimization skipped' }));
+            setTimeout(() => {
+              setShowProgressModal(false);
+              alert(`✅ Successfully extracted ${result.data.pageCount} pages!\n⚠️ Optimization failed: ${optimizeResult.error}`);
+              fetchPages();
+            }, 500);
+          }
+        } catch (optimizeError) {
+          // Extraction succeeded but optimization failed
+          setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction complete, optimization skipped' }));
+          setTimeout(() => {
+            setShowProgressModal(false);
+            alert(`✅ Successfully extracted ${result.data.pageCount} pages!\n⚠️ Optimization failed due to error`);
+            fetchPages();
+          }, 500);
+        }
       } else {
+        setShowProgressModal(false);
         alert('❌ Extraction failed: ' + result.error);
-        console.error('Extraction error:', result.details);
       }
     } catch (error) {
-      console.error('Extract error:', error);
+      setShowProgressModal(false);
       alert('Failed to extract pages from PDF');
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  // Optimize pages to reduce file size while maintaining quality
+  const handleOptimizePages = async () => {
+    if (pages.length === 0) {
+      alert('No pages to optimize!');
+      return;
+    }
+
+    const preset = prompt(
+      'Choose optimization preset:\n\n' +
+      '1. highQuality - Best quality, ~300-500KB per page\n' +
+      '2. balanced - Good quality, ~200-300KB per page (Recommended)\n' +
+      '3. compressed - Smaller size, ~100-200KB per page\n' +
+      '4. thumbnail - Smallest size, ~50-100KB per page\n\n' +
+      'Enter preset name:',
+      'balanced'
+    );
+
+    if (!preset || !['highQuality', 'balanced', 'compressed', 'thumbnail'].includes(preset)) {
+      alert('Invalid preset. Please choose: highQuality, balanced, compressed, or thumbnail');
+      return;
+    }
+
+    // Show progress modal
+    setProgressData({
+      title: 'Optimizing Pages',
+      fileName: `${pages.length} pages`,
+      fileSize: 'Reducing file sizes...',
+      progress: 0,
+      status: 'Starting optimization...',
+    });
+    setShowProgressModal(true);
+
+    try {
+      setProgressData(prev => ({ ...prev, progress: 20, status: 'Analyzing images...' }));
+
+      const response = await fetch(`/api/editions/${editionId}/optimize-pages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preset }),
+      });
+
+      setProgressData(prev => ({ ...prev, progress: 60, status: 'Optimizing images...' }));
+
+      const result = await response.json();
+      
+      setProgressData(prev => ({ ...prev, progress: 90, status: 'Finalizing...' }));
+      
+      if (result.success) {
+        setProgressData(prev => ({ ...prev, progress: 100, status: 'Optimization complete!' }));
+        
+        setTimeout(() => {
+          setShowProgressModal(false);
+          alert(
+            `✅ Successfully optimized ${result.data.optimizedPages} pages!\n\n` +
+            `📊 File size reduced by ${result.data.totalSavings}\n` +
+            `📁 Original: ${result.data.originalSize}\n` +
+            `📁 Optimized: ${result.data.optimizedSize}\n\n` +
+            `🎯 Preset used: ${result.data.preset}`
+          );
+          fetchPages(); // Refresh the page list
+        }, 500);
+      } else {
+        setShowProgressModal(false);
+        alert('❌ Optimization failed: ' + result.error);
+      }
+    } catch (error) {
+      setShowProgressModal(false);
+      alert('Failed to optimize pages');
     }
   };
 
@@ -240,12 +368,29 @@ export default function EditionPagesPage() {
                     return;
                   }
 
+                  // Show progress modal
+                  setProgressData({
+                    title: 'Uploading Images',
+                    fileName: `${files.length} files selected`,
+                    fileSize: `${(files.reduce((total, file) => total + file.size, 0) / (1024 * 1024)).toFixed(2)} MB total`,
+                    progress: 0,
+                    status: 'Preparing upload...',
+                  });
+                  setShowProgressModal(true);
+
                   try {
-                    setLoading(true);
                     let uploadedCount = 0;
 
                     for (let i = 0; i < files.length; i++) {
                       const file = files[i];
+                      
+                      // Update progress
+                      const progress = (i / files.length) * 100;
+                      setProgressData(prev => ({ 
+                        ...prev, 
+                        progress, 
+                        status: `Uploading ${file.name} (${i + 1}/${files.length})...` 
+                      }));
                       
                       // Create FormData for image upload
                       const formData = new FormData();
@@ -269,18 +414,25 @@ export default function EditionPagesPage() {
                       }
                     }
 
-                    if (uploadedCount > 0) {
-                      alert(`Successfully uploaded ${uploadedCount} out of ${files.length} images`);
-                      fetchPages(); // Refresh the page list
-                    } else {
-                      alert('Failed to upload any images');
-                    }
+                    // Complete progress
+                    setProgressData(prev => ({ 
+                      ...prev, 
+                      progress: 100, 
+                      status: `Upload complete! ${uploadedCount}/${files.length} files uploaded successfully.` 
+                    }));
+
+                    setTimeout(() => {
+                      setShowProgressModal(false);
+                      alert(`Successfully uploaded ${uploadedCount} out of ${files.length} images!`);
+                      fetchPages();
+                      e.target.value = '';
+                    }, 1000);
+
                   } catch (error) {
                     console.error('Upload error:', error);
+                    setShowProgressModal(false);
                     alert('Failed to upload images');
-                  } finally {
-                    setLoading(false);
-                    e.target.value = ''; // Reset file input
+                    e.target.value = '';
                   }
                 }}
               />
@@ -294,24 +446,46 @@ export default function EditionPagesPage() {
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    setLoading(true);
+                    // Show progress modal
+                    setProgressData({
+                      title: 'Uploading PDF',
+                      fileName: file.name,
+                      fileSize: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+                      progress: 0,
+                      status: 'Preparing upload...',
+                    });
+                    setShowProgressModal(true);
+                    
                     try {
+                      // Simulate progress updates
+                      setProgressData(prev => ({ ...prev, progress: 20, status: 'Uploading file...' }));
+                      
                       // Direct upload to local storage
                       const { uploadPDFToLocal } = await import('@/lib/upload-helpers');
+                      
+                      setProgressData(prev => ({ ...prev, progress: 60, status: 'Processing PDF...' }));
+                      
                       const result = await uploadPDFToLocal(file, editionId);
                       
+                      setProgressData(prev => ({ ...prev, progress: 90, status: 'Finalizing...' }));
+                      
                       if (result.success) {
-                        setUploadedPDF(file);
-                        setPdfUrl(result.url!);
-                        alert('PDF uploaded successfully!');
+                        setProgressData(prev => ({ ...prev, progress: 100, status: 'Upload complete!' }));
+                        
+                        setTimeout(() => {
+                          setUploadedPDF(file);
+                          setPdfUrl(result.url!);
+                          setShowProgressModal(false);
+                          alert('PDF uploaded successfully!');
+                        }, 500);
                       } else {
+                        setShowProgressModal(false);
                         alert('Error: ' + result.error);
                       }
                     } catch (error) {
                       console.error('Upload error:', error);
+                      setShowProgressModal(false);
                       alert('Failed to upload PDF');
-                    } finally {
-                      setLoading(false);
                     }
                   }
                 }}
@@ -378,7 +552,7 @@ export default function EditionPagesPage() {
               disabled={!pdfUrl}
               className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              📄 Extract Pages
+              📄 Extract & Optimize Pages
             </button>
           </div>
 
@@ -651,7 +825,7 @@ export default function EditionPagesPage() {
           <div className="bg-white rounded-lg w-full max-w-6xl max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-500">Extract Pages from PDF</h3>
+              <h3 className="text-xl font-bold text-gray-500">Extract & Optimize Pages from PDF</h3>
               <button
                 onClick={() => setShowExtractModal(false)}
                 className="text-gray-400 hover:text-gray-600 text-2xl w-10 h-10 flex items-center justify-center border border-gray-300 rounded"
@@ -684,18 +858,18 @@ export default function EditionPagesPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-500 mb-2">
-                        Image Quality
+                        Optimization Preset
                       </label>
-                      <input
-                        type="number"
-                        value={extractSettings.jpgQuality}
-                        onChange={(e) => setExtractSettings({ ...extractSettings, jpgQuality: Number(e.target.value) })}
+                      <select
+                        value={extractSettings.optimizationPreset || 'balanced'}
+                        onChange={(e) => setExtractSettings({ ...extractSettings, optimizationPreset: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                        min="1"
-                        max="100"
-                        disabled
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Currently saves as PNG (lossless)</p>
+                      >
+                        <option value="highQuality">Ultra High Quality (400-600KB) 🏆</option>
+                        <option value="balanced">High Quality Balanced (300-400KB) ⭐</option>
+                        <option value="compressed">Good Quality Compressed (200-300KB)</option>
+                        <option value="thumbnail">Standard Quality (100-200KB)</option>
+                      </select>
                     </div>
                   </div>
 
@@ -767,13 +941,13 @@ export default function EditionPagesPage() {
                     <span className="text-sm font-semibold text-gray-500">Extract All Pages (Maximum 30 Pages)</span>
                   </label>
 
-                  {/* Extract Button */}
+                  {/* Extract & Optimize Button */}
                   <button
                     onClick={handleExtractPages}
                     disabled={!pdfUrl || loading}
                     className="w-full px-4 py-3 bg-green-600 text-white rounded hover:bg-green-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading ? '🔄 Extracting...' : '📄 Extract Pages with Ghostscript'}
+                    {loading ? '🔄 Processing...' : '📄 Extract & Optimize Pages'}
                   </button>
                 </div>
 
@@ -860,33 +1034,29 @@ export default function EditionPagesPage() {
                     style={{ cursor: pdfUrl ? 'grab' : 'default' }}
                   >
                     {pdfUrl ? (
-                      <div className="flex flex-col items-center p-4">
-                        <div 
-                          style={{ 
-                            width: `${pdfZoom}%`,
-                            transition: 'width 0.2s ease-in-out'
-                          }}
-                          className="bg-white shadow-lg"
-                        >
-                          <iframe
-                            src={`${pdfUrl}#page=${extractSettings.currentPage}`}
-                            className="w-full h-[550px] border-0"
-                            title="PDF Preview"
-                          />
-                        </div>
-                        <p className="text-sm text-gray-600 mt-4 text-center">
-                          Page {extractSettings.currentPage} Preview
-                          <span className="text-xs text-gray-500 block mt-1">
-                            Two-finger scroll/pinch to zoom
-                          </span>
-                        </p>
-                      </div>
+                      <SimplePDFViewer 
+                        pdfUrl={pdfUrl}
+                        pageNumber={extractSettings.currentPage}
+                        className="w-full h-[550px]"
+                      />
                     ) : (
-                      <div className="text-center text-gray-500 flex items-center justify-center h-full">
-                        <div>
+                      <div className="w-full h-[550px] flex items-center justify-center bg-gray-50 border border-gray-200 rounded">
+                        <div className="text-center">
                           <p className="text-4xl mb-2">📄</p>
-                          <p>Upload a PDF to see preview</p>
+                          <p className="text-gray-600">Upload a PDF to see preview</p>
                         </div>
+                      </div>
+                    )}
+                    
+                    {/* Preview info */}
+                    {pdfUrl && (
+                      <div className="p-4 text-center border-t border-gray-200 bg-white">
+                        <p className="text-sm text-gray-600">
+                          Page {extractSettings.currentPage} Preview • Zoom: {pdfZoom}%
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Use zoom controls above or scroll with Ctrl+wheel
+                        </p>
                       </div>
                     )}
                   </div>
@@ -1035,6 +1205,18 @@ export default function EditionPagesPage() {
           </div>
         </div>
       )}
+
+      {/* Progress Modal */}
+      <ProgressModal
+        isOpen={showProgressModal}
+        title={progressData.title}
+        fileName={progressData.fileName}
+        fileSize={progressData.fileSize}
+        progress={progressData.progress}
+        status={progressData.status}
+        onCancel={() => setShowProgressModal(false)}
+        showCancel={progressData.progress < 100}
+      />
     </div>
   );
 }

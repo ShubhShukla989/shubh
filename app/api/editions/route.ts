@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { editions, edition_pages, users } from '@/lib/schema';
 import { eq, desc, asc, and } from 'drizzle-orm';
+import { withCache, invalidateCacheByTags } from '@/lib/cache';
 
-export async function GET(request: NextRequest) {
+// Cache configuration for editions - EXTREME performance for 1000+ users
+const CACHE_CONFIG = {
+  ttl: 1800, // 30 minutes for user-facing API
+  tags: ['editions'],
+};
+
+async function getEditionsHandler(request: NextRequest) {
   try {
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
@@ -107,6 +114,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Apply caching middleware to GET requests
+export const GET = withCache(getEditionsHandler, CACHE_CONFIG);
+
 export async function POST(request: NextRequest) {
   try {
     const raw = await request.json();
@@ -147,6 +157,9 @@ export async function POST(request: NextRequest) {
         seo_meta_description,
       })
       .returning();
+
+    // Invalidate editions cache
+    invalidateCacheByTags(['editions']);
 
     return NextResponse.json({ success: true, data: newEdition }, { status: 201 });
   } catch (error: any) {

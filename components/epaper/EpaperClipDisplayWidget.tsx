@@ -1,6 +1,5 @@
 'use client';
 
-import { useClip } from '@/contexts/ClipContext';
 import { useState, useEffect, useRef } from 'react';
 import { Download } from 'lucide-react';
 
@@ -14,15 +13,45 @@ interface EpaperClipDisplayWidgetProps {
   };
 }
 
+// Safe hook for ClipContext
+function useClipSafe() {
+  try {
+    // Dynamic import to avoid build errors if ClipContext is not available
+    const { useClip } = require('@/contexts/ClipContext');
+    return useClip();
+  } catch {
+    return null;
+  }
+}
+
 export function EpaperClipDisplayWidget({ config }: EpaperClipDisplayWidgetProps) {
-  const { clipImage, clipUrl, editionId, setCombinedImage: setContextCombinedImage } = useClip();
+  const clipContext = useClipSafe();
+  
+  // If no clip context, show placeholder
+  if (!clipContext) {
+    return (
+      <div className={config.cssClasses || ''} style={parseInlineStyle(config.style)}>
+        {config.title && (
+          <h4 className="text-lg font-semibold mb-3">{config.title}</h4>
+        )}
+        <div className="p-6 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg text-center">
+          <div className="text-4xl mb-2">✂️</div>
+          <div className="text-blue-600 font-medium">Clip Display Widget</div>
+          <div className="text-blue-500 text-sm mt-1">
+            Clipped content will appear here when available
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const { clipImage, clipUrl, editionId, setCombinedImage: setContextCombinedImage } = clipContext;
   const [categoryLogoUrl, setCategoryLogoUrl] = useState<string | null>(null);
   const [watermarkSettings, setWatermarkSettings] = useState<any>(null);
   const [editionData, setEditionData] = useState<any>(null);
   const [combinedImage, setCombinedImage] = useState<string | null>(null);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const combinedImageRef = useRef<HTMLImageElement>(null);
 
   const showImage = config.showImage !== false;
   const showUrl = config.showUrl !== false;
@@ -306,7 +335,7 @@ export function EpaperClipDisplayWidget({ config }: EpaperClipDisplayWidgetProps
           <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-2 border-red-500 rounded-lg">
             <input
               type="text"
-              value={clipUrl}
+              value={clipUrl || ''}
               readOnly
               className="flex-1 bg-transparent text-sm text-gray-700 outline-none"
               onClick={(e) => e.currentTarget.select()}

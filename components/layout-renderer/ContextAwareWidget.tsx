@@ -1,7 +1,8 @@
 'use client';
 
-import { useEpaperSafe } from '@/contexts/EpaperContext';
+// Removed EpaperContext import - working independently now
 import { useColumnVisibility } from './ColumnVisibilityHelper';
+import { useEffect, useState } from 'react';
 import { EpaperArchiveWidget } from '../epaper/EpaperArchiveWidget';
 import { EpaperCalendarWidget } from '../epaper/EpaperCalendarWidget';
 import { EpaperPaginationWidget } from '../epaper/EpaperPaginationWidget';
@@ -19,6 +20,7 @@ import { SocialWidget } from '../SocialWidget';
 import { PageDownloadWidget } from '../page/PageDownloadWidget';
 import { NavigationWidget } from '../navigation/NavigationWidget';
 import { MenuWidget } from '../MenuWidget';
+import HeadingWidget from '../HeadingWidget';
 
 interface ContextAwareWidgetProps {
   widget: {
@@ -61,7 +63,7 @@ function WidgetRenderer({
   editionId, 
   pageNumber 
 }: ContextAwareWidgetProps) {
-  // List of widgets that require EpaperContext
+  // List of widgets that require editionId from URL
   const epaperContextWidgets = [
     'epaper-display',
     'epaper-page-display',
@@ -75,15 +77,16 @@ function WidgetRenderer({
     'epaper-area-map-display'
   ];
 
-  // Check if widget needs EpaperContext
-  const needsEpaperContext = epaperContextWidgets.includes(widget.type);
+  // Check if widget needs editionId
+  const needsEditionId = epaperContextWidgets.includes(widget.type);
 
-  if (needsEpaperContext) {
-    // Try to use EpaperContext safely
-    const epaperContext = useEpaperSafe();
+  if (needsEditionId) {
+    // Get editionId from URL
+    const currentEditionId = editionId || (typeof window !== 'undefined' ? 
+      window.location.pathname.split('/').pop() : '');
     
-    // If context is missing or incomplete, show preview placeholder
-    if (!epaperContext || !epaperContext.editionId) {
+    // If editionId is missing, show preview placeholder
+    if (!currentEditionId) {
       return (
         <div className="p-2 bg-blue-50 border border-blue-200 rounded text-center">
           <div className="text-blue-600 text-xs font-medium">
@@ -143,18 +146,11 @@ function renderWidget(widget: any, areaMapId?: string, editionId?: string, pageN
       );
 
     case 'heading':
-      const HeadingTag = (widget.config.renderTag || 'h1') as keyof JSX.IntrinsicElements;
-      const headingText = widget.config.title || widget.config.text || 'Heading';
-      const formatClass = widget.config.format || 'h4';
-      
-      return (
-        <HeadingTag 
-          className={`${formatClass} ${widget.config.cssClasses || ''}`}
-          style={parseInlineStyle(widget.config.style)}
-        >
-          {headingText}
-        </HeadingTag>
-      );
+      return <HeadingWidgetRenderer 
+        widget={widget} 
+        editionId={editionId} 
+        pageNumber={pageNumber} 
+      />;
 
     case 'button':
       return (
@@ -227,6 +223,12 @@ function renderWidget(widget: any, areaMapId?: string, editionId?: string, pageN
     case 'navigation':
       return <NavigationWidget config={widget.config} />;
 
+    case 'heading-widget':
+      return <HeadingWidget 
+        config={widget.config}
+        className={widget.config.cssClasses || ''}
+      />;
+
     default:
       return (
         <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
@@ -252,4 +254,203 @@ function parseInlineStyle(styleString?: string): React.CSSProperties {
   } catch {
     return {};
   }
+}
+
+// Helper function to get edition title
+async function fetchEditionTitle(editionId: string): Promise<string | null> {
+  try {
+    const response = await fetch(`/api/editions/${editionId}/title`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.success ? data.title : null;
+    }
+  } catch (error) {
+    console.error('Error fetching edition title:', error);
+  }
+  return null;
+}
+
+function getEditionTitle(editionId: string): string | null {
+  // Try to get from page title or URL
+  const urlPath = window.location.pathname;
+  
+  // Check if we're on an epaper view page OR category page with edition
+  if (urlPath.includes('/epaper/view/') || urlPath.includes('/epaper/category/')) {
+    // Try to extract from document title
+    const title = document.title;
+    if (title && title !== 'Epaper CMS') {
+      // Remove common suffixes
+      return title.replace(/ - Epaper CMS$/, '').replace(/ - Page \d+.*$/, '').replace(/ Archive$/, '');
+    }
+  }
+  
+  // Fallback: return null so we can fetch from API
+  return null;
+}
+
+// Helper function to get category name from URL
+function getCategoryFromURL(): string | null {
+  const urlPath = window.location.pathname;
+  
+  // Check if we're on a category archive page
+  if (urlPath.includes('/epaper/category/')) {
+    // Try to extract from document title
+    const title = document.title;
+    if (title && title !== 'Epaper CMS') {
+      // Remove common suffixes
+      return title.replace(/ - Epaper CMS$/, '').replace(/ Archive$/, '');
+    }
+    
+    // Fallback: extract from URL
+    const categoryAlias = urlPath.split('/epaper/category/')[1]?.split('/')[0];
+    if (categoryAlias) {
+      // Convert alias to readable name (capitalize and replace hyphens)
+      return categoryAlias.split('-').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+    }
+  }
+  
+  return null;
+}
+
+// Separate component for heading widget with state management
+function HeadingWidgetRenderer({ 
+  widget, 
+  editionId, 
+  pageNumber 
+}: { 
+  widget: any; 
+  editionId?: string; 
+  pageNumber?: string; 
+}) {
+  const [editionTitle, setEditionTitle] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Get context-aware heading text
+  const getContextAwareHeading = () => {
+    // If custom title is provided, use it
+    if (widget.config.title && widget.config.title.trim()) {
+      return widget.config.title;
+    }
+    
+    // Only access browser APIs on client side
+    if (typeof window === 'undefined') {
+      return widget.config.text || 'Archive';
+    }
+    
+    const urlPath = window.location.pathname;
+    
+    // Check if we're on an epaper display page (has editionId in URL)
+    const currentEditionId = editionId || window.location.pathname.split('/').pop();
+    const isEpaperDisplayPage = urlPath.includes('/epaper/view/') || 
+                               (urlPath.includes('/epaper/category/') && currentEditionId && !isNaN(Number(currentEditionId)));
+    
+    if (isEpaperDisplayPage) {
+      // For epaper display: show "Edition Title - Date - Page X"
+      const urlParams = new URLSearchParams(window.location.search);
+      const currentPage = parseInt(urlParams.get('page') || '1');
+      
+      const title = editionTitle || getEditionTitle(currentEditionId || '') || 'Edition';
+      
+      // Format date like "28 Dec 2025"
+      const today = new Date().toLocaleDateString('en-GB', { 
+        day: '2-digit', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+      
+      return `${title} - ${today} - Page ${currentPage}`;
+    }
+    
+    // Check if we're on a category archive page (no edition ID)
+    const categoryName = getCategoryFromURL();
+    if (categoryName) {
+      return categoryName;
+    }
+    
+    // Fallback to page title or default
+    return document.title || widget.config.text || 'Archive';
+  };
+
+  // Fetch edition title when component mounts
+  useEffect(() => {
+    const fetchTitle = async () => {
+      if (typeof window === 'undefined') return;
+      
+      const urlPath = window.location.pathname;
+      const currentEditionId = editionId || window.location.pathname.split('/').pop();
+      const isEpaperDisplayPage = urlPath.includes('/epaper/view/') || 
+                                 (urlPath.includes('/epaper/category/') && currentEditionId && !isNaN(Number(currentEditionId)));
+      
+      if (isEpaperDisplayPage && currentEditionId && !isNaN(Number(currentEditionId))) {
+        // First try to get from document title
+        const titleFromDoc = getEditionTitle(currentEditionId);
+        if (titleFromDoc) {
+          setEditionTitle(titleFromDoc);
+          return;
+        }
+        
+        // If not found, fetch from API
+        setLoading(true);
+        try {
+          const response = await fetch(`/api/editions/${currentEditionId}/title`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              setEditionTitle(data.title);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching edition title:', error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchTitle();
+  }, [editionId]);
+  
+  // Check if we should show underlined part
+  const shouldShowUnderline = () => {
+    // Always show solid red line, no text
+    return false; // Never show text, always just solid line
+  };
+  
+  const headingText = getContextAwareHeading();
+  const showUnderline = shouldShowUnderline();
+  
+  // Apply HeadingWidget styling to regular heading widget
+  return (
+    <div className={`mb-4 md:mb-6 ${widget.config.cssClasses || ''}`} style={parseInlineStyle(widget.config.style)}>
+      {/* Main heading - bold - responsive font size */}
+      <h2 style={{ 
+        fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', // Responsive font size
+        fontWeight: 'bold', 
+        color: '#111827', 
+        marginBottom: '0.5rem',
+        lineHeight: '1.2',
+        wordBreak: 'break-word', // Handle long titles on mobile
+        hyphens: 'auto'
+      }}>
+        {loading ? 'Loading...' : headingText}
+      </h2>
+      
+      {/* Red solid underline - always full width, responsive height */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center',
+        width: '100%'
+      }}>
+        <div style={{
+          flex: '1',
+          height: 'clamp(1px, 0.5vw, 2px)', // Responsive line height
+          backgroundColor: '#dc2626',
+          width: '100%',
+          minHeight: '1px' // Ensure visibility on very small screens
+        }}></div>
+      </div>
+    </div>
+  );
 }

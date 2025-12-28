@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCategory } from '@/contexts/CategoryContext';
-import { useEpaper } from '@/contexts/EpaperContext';
+// Removed EpaperContext import - working independently now
 
 
 interface EpaperCalendarWidgetProps {
@@ -25,17 +25,9 @@ interface Edition {
 }
 
 export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
-  // Try to get categoryId from CategoryContext first, then from EpaperContext
+  // Get categoryId from CategoryContext only
   const categoryContext = useCategory();
-  const epaperContext = (() => {
-    try {
-      return useEpaper();
-    } catch {
-      return null;
-    }
-  })();
-  
-  const categoryId = categoryContext?.categoryId || epaperContext?.categoryId || null;
+  const categoryId = categoryContext?.categoryId || null;
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [editions, setEditions] = useState<Edition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +36,7 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
 
   const getCleanButtonText = () => {
     if (!config.buttonLabel) {
-      return showCalendar ? 'Hide Calendar' : 'Calendar';
+      return showCalendar ? 'Hide Archive' : 'Archive';
     }
     
     // If buttonLabel contains HTML, extract just the text part
@@ -52,12 +44,12 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
     tempDiv.innerHTML = config.buttonLabel;
     const textContent = tempDiv.textContent || tempDiv.innerText || '';
     
-    // If it's just "calendar" or similar, use our default
-    if (textContent.toLowerCase().trim() === 'calendar') {
-      return showCalendar ? 'Hide Calendar' : 'Calendar';
+    // If it's just "archive" or "calendar" or similar, use our default
+    if (textContent.toLowerCase().trim() === 'archive' || textContent.toLowerCase().trim() === 'calendar') {
+      return showCalendar ? 'Hide Archive' : 'Archive';
     }
     
-    return textContent.trim() || (showCalendar ? 'Hide Calendar' : 'Calendar');
+    return textContent.trim() || (showCalendar ? 'Hide Archive' : 'Archive');
   };
 
   useEffect(() => {
@@ -68,23 +60,17 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
     try {
       let url = '/api/editions?status=published';
       
-      console.log('🔄 Fetching editions - categoryId:', categoryId, 'considerCurrentCategory:', config.considerCurrentCategory);
-      
       // Smart default: if categoryId exists and considerCurrentCategory is not explicitly 'no', filter by category
       // This means: undefined or 'yes' = filter by category, only 'no' = show all
       const shouldFilterByCategory = categoryId && config.considerCurrentCategory !== 'no';
       
       if (shouldFilterByCategory) {
         url += `&category_id=${categoryId}`;
-        console.log('✅ Filtering by category:', categoryId);
-      } else {
-        console.log('❌ Showing all categories');
       }
       
       const response = await fetch(url);
       const data = await response.json();
       if (data.success) {
-        console.log('📦 Fetched editions count:', data.data?.length);
         setEditions(data.data || []);
       }
     } catch (error) {
@@ -103,21 +89,13 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     
-    console.log('Selected date:', dateStr);
-    
     // Find editions for this date
     const dateEditions = editions.filter(e => {
       const editionDate = (e.date || e.publication_date).split('T')[0];
       return editionDate === dateStr;
     });
     
-    console.log('Found editions:', dateEditions.length, dateEditions);
-    console.log('Current categoryId:', categoryId);
-    console.log('Consider current category config:', config.considerCurrentCategory);
-    console.log('Full config:', config);
-    
     if (dateEditions.length === 0) {
-      console.log('No editions found for date:', dateStr);
       return;
     }
     
@@ -127,29 +105,20 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
     // Smart default: if categoryId exists and considerCurrentCategory is not explicitly 'no', filter by category
     const shouldFilterByCategory = categoryId && config.considerCurrentCategory !== 'no';
     
-    console.log('🔍 Date selected:', dateStr);
-    console.log('🔍 Should filter by category?', shouldFilterByCategory);
-    console.log('🔍 Current categoryId:', categoryId);
-    console.log('🔍 Available editions for date:', dateEditions.map(e => ({ id: e.id, category_id: e.category_id })));
-    
     if (shouldFilterByCategory) {
       // Find edition matching current category
       edition = dateEditions.find(e => e.category_id === categoryId);
       
       if (!edition) {
-        console.log('❌ No edition found for current category:', categoryId);
         alert(`No edition available for this date in the current category.`);
         return;
       }
-      console.log('✅ Using category-filtered edition:', edition.id);
     } else {
       // Take first available edition (any category)
       edition = dateEditions[0];
-      console.log('✅ Using first available edition:', edition.id, 'category:', edition.category_id);
     }
     
     if (edition) {
-      console.log('Navigating to edition:', edition.id, 'category:', edition.category_id);
       router.push(`/epaper/view/${edition.id}`);
     }
   };
@@ -162,9 +131,6 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
     
     if (shouldFilterByCategory) {
       filteredEditions = editions.filter(e => e.category_id === categoryId);
-      console.log('📅 Showing dates for category:', categoryId, 'count:', filteredEditions.length);
-    } else {
-      console.log('📅 Showing dates for all categories, count:', filteredEditions.length);
     }
     
     return filteredEditions.map(e => {
@@ -268,8 +234,8 @@ export function EpaperCalendarWidget({ config }: EpaperCalendarWidgetProps) {
           
           {/* Calendar Dropdown */}
           {showCalendar && (
-            <div className="absolute top-full right-0 mt-2 z-50">
-              <div className="bg-white rounded-lg shadow-2xl border border-gray-200 p-2 w-72">
+            <div className="absolute top-full left-0 mt-2 z-50">
+              <div className="bg-white rounded-lg shadow-2xl border border-gray-200 p-2" style={{ width: 'max-content', minWidth: '280px' }}>
                 {/* Month/Year Selection with Navigation */}
                 <div className="flex items-center justify-center gap-1 mb-2">
                   {/* Previous Month Button */}

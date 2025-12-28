@@ -67,22 +67,22 @@ body {
   @apply bg-gray-50 text-gray-900;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - Dark and 2x size */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 16px; /* 2x size from 8px to 16px */
+  height: 16px; /* 2x size from 8px to 16px */
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100;
+  @apply bg-gray-200; /* Slightly darker track */
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded;
+  @apply bg-gray-700 rounded; /* Much darker thumb */
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
+  @apply bg-gray-900; /* Even darker on hover */
 }
 
 

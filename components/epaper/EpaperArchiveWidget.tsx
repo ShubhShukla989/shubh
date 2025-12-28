@@ -38,15 +38,24 @@ export function EpaperArchiveWidget({ config }: EpaperArchiveWidgetProps) {
   const [editions, setEditions] = useState<Edition[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  // Client-side mounting
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
     };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+    
+    if (isClient) {
+      checkMobile();
+      window.addEventListener('resize', checkMobile);
+      return () => window.removeEventListener('resize', checkMobile);
+    }
+  }, [isClient]);
 
   useEffect(() => {
     fetchEditions();
@@ -85,24 +94,37 @@ export function EpaperArchiveWidget({ config }: EpaperArchiveWidgetProps) {
   }
 
   const perRow = config.perRowCount || 3;
-  const thumbWidth = config.thumbnailWidth || 300;
-  const thumbHeight = config.thumbnailHeight || 400;
+  
+  // Simple, reliable sizing
+  const getCardDimensions = () => {
+    if (isMobile) {
+      return {
+        width: 350,
+        height: 500
+      };
+    } else {
+      return {
+        width: config.thumbnailWidth || 280,
+        height: config.thumbnailHeight || 380
+      };
+    }
+  };
+  
+  const { width: cardWidth, height: cardHeight } = getCardDimensions();
   const format = config.format || 'thumb-image-as-background';
 
   return (
-    <div className={`epaper-archive-widget ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
-      {/* Header with Category Title and Underline */}
-      <div className="mb-8 px-4 md:px-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-          {categoryTitle || config.title || 'Archive'}
-        </h1>
-        <div className="w-32 h-1 bg-gradient-to-r from-red-600 to-orange-500"></div>
-      </div>
-      
+    <div className={`epaper-archive-widget ${config.cssClasses || ''}`} style={{...parseInlineStyle(config.style), width: '100%', maxWidth: '100%'}}>
       <div 
-        className="grid gap-4 md:gap-6 px-4 md:px-8"
+        className="archive-cards-container"
         style={{
-          gridTemplateColumns: isMobile ? '1fr' : `repeat(${perRow}, 1fr)`,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px',
+          padding: '8px',
+          width: '100%',
+          boxSizing: 'border-box'
         }}
       >
         {editions.map((edition) => {
@@ -114,22 +136,107 @@ export function EpaperArchiveWidget({ config }: EpaperArchiveWidgetProps) {
             <Link
               key={edition.id}
               href={`/epaper/view/${edition.id}`}
-              className="block group"
+              className="archive-card-link"
               title={`View ${edition.title}`}
+              style={{
+                display: 'block',
+                textDecoration: 'none',
+                width: `${cardWidth}px`,
+                height: `${cardHeight}px`,
+                flexShrink: 0
+              }}
             >
-              <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 hover:border-red-500">
-                <div className="relative overflow-hidden" style={{ paddingBottom: '133%' }}>
+              <div 
+                className="archive-card"
+                style={{
+                  width: `${cardWidth}px !important`,
+                  height: `${cardHeight}px !important`,
+                  backgroundColor: 'white',
+                  border: '4px solid #1f2937',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
+                  e.currentTarget.style.borderColor = '#2563eb';
+                  e.currentTarget.style.boxShadow = '0 20px 40px rgba(0,0,0,0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.borderColor = '#1f2937';
+                  e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.1)';
+                }}
+              >
+                <div 
+                  className="card-image"
+                  style={{ 
+                    width: '100%',
+                    height: `${cardHeight * 0.8}px`,
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}
+                >
                   <img
                     src={thumbnailUrl}
                     alt={edition.title}
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transition: 'transform 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
                   />
                 </div>
-                <div className="p-3 md:p-4 text-center bg-white border-t-2 border-gray-200">
-                  <h3 className="font-bold text-gray-900 text-xs md:text-base mb-1 group-hover:text-red-600 transition-colors leading-tight">
+                <div 
+                  className="card-content"
+                  style={{
+                    height: `${cardHeight * 0.2}px`,
+                    padding: '8px 12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    borderTop: '4px solid #1f2937',
+                    backgroundColor: 'white'
+                  }}
+                >
+                  <h3 
+                    style={{ 
+                      fontSize: `${Math.max(10, cardWidth / 25)}px`,
+                      fontWeight: 'bold',
+                      color: '#1f2937',
+                      margin: '0 0 4px 0',
+                      lineHeight: '1.2',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      width: '100%',
+                      transition: 'color 0.3s ease'
+                    }}
+                  >
                     {edition.title}
                   </h3>
-                  <p className="text-xs md:text-sm text-gray-600 font-medium">
+                  <p 
+                    style={{ 
+                      fontSize: `${Math.max(8, cardWidth / 35)}px`,
+                      color: '#6b7280',
+                      margin: '0',
+                      fontWeight: '500'
+                    }}
+                  >
                     {new Date(edition.date).toLocaleDateString('en-IN', { 
                       day: 'numeric',
                       month: 'short',

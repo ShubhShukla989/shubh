@@ -46,7 +46,6 @@ export function WidgetComponent({ widget, onEdit, onDelete, onDuplicate, onDragS
       case 'epaper-display': return 'EpaperDisplayWidget';
       case 'epaper-area-map': return 'AreaMapDisplayWidget';
       case 'page-download': return 'PageDownloadWidget';
-      case 'pwa-install': return 'PWAInstallWidget';
       case 'youtube': return 'YouTubeWidget';
       case 'rss': return 'RSSWidget';
       default: return 'Widget';
@@ -87,7 +86,6 @@ export function WidgetComponent({ widget, onEdit, onDelete, onDuplicate, onDragS
       case 'epaper-display': return 'bg-slate-800';
       case 'epaper-area-map': return 'bg-amber-700';
       case 'page-download': return 'bg-red-600';
-      case 'pwa-install': return 'bg-indigo-600';
       case 'youtube': return 'bg-red-700';
       case 'rss': return 'bg-orange-700';
       default: return 'bg-gray-500';

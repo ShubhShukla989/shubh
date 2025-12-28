@@ -12,10 +12,12 @@ export function GlobalHeaderFooter({ children }: { children: React.ReactNode }) 
 
   // Check if current page should have header/footer
   const shouldShowHeaderFooter = () => {
-    // Don't show on admin pages
+    // Don't show on admin pages (including all admin subpaths)
     if (pathname?.startsWith('/admin')) return false;
     // Don't show on login page
     if (pathname?.startsWith('/login')) return false;
+    // Don't show on any admin-related paths
+    if (pathname?.includes('/admin/')) return false;
     // Show on all other pages (including epaper category and archive pages)
     return true;
   };

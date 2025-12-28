@@ -3,6 +3,8 @@ import { site_settings, editions, epaper_categories, layouts } from '@/lib/schem
 import { eq, desc, asc, and } from 'drizzle-orm';
 import { LayoutRenderer } from '@/components/layout-renderer/LayoutRenderer';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
+import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 
 async function getHomepageSettings() {
   try {
@@ -228,7 +230,19 @@ export default async function HomePage() {
   // Default: render website homepage with layout
   return (
     <div className="homepage w-full">
-      <LayoutRenderer layoutName={settings.layout} />
+      <Suspense fallback={
+        <div className="space-y-4 p-4">
+          <SkeletonLoader variant="text" width="60%" height="32px" />
+          <SkeletonLoader variant="image" height="300px" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <SkeletonLoader variant="card" height="200px" />
+            <SkeletonLoader variant="card" height="200px" />
+            <SkeletonLoader variant="card" height="200px" />
+          </div>
+        </div>
+      }>
+        <LayoutRenderer layoutName={settings.layout} />
+      </Suspense>
     </div>
   );
 }

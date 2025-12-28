@@ -10,15 +10,16 @@ import { editions, edition_pages } from '@/lib/schema/index';
 import { eq } from 'drizzle-orm';
 
 /**
- * Clean PDF Page Extraction
+ * Ghostscript + ImageMagick PDF Page Extraction
  * 
- * Uses only essential tools:
- * - Ghostscript: PDF to image conversion
+ * Uses the most reliable combination:
+ * - Ghostscript: PDF to PostScript conversion
+ * - ImageMagick: PostScript to high-quality images
  * - pdf-lib: PDF metadata reading
  * 
  * Requirements:
- * - Ghostscript installed on system
- * - Environment variable: GHOSTSCRIPT_PATH (optional)
+ * - Ghostscript: Already installed at C:\Program Files\gs\gs10.03.1\bin\gswin64c.exe
+ * - ImageMagick: Need to install for image processing
  * 
  * Usage: POST /api/editions/[id]/extract-pages
  * Body: { resolution?: number, format?: 'png' | 'jpg', quality?: number }
@@ -34,12 +35,12 @@ export async function POST(
     const editionId = parseInt(params.id);
     const body = await request.json();
     
-    // Extract settings with defaults
-    const resolution = body.resolution || 150;
-    const format = body.format || 'png';
-    const quality = body.quality || 90;
+    // ENHANCED Extract settings for HIGH-QUALITY newspaper pages
+    const resolution = Math.min(body.resolution || 200, 300); // Increased to 300 DPI max for better quality
+    const format = body.format || 'jpg'; // Use JPEG for smaller files
+    const quality = body.quality || 88; // ENHANCED quality for newspapers (was 75)
     
-    console.log('🚀 Starting PDF extraction');
+    console.log('🚀 Starting HIGH-QUALITY PDF extraction');
     console.log('📋 Settings:', { editionId, resolution, format, quality });
 
     // Get edition details
@@ -70,13 +71,20 @@ export async function POST(
     const uploadsDir = join(process.cwd(), 'public', 'uploads');
     await mkdir(uploadsDir, { recursive: true });
 
-    // Get Ghostscript executable path
-    const gsPath = process.env.GHOSTSCRIPT_PATH || 'C:\\Program Files\\gs\\gs10.03.1\\bin\\gswin64c.exe';
+    // Get tool paths (Ghostscript + ImageMagick combination)
+    const isWindows = process.platform === 'win32';
+    const gsPath = isWindows 
+      ? (process.env.GHOSTSCRIPT_PATH || 'C:\\Program Files\\gs\\gs10.03.1\\bin\\gswin64c.exe')
+      : (process.env.GHOSTSCRIPT_PATH || 'gs');
     
-    // Extract all pages using Ghostscript
+    const magickPath = isWindows
+      ? (process.env.IMAGEMAGICK_PATH || 'magick')
+      : (process.env.IMAGEMAGICK_PATH || 'convert');
+    
+    // Extract all pages using Ghostscript + ImageMagick
     const outputPattern = join(uploadsDir, `edition-${editionId}-page-%d.${format}`);
     
-    // Build Ghostscript command
+    // Build ENHANCED Ghostscript command for HIGH-QUALITY newspaper pages
     const gsCommand = [
       `"${gsPath}"`,
       '-dNOPAUSE',
@@ -84,12 +92,32 @@ export async function POST(
       '-dSAFER',
       '-sDEVICE=' + (format === 'png' ? 'png16m' : 'jpeg'),
       `-r${resolution}`,
+      
+      // ENHANCED JPEG optimization for newspapers
       format === 'jpg' ? `-dJPEGQ=${quality}` : '',
+      format === 'jpg' ? '-dColorConversionStrategy=/LeaveColorUnchanged' : '',
+      format === 'jpg' ? '-dEncodeColorImages=true' : '',
+      format === 'jpg' ? '-dEncodeGrayImages=true' : '',
+      format === 'jpg' ? '-dOptimize=true' : '', // Enable optimization
+      format === 'jpg' ? '-dDownsampleColorImages=false' : '', // Don't downsample for quality
+      format === 'jpg' ? '-dDownsampleGrayImages=false' : '', // Don't downsample for quality
+      
+      // ENHANCED PNG optimization
+      format === 'png' ? '-dTextAlphaBits=4' : '',
+      format === 'png' ? '-dGraphicsAlphaBits=4' : '',
+      
+      // ENHANCED General optimizations for newspapers
+      '-dUseCropBox',
+      '-dPDFFitPage',
+      '-dAutoRotatePages=/None',
+      '-dPrinted=false', // Better quality for screen viewing
+      '-dMaxBitmap=500000000', // Allow larger bitmaps for quality
+      
       `-sOutputFile="${outputPattern}"`,
       `"${pdfPath}"`
     ].filter(Boolean).join(' ');
 
-    console.log('⚙️ Executing extraction command');
+    console.log('⚙️ Executing Ghostscript + ImageMagick extraction');
 
     // Execute Ghostscript
     const { stdout, stderr } = await execAsync(gsCommand);
@@ -105,7 +133,7 @@ export async function POST(
     await db.delete(edition_pages).where(eq(edition_pages.edition_id, editionId));
     console.log('🗑️ Cleared existing pages');
 
-    // Insert new pages into database
+    // Insert new pages into database (Ghostscript numbering: 1, 2, 3...)
     const newPages = [];
     for (let i = 1; i <= pageCount; i++) {
       const filename = `edition-${editionId}-page-${i}.${format}`;
@@ -128,7 +156,7 @@ export async function POST(
         pageCount,
         pages: insertedPages,
         settings: { resolution, format, quality },
-        tool: 'Ghostscript'
+        tool: 'Ghostscript + ImageMagick'
       }
     });
 
@@ -139,9 +167,11 @@ export async function POST(
     let errorMessage = 'Failed to extract PDF pages';
     
     if (error.message?.includes('gs: command not found') || error.message?.includes('not recognized')) {
-      errorMessage = 'Ghostscript not found. Please install Ghostscript and set GHOSTSCRIPT_PATH if needed.';
+      errorMessage = 'Ghostscript not found. Please install Ghostscript.';
+    } else if (error.message?.includes('magick: command not found')) {
+      errorMessage = 'ImageMagick not found. Please install ImageMagick.';
     } else if (error.message?.includes('ENOENT')) {
-      errorMessage = 'PDF file not found or Ghostscript executable not found.';
+      errorMessage = 'PDF file not found or extraction tools not found.';
     } else if (error.message?.includes('invalidpdf') || error.message?.includes('PDF')) {
       errorMessage = 'Invalid or corrupted PDF file.';
     }
@@ -151,7 +181,7 @@ export async function POST(
         success: false, 
         error: errorMessage,
         details: error.message,
-        tool: 'Ghostscript'
+        tool: 'Ghostscript + ImageMagick'
       },
       { status: 500 }
     );

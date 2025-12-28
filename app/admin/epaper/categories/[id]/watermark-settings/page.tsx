@@ -15,7 +15,7 @@ export default function CategoryWatermarkSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [categoryName, setCategoryName] = useState('');
   const [showMediaBrowser, setShowMediaBrowser] = useState(false);
-  const [mediaTargetField, setMediaTargetField] = useState<'logo' | 'center_watermark'>('logo');
+  const [mediaTargetField, setMediaTargetField] = useState<'logo'>('logo');
   const [settings, setSettings] = useState({
     override_global_settings: false,
     enable_watermarking: false,
@@ -31,9 +31,6 @@ export default function CategoryWatermarkSettingsPage() {
     border_color: '#000000',
     info_text: '',
     info_text_font: 'English',
-    enable_center_watermark: false,
-    center_watermark_url: '',
-    center_watermark_opacity: 100,
   });
 
   useEffect(() => {
@@ -157,10 +154,7 @@ export default function CategoryWatermarkSettingsPage() {
                     placeholder="https://example.com/logo.png"
                   />
                   <button 
-                    onClick={() => {
-                      setMediaTargetField('logo');
-                      setShowMediaBrowser(true);
-                    }}
+                    onClick={() => setShowMediaBrowser(true)}
                     className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
                   >
                     Upload Watermark...
@@ -339,65 +333,7 @@ export default function CategoryWatermarkSettingsPage() {
                 </div>
               )}
 
-              {/* Extra Watermark on Center */}
-              <div className="border-t pt-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <input
-                    type="checkbox"
-                    id="enable_center_watermark"
-                    checked={settings.enable_center_watermark}
-                    onChange={(e) =>
-                      setSettings({ ...settings, enable_center_watermark: e.target.checked })
-                    }
-                    className="w-4 h-4"
-                  />
-                  <label htmlFor="enable_center_watermark" className="font-medium">
-                    Enable Extra Watermark on Center of Clip/Areamap
-                  </label>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Watermark Logo</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={settings.center_watermark_url}
-                        onChange={(e) =>
-                          setSettings({ ...settings, center_watermark_url: e.target.value })
-                        }
-                        className="flex-1 px-3 py-2 border rounded-lg"
-                      />
-                      <button 
-                        onClick={() => {
-                          setMediaTargetField('center_watermark');
-                          setShowMediaBrowser(true);
-                        }}
-                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-                      >
-                        Upload Watermark...
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Opacity</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={settings.center_watermark_opacity}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          center_watermark_opacity: parseInt(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full px-3 py-2 border rounded-lg"
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Footer */}
@@ -426,13 +362,8 @@ export default function CategoryWatermarkSettingsPage() {
         isOpen={showMediaBrowser}
         onClose={() => setShowMediaBrowser(false)}
         onSelect={(url) => {
-          if (mediaTargetField === 'logo') {
-            setSettings({ ...settings, logo_url: url });
-            alert('✅ Logo image selected successfully!');
-          } else {
-            setSettings({ ...settings, center_watermark_url: url });
-            alert('✅ Center watermark image selected successfully!');
-          }
+          setSettings({ ...settings, logo_url: url });
+          alert('✅ Logo image selected successfully!');
           setShowMediaBrowser(false);
         }}
         accept="image/*"

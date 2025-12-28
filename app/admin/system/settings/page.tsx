@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
+import MediaBrowser from '@/components/page-manager/MediaBrowser';
 
 type SidebarType = 'basic' | 'epaper';
 type BasicTabType = 'site' | 'ads' | 'robots' | 'analytics';
@@ -48,9 +49,9 @@ export default function SettingsPage() {
   const [borderColor, setBorderColor] = useState('#000000');
   const [infoText, setInfoText] = useState('');
   const [infoTextFont, setInfoTextFont] = useState('English');
-  const [enableCenterWatermark, setEnableCenterWatermark] = useState(false);
-  const [centerWatermarkUrl, setCenterWatermarkUrl] = useState('');
-  const [centerWatermarkOpacity, setCenterWatermarkOpacity] = useState(100);
+
+  // Media browser state
+  const [showMediaBrowser, setShowMediaBrowser] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -112,9 +113,6 @@ export default function SettingsPage() {
         setBorderColor(data.border_color || '#000000');
         setInfoText(data.info_text || '');
         setInfoTextFont(data.info_text_font || 'English');
-        setEnableCenterWatermark(data.enable_center_watermark || false);
-        setCenterWatermarkUrl(data.center_watermark_url || '');
-        setCenterWatermarkOpacity(data.center_watermark_opacity || 100);
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -268,9 +266,6 @@ export default function SettingsPage() {
           border_color: borderColor,
           info_text: infoText,
           info_text_font: infoTextFont,
-          enable_center_watermark: enableCenterWatermark,
-          center_watermark_url: centerWatermarkUrl,
-          center_watermark_opacity: centerWatermarkOpacity,
         }),
       });
 
@@ -669,61 +664,72 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
 
               {activeSidebar === 'epaper' && activeEpaperTab === 'watermark' && (
                 <div className="space-y-6">
-                  <label className="flex items-center gap-2">
+                  {/* Enable Watermarking */}
+                  <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
+                      id="enable_watermarking"
                       checked={enableWatermarking}
                       onChange={(e) => setEnableWatermarking(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 rounded"
+                      className="w-4 h-4"
                     />
-                    <span className="text-sm font-medium text-gray-500">Enable Watermarking in Area Maps</span>
-                  </label>
+                    <label htmlFor="enable_watermarking" className="font-medium">
+                      Enable Watermarking in Area Maps
+                    </label>
+                  </div>
 
+                  {/* Logo */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-2">Logo</label>
+                    <label className="block text-sm font-medium mb-2">Logo</label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={logoUrl}
                         onChange={(e) => setLogoUrl(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
                         placeholder="https://example.com/logo.png"
                       />
-                      <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+                      <button 
+                        onClick={() => setShowMediaBrowser(true)}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                      >
                         Upload Watermark...
                       </button>
                     </div>
                   </div>
 
+                  {/* Row 1: Opacity, Mode, Position, Min Width */}
                   <div className="grid grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-2">Opacity</label>
+                      <label className="block text-sm font-medium mb-2">Opacity</label>
                       <input
                         type="number"
-                        value={opacity}
-                        onChange={(e) => setOpacity(parseInt(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                         min="0"
                         max="100"
+                        value={opacity}
+                        onChange={(e) => setOpacity(parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 border rounded-lg"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-2">Mode</label>
+                      <label className="block text-sm font-medium mb-2">Mode</label>
                       <select
                         value={mode}
                         onChange={(e) => setMode(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        className="w-full px-3 py-2 border rounded-lg"
                       >
                         <option value="in_outerside">In Outerside</option>
-                        <option value="in_inside">In Inside</option>
+                        <option value="watermark">Watermark</option>
                       </select>
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-2">Position</label>
+                      <label className="block text-sm font-medium mb-2">Position</label>
                       <select
                         value={position}
                         onChange={(e) => setPosition(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        className="w-full px-3 py-2 border rounded-lg"
                       >
                         <option value="top_center">Top Center</option>
                         <option value="top_left">Top Left</option>
@@ -733,133 +739,121 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                         <option value="bottom_right">Bottom Right</option>
                       </select>
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-2">Min Width (px)</label>
+                      <label className="block text-sm font-medium mb-2">
+                        Minimum Width of Map/Clip image (px)
+                      </label>
                       <input
                         type="number"
-                        value={minWidthPx}
-                        onChange={(e) => setMinWidthPx(parseInt(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                         min="0"
+                        value={minWidthPx}
+                        onChange={(e) => setMinWidthPx(parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 border rounded-lg"
                       />
                     </div>
                   </div>
 
+                  {/* Row 2: Colors */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-2">Background Color</label>
+                      <label className="block text-sm font-medium mb-2">Background Color</label>
                       <input
                         type="color"
                         value={backgroundColor}
                         onChange={(e) => setBackgroundColor(e.target.value)}
-                        className="w-full h-10 px-1 py-1 border border-gray-300 rounded-lg"
+                        className="w-full h-10 border rounded-lg"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-500 mb-2">Foreground Color</label>
+                      <label className="block text-sm font-medium mb-2">Foreground Color (Text)</label>
                       <input
                         type="color"
                         value={foregroundColor}
                         onChange={(e) => setForegroundColor(e.target.value)}
-                        className="w-full h-10 px-1 py-1 border border-gray-300 rounded-lg"
+                        className="w-full h-10 border rounded-lg"
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="flex items-center gap-2 mb-2">
+                  {/* Border Settings */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
+                        id="enable_border"
                         checked={enableBorder}
                         onChange={(e) => setEnableBorder(e.target.checked)}
-                        className="w-4 h-4 text-blue-600 rounded"
+                        className="w-4 h-4"
                       />
-                      <span className="text-sm font-medium text-gray-500">Enable Border</span>
-                    </label>
-                    {enableBorder && (
-                      <div className="grid grid-cols-2 gap-4 ml-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-2">Border Width</label>
-                          <input
-                            type="number"
-                            value={borderWidth}
-                            onChange={(e) => setBorderWidth(parseInt(e.target.value))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                            min="1"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-2">Border Color</label>
-                          <input
-                            type="color"
-                            value={borderColor}
-                            onChange={(e) => setBorderColor(e.target.value)}
-                            className="w-full h-10 px-1 py-1 border border-gray-300 rounded-lg"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      <label htmlFor="enable_border" className="font-medium">
+                        Enable Border
+                      </label>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-2">Info Text</label>
-                    <input
-                      type="text"
-                      value={infoText}
-                      onChange={(e) => setInfoText(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                      placeholder="Additional information text"
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Border Width</label>
+                      <select
+                        value={borderWidth}
+                        onChange={(e) => setBorderWidth(parseInt(e.target.value))}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      >
+                        <option value="1">1 - Thin</option>
+                        <option value="2">2 - Default</option>
+                        <option value="3">3 - Medium</option>
+                        <option value="4">4 - Thick</option>
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500 mb-2">Info Text Font</label>
-                    <select
-                      value={infoTextFont}
-                      onChange={(e) => setInfoTextFont(e.target.value)}
-                      className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg"
-                    >
-                      <option value="English">English</option>
-                      <option value="Hindi">Hindi</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-2 mb-2">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Border Color</label>
                       <input
-                        type="checkbox"
-                        checked={enableCenterWatermark}
-                        onChange={(e) => setEnableCenterWatermark(e.target.checked)}
-                        className="w-4 h-4 text-blue-600 rounded"
+                        type="color"
+                        value={borderColor}
+                        onChange={(e) => setBorderColor(e.target.value)}
+                        className="w-full h-10 border rounded-lg"
                       />
-                      <span className="text-sm font-medium text-gray-500">Enable Center Watermark</span>
-                    </label>
-                    {enableCenterWatermark && (
-                      <div className="ml-6 space-y-4">
+                    </div>
+                  </div>
+
+                  {/* Info Text (Only for In Outerside mode) */}
+                  {mode === 'in_outerside' && (
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <p className="text-sm text-blue-600 mb-3">
+                        This will appear only if you select 'mode' =&gt; In Outerside
+                      </p>
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-2">Center Watermark URL</label>
-                          <input
-                            type="text"
-                            value={centerWatermarkUrl}
-                            onChange={(e) => setCenterWatermarkUrl(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                            placeholder="https://example.com/center-watermark.png"
+                          <label className="block text-sm font-medium mb-2">Info Text</label>
+                          <textarea
+                            value={infoText}
+                            onChange={(e) => setInfoText(e.target.value)}
+                            className="w-full px-3 py-2 border rounded-lg"
+                            rows={3}
+                            placeholder="Garvi Gujarat English Ahemdabad Edition{newline}{date}"
                           />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Templates: {'{edition_title}'} {'{page_title}'} {'{date}'} {'{url}'}{' '}
+                            {'{newline}'}
+                          </p>
                         </div>
+
                         <div>
-                          <label className="block text-sm font-medium text-gray-500 mb-2">Center Watermark Opacity</label>
-                          <input
-                            type="number"
-                            value={centerWatermarkOpacity}
-                            onChange={(e) => setCenterWatermarkOpacity(parseInt(e.target.value))}
-                            className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg"
-                            min="0"
-                            max="100"
-                          />
+                          <label className="block text-sm font-medium mb-2">Info Text Font</label>
+                          <select
+                            value={infoTextFont}
+                            onChange={(e) => setInfoTextFont(e.target.value)}
+                            className="w-full px-3 py-2 border rounded-lg"
+                          >
+                            <option value="English">English</option>
+                            <option value="Hindi">Hindi</option>
+                            <option value="Gujarati">Gujarati</option>
+                          </select>
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   <button
                     onClick={handleSaveWatermark}
@@ -875,6 +869,18 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
           </div>
         </div>
       </div>
+
+      {/* Media Browser */}
+      <MediaBrowser
+        isOpen={showMediaBrowser}
+        onClose={() => setShowMediaBrowser(false)}
+        onSelect={(url) => {
+          setLogoUrl(url);
+          alert('✅ Logo image selected successfully!');
+          setShowMediaBrowser(false);
+        }}
+        accept="image/*"
+      />
     </div>
   );
 }

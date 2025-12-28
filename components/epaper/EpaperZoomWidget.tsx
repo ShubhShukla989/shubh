@@ -1,6 +1,7 @@
 'use client';
 
-import { useEpaper } from '@/contexts/EpaperContext';
+import { useState } from 'react';
+// Removed EpaperContext import - working independently now
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 interface EpaperZoomWidgetProps {
@@ -14,7 +15,8 @@ interface EpaperZoomWidgetProps {
 }
 
 export function EpaperZoomWidget({ config }: EpaperZoomWidgetProps) {
-  const { zoom, setZoom } = useEpaper();
+  // Work independently with local state
+  const [zoom, setZoom] = useState(1);
 
   const handleZoomIn = () => {
     setZoom(Math.min(zoom + 0.1, 2));

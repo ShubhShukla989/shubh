@@ -1,11 +1,10 @@
 'use client';
 
-import { Component, ReactNode } from 'react';
+import React, { Component, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
-  widgetType: string;
-  widgetTitle?: string;
+  widgetType?: string;
 }
 
 interface State {
@@ -23,28 +22,33 @@ export class WidgetErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: any) {
-    console.error(`Widget Error [${this.props.widgetType}]:`, error, errorInfo);
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Widget Error Boundary caught an error:', error, errorInfo);
+    console.error('Widget type:', this.props.widgetType);
   }
 
   render() {
     if (this.state.hasError) {
       return (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs">×</span>
-            </div>
-            <p className="text-red-800 text-sm font-medium">
-              {this.props.widgetTitle || this.props.widgetType} Widget Error
-            </p>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="text-red-600">⚠️</div>
+            <h4 className="text-red-800 font-medium">Widget Error</h4>
           </div>
-          <p className="text-red-600 text-xs mt-1">
-            Widget failed to render. Check console for details.
+          <p className="text-red-700 text-sm mb-2">
+            {this.props.widgetType ? `Widget "${this.props.widgetType}" failed to render` : 'Widget failed to render'}
           </p>
+          {this.state.error && (
+            <details className="text-xs text-red-600">
+              <summary className="cursor-pointer">Error details</summary>
+              <pre className="mt-2 p-2 bg-red-100 rounded text-xs overflow-auto">
+                {this.state.error.message}
+              </pre>
+            </details>
+          )}
           <button
-            onClick={() => this.setState({ hasError: false })}
-            className="mt-2 px-2 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200"
+            onClick={() => this.setState({ hasError: false, error: undefined })}
+            className="mt-2 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
           >
             Retry
           </button>

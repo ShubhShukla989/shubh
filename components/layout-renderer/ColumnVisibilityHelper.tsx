@@ -29,7 +29,7 @@ export function useColumnVisibility() {
     
     const checkDevice = () => {
       const width = window.innerWidth;
-      setIsMobile(width < 768); // Bootstrap's md breakpoint
+      setIsMobile(width <= 768);
     };
 
     checkDevice();

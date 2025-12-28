@@ -10,7 +10,7 @@ import { LayoutBuilder } from '@/components/layout-builder/LayoutBuilder';
 import { LayoutStructure } from '@/components/layout-builder/types';
 import dynamic from 'next/dynamic';
 
-// Dynamically import TinyMCE to avoid SSR issues
+// Dynamically import TinyMCE to avoid SSR issues - using improved loading
 const Editor = dynamic(() => import('@tinymce/tinymce-react').then((mod) => mod.Editor as any), {
   ssr: false,
   loading: () => (
@@ -18,6 +18,7 @@ const Editor = dynamic(() => import('@tinymce/tinymce-react').then((mod) => mod.
       <div className="text-center">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
         <p className="text-sm text-gray-600">Loading editor...</p>
+        <p className="text-xs text-gray-500 mt-1">Initializing TinyMCE...</p>
       </div>
     </div>
   ),

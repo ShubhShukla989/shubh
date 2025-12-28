@@ -2,9 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { epaper_categories } from '@/lib/schema/categories';
 import { eq, asc, and } from 'drizzle-orm';
+import { validateRequest } from '@/lib/api-validation';
+import { categorySchema } from '@/lib/validations/category';
+import { withCache, invalidateCacheByTags } from '@/lib/cache';
 
-// GET all categories
-export async function GET(request: NextRequest) {
+// Cache configuration for categories - EXTREME performance for 1000+ users
+const CACHE_CONFIG = {
+  ttl: 3600, // 1 hour for categories (change less frequently)
+  tags: ['categories'],
+};
+
+// GET all categories with caching
+async function getCategoriesHandler(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const featured = searchParams.get('featured');
@@ -38,49 +47,23 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST create new category
-export async function POST(request: NextRequest) {
+// Apply caching middleware to GET requests
+export const GET = withCache(getCategoriesHandler, CACHE_CONFIG);
+
+// POST create new category with validation and cache invalidation
+export const POST = validateRequest(categorySchema, async (validatedData) => {
   try {
-    const body = await request.json();
-    const {
-      title,
-      alias,
-      description,
-      parent_id,
-      image_url,
-      meta_title,
-      meta_description,
-      meta_keywords,
-      robots,
-      is_active,
-      is_featured,
-      display_order,
-    } = body;
-
-    if (!title || !alias) {
-      return NextResponse.json(
-        { success: false, error: 'Title and alias are required' },
-        { status: 400 }
-      );
-    }
-
     const [data] = await db
       .insert(epaper_categories)
       .values({
-        title,
-        alias,
-        description,
-        parent_id,
-        image_url,
-        meta_title,
-        meta_description,
-        meta_keywords,
-        robots: robots || 'index, follow',
-        is_active: is_active !== undefined ? is_active : true,
-        is_featured: is_featured || false,
-        display_order: display_order || 0,
+        ...validatedData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .returning();
+
+    // Invalidate categories cache
+    invalidateCacheByTags(['categories']);
 
     return NextResponse.json({
       success: true,
@@ -89,9 +72,20 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Create category error:', error);
+    
+    // Handle unique constraint violations
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      if (error.message.includes('alias')) {
+        return NextResponse.json(
+          { success: false, error: 'A category with this alias already exists' },
+          { status: 409 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       { success: false, error: 'Failed to create category' },
       { status: 500 }
     );
   }
-}
+});

@@ -558,7 +558,7 @@ console.log('📝 Inserted sample data');
 db.close();
 console.log('✅ Database setup complete!');
 console.log('\n🎉 Features included:');
-console.log('   📄 High-quality PDF extraction (300-600 DPI)');
+console.log('   📄 High-quality PDF extraction with GraphicsMagick (300-600 DPI)');
 console.log('   🎨 7 complete layout templates');
 console.log('   🔐 Admin authentication ready');
 console.log('   📊 Analytics and media management');
