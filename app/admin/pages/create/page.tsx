@@ -4,13 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save, Image as ImageIcon, Layout } from 'lucide-react';
 import { pageService, PageFormData } from '@/lib/services/pageService';
+import { sanitizeHtml } from '@/lib/utils/styleParser';
 import SEOSection from '@/components/page-manager/SEOSection';
 import MediaBrowser from '@/components/page-manager/MediaBrowser';
 import { LayoutBuilder } from '@/components/layout-builder/LayoutBuilder';
 import { LayoutStructure } from '@/components/layout-builder/types';
 import dynamic from 'next/dynamic';
 
-// Dynamically import TinyMCE to avoid SSR issues - using improved loading
+// Dynamically import TinyMCE to avoid SSR issues with better error handling
 const Editor = dynamic(() => import('@tinymce/tinymce-react').then((mod) => mod.Editor as any), {
   ssr: false,
   loading: () => (
@@ -18,7 +19,6 @@ const Editor = dynamic(() => import('@tinymce/tinymce-react').then((mod) => mod.
       <div className="text-center">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
         <p className="text-sm text-gray-600">Loading editor...</p>
-        <p className="text-xs text-gray-500 mt-1">Initializing TinyMCE...</p>
       </div>
     </div>
   ),
@@ -108,7 +108,7 @@ export default function CreatePage() {
         setLayouts(result.data || []);
       }
     } catch (error) {
-      console.error('Error fetching layouts:', error);
+      // Handle error silently in production
     }
   };
 
@@ -122,19 +122,51 @@ export default function CreatePage() {
     }
 
     try {
-      const response = await fetch(`/api/layouts/${layoutName}`);
+      const response = await fetch(`/api/layouts/${encodeURIComponent(layoutName)}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch layout: ${response.status} ${response.statusText}`);
+      }
+      
       const result = await response.json();
 
       if (result.success && result.data) {
         const data = result.data;
         setSelectedLayoutName(layoutName);
-        setLayoutStructure(typeof data.structure === 'string' ? JSON.parse(data.structure) : data.structure || { rows: [] });
+        
+        // Parse structure safely
+        let parsedStructure = { rows: [] };
+        if (data.structure) {
+          try {
+            parsedStructure = typeof data.structure === 'string' 
+              ? JSON.parse(data.structure) 
+              : data.structure;
+              
+            // Validate structure
+            if (!parsedStructure || !Array.isArray(parsedStructure.rows)) {
+              parsedStructure = { rows: [] };
+            }
+          } catch (parseError) {
+            parsedStructure = { rows: [] };
+            alert('Warning: Layout structure is corrupted. Starting with empty layout.');
+          }
+        }
+        
+        setLayoutStructure(parsedStructure);
         setCustomCss(data.custom_css || '');
         setCustomJs(data.custom_js || '');
+      } else {
+        throw new Error(result.message || 'Layout not found');
       }
     } catch (error) {
       console.error('Error loading layout:', error);
-      alert('Failed to load layout');
+      alert(`Failed to load layout: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Reset to empty state on error
+      setSelectedLayoutName('');
+      setLayoutStructure({ rows: [] });
+      setCustomCss('');
+      setCustomJs('');
     }
   };
 
@@ -147,10 +179,12 @@ export default function CreatePage() {
   };
 
   const handleEditorChange = (content: string) => {
-    updateField('content', content);
+    // Sanitize content before updating state
+    const sanitizedContent = sanitizeHtml(content);
+    updateField('content', sanitizedContent);
     
-    // Calculate word count
-    const text = content.replace(/<[^>]*>/g, '').trim();
+    // Calculate word count from clean text
+    const text = sanitizedContent.replace(/<[^>]*>/g, '').trim();
     const words = text.split(/\s+/).filter((word) => word.length > 0);
     setWordCount(words.length);
   };
@@ -187,13 +221,26 @@ export default function CreatePage() {
       return;
     }
 
+    // Validate alias format
+    const aliasRegex = /^[a-z0-9-]+$/;
+    if (!aliasRegex.test(formData.alias)) {
+      alert('Alias can only contain lowercase letters, numbers, and hyphens');
+      return;
+    }
+
     setSaving(true);
     try {
       // Prepare page data
       const pageData = { ...formData };
       
-      // If using designer mode, save layout data
+      // If using designer mode, validate layout data
       if (contentMode === 'designer') {
+        if (!layoutStructure.rows || layoutStructure.rows.length === 0) {
+          alert('Please add at least one row to your layout');
+          setSaving(false);
+          return;
+        }
+        
         pageData.content = JSON.stringify({
           mode: 'designer',
           layoutName: selectedLayoutName,
@@ -213,7 +260,8 @@ export default function CreatePage() {
       }, 1000);
     } catch (error) {
       console.error('Save failed:', error);
-      alert(error instanceof Error ? error.message : 'Failed to save page');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save page';
+      alert(errorMessage);
     } finally {
       setSaving(false);
     }

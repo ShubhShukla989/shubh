@@ -11,14 +11,11 @@ export async function GET() {
       });
     }
 
-    console.log('🔍 Media API called at:', new Date().toISOString());
-    
     const { db } = await import('@/lib/db');
     const { media_files } = await import('@/lib/schema/media');
     const { desc } = await import('drizzle-orm');
     
     const files = await db.select().from(media_files).orderBy(desc(media_files.created_at));
-    console.log('📁 Found files in database:', files.length);
     
     // Transform to match MediaBrowser expected format
     const transformedFiles = files.map(file => ({
@@ -29,8 +26,6 @@ export async function GET() {
       type: file.mime_type || 'image/jpeg',
       createdAt: file.created_at || new Date().toISOString()
     }));
-    
-    console.log('📤 Returning files:', transformedFiles.map(f => f.name));
     
     return NextResponse.json({
       success: true,

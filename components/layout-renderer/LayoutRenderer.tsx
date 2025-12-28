@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useColumnVisibility } from './ColumnVisibilityHelper';
-
 import { ContextAwareWidget } from './ContextAwareWidget';
 import { WidgetErrorBoundary } from './WidgetErrorBoundary';
+import { parseInlineStyle } from '@/lib/utils/styleParser';
 
 interface LayoutRendererProps {
   layoutName: string;
@@ -14,29 +14,19 @@ interface LayoutRendererProps {
   pageNumber?: string;
 }
 
+interface LayoutData {
+  structure: any;
+  custom_css?: string;
+  custom_js?: string;
+}
+
 export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pageNumber }: LayoutRendererProps) {
   const { isColumnVisible, isRowVisible, isWidgetVisible } = useColumnVisibility();
-  const [layoutData, setLayoutData] = useState<any>(null);
+  const [layoutData, setLayoutData] = useState<LayoutData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Mobile detection
-  useEffect(() => {
-    const checkMobile = () => {
-      if (typeof window !== 'undefined') {
-        setIsMobile(window.innerWidth <= 768);
-      }
-    };
-    
-    // Initial check
-    checkMobile();
-    
-    // Add resize listener
-    if (typeof window !== 'undefined') {
-      window.addEventListener('resize', checkMobile);
-      return () => window.removeEventListener('resize', checkMobile);
-    }
-  }, []);
+  
+  // Use the existing useColumnVisibility hook instead of duplicate mobile detection
+  const { isMobile } = useColumnVisibility();
 
   // Check if this is an epaper display page
   const isEpaperDisplayPage = layoutName === 'Epaper Display';
@@ -80,7 +70,7 @@ export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pag
       if (data.success && data.data) {
         setLayoutData(data.data);
       } else {
-        // Auto-fallback to Website Homepage if current layout fails
+        // Auto-fallback to Website Homepage if current layout fails (prevent infinite loop)
         if (layoutName !== 'Website Homepage') {
           const fallbackUrl = `/api/layouts/${encodeURIComponent('Website Homepage')}`;
           const fallbackResponse = await fetch(`${fallbackUrl}?_t=${timestamp}`, {
@@ -96,14 +86,29 @@ export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pag
           if (fallbackData.success && fallbackData.data) {
             setLayoutData(fallbackData.data);
           } else {
-            setLayoutData(null);
+            // If even fallback fails, create minimal structure
+            setLayoutData({
+              structure: { rows: [] },
+              custom_css: '',
+              custom_js: ''
+            });
           }
         } else {
-          setLayoutData(null);
+          // If Website Homepage itself fails, create minimal structure
+          setLayoutData({
+            structure: { rows: [] },
+            custom_css: '',
+            custom_js: ''
+          });
         }
       }
     } catch (error) {
-      setLayoutData(null);
+      // Layout fetch error - provide fallback structure to prevent crashes
+      setLayoutData({
+        structure: { rows: [] },
+        custom_css: '',
+        custom_js: ''
+      });
     } finally {
       setLoading(false);
     }
@@ -369,16 +374,33 @@ export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pag
     );
   }
 
-  // Parse structure safely
+  // Parse structure safely with better error handling
   let structure;
   try {
+    if (!layoutData.structure) {
+      return (
+        <div className="flex items-center justify-center min-h-[200px]">
+          <div className="text-yellow-600">Layout has no structure defined</div>
+        </div>
+      );
+    }
+    
     structure = typeof layoutData.structure === 'string' 
       ? JSON.parse(layoutData.structure) 
       : layoutData.structure;
+      
+    // Validate structure format
+    if (!structure || typeof structure !== 'object') {
+      throw new Error('Invalid structure format');
+    }
+    
   } catch (error) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
-        <div className="text-red-500">Invalid layout structure</div>
+        <div className="text-red-500">
+          <div className="font-medium">Invalid layout structure</div>
+          <div className="text-sm mt-1">Please check the layout configuration in admin panel</div>
+        </div>
       </div>
     );
   }
@@ -393,10 +415,12 @@ export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pag
 
   return (
     <>
-      {/* Custom CSS */}
+      {/* Custom CSS - with basic sanitization */}
       {layoutData.custom_css && (
         <style 
-          dangerouslySetInnerHTML={{ __html: layoutData.custom_css }}
+          dangerouslySetInnerHTML={{ 
+            __html: layoutData.custom_css.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') 
+          }}
           data-layout={layoutName}
         />
       )}
@@ -463,7 +487,7 @@ export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pag
                   // Apply mobile archive filtering
                   visibleWidgets = getMobileArchiveWidgets(visibleWidgets);
                   
-                  // Get column width from designer settings
+                  // Get column width from designer settings with better validation
                   const getColumnWidth = () => {
                     const cssClass = column.properties?.cssClass || column.cssClass || '';
                     
@@ -471,11 +495,23 @@ export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pag
                     const colMatch = cssClass.match(/col-(\d+)/);
                     if (colMatch) {
                       const colSize = parseInt(colMatch[1]);
-                      return (colSize / 12) * 100;
+                      if (colSize >= 1 && colSize <= 12) {
+                        return (colSize / 12) * 100;
+                      }
                     }
                     
-                    // Default: equal distribution
-                    return 100 / allColumns.length;
+                    // Responsive column classes (col-md-6, col-lg-4, etc.)
+                    const responsiveMatch = cssClass.match(/col-(?:xs|sm|md|lg|xl)-(\d+)/);
+                    if (responsiveMatch) {
+                      const colSize = parseInt(responsiveMatch[1]);
+                      if (colSize >= 1 && colSize <= 12) {
+                        return (colSize / 12) * 100;
+                      }
+                    }
+                    
+                    // Default: equal distribution with minimum width
+                    const equalWidth = 100 / Math.max(allColumns.length, 1);
+                    return Math.max(equalWidth, 8.33); // Minimum 1/12 width
                   };
                   
                   const columnWidth = getColumnWidth();
@@ -517,33 +553,15 @@ export function LayoutRenderer({ layoutName, pageName, areaMapId, editionId, pag
         })}
       </div>
 
-      {/* Custom JS */}
+      {/* Custom JS - with basic sanitization */}
       {layoutData.custom_js && (
         <script 
-          dangerouslySetInnerHTML={{ __html: layoutData.custom_js }}
+          dangerouslySetInnerHTML={{ 
+            __html: layoutData.custom_js.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') 
+          }}
           type="text/javascript"
         />
       )}
     </>
   );
-}
-
-
-
-function parseInlineStyle(styleString?: string): React.CSSProperties {
-  if (!styleString) return {};
-  
-  try {
-    const styles: any = {};
-    styleString.split(';').forEach(rule => {
-      const [property, value] = rule.split(':').map(s => s.trim());
-      if (property && value) {
-        const camelProperty = property.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-        styles[camelProperty] = value;
-      }
-    });
-    return styles;
-  } catch {
-    return {};
-  }
 }

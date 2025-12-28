@@ -2,13 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { editions, edition_pages, users } from '@/lib/schema';
 import { eq, desc, asc, and } from 'drizzle-orm';
-import { withCache, invalidateCacheByTags } from '@/lib/cache';
 
-// Cache configuration for editions - EXTREME performance for 1000+ users
-const CACHE_CONFIG = {
-  ttl: 1800, // 30 minutes for user-facing API
-  tags: ['editions'],
-};
+// Disable Next.js caching for admin panel
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 async function getEditionsHandler(request: NextRequest) {
   try {
@@ -60,7 +57,7 @@ async function getEditionsHandler(request: NextRequest) {
         .from(editions)
         .leftJoin(createdByUser, eq(editions.created_by, createdByUser.id))
         .where(and(...conditions))
-        .orderBy(desc(editions.date));
+        .orderBy(desc(editions.created_at), desc(editions.id));
     } else {
       editionsData = await db
         .select({
@@ -84,7 +81,7 @@ async function getEditionsHandler(request: NextRequest) {
         })
         .from(editions)
         .leftJoin(createdByUser, eq(editions.created_by, createdByUser.id))
-        .orderBy(desc(editions.date));
+        .orderBy(desc(editions.created_at), desc(editions.id));
     }
 
     // Get pages for each edition
@@ -107,15 +104,26 @@ async function getEditionsHandler(request: NextRequest) {
       })
     );
 
-    return NextResponse.json({ success: true, data: processedData });
+    return NextResponse.json({ success: true, data: processedData }, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
-    console.error('[GET /api/editions] Error:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch editions' }, { status: 500 });
   }
 }
 
-// Apply caching middleware to GET requests
-export const GET = withCache(getEditionsHandler, CACHE_CONFIG);
+// Apply caching middleware to GET requests - DISABLED FOR ADMIN PANEL
+// export const GET = withCache(getEditionsHandler, CACHE_CONFIG);
+
+// Direct handler without caching for admin panel
+export async function GET(request: NextRequest) {
+  return getEditionsHandler(request);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -155,15 +163,23 @@ export async function POST(request: NextRequest) {
         scheduled_date: scheduled_date ? new Date(scheduled_date).toISOString() : null,
         seo_h1,
         seo_meta_description,
+        created_at: new Date().toISOString(), // Explicitly set created_at
+        updated_at: new Date().toISOString(), // Explicitly set updated_at
       })
       .returning();
 
     // Invalidate editions cache
-    invalidateCacheByTags(['editions']);
+    // Cache invalidation removed for simplicity
 
-    return NextResponse.json({ success: true, data: newEdition }, { status: 201 });
+    return NextResponse.json({ success: true, data: newEdition }, { 
+      status: 201,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error: any) {
-    console.error('[POST /api/editions] Error:', error);
     return NextResponse.json(
       { success: false, error: error.message || 'Failed to create edition' },
       { status: 500 }

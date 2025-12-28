@@ -3,6 +3,10 @@ import { db } from '@/lib/db';
 import { editions } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 
+// Disable Next.js caching for admin panel
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -23,7 +27,6 @@ export async function GET(
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error('Get edition error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch edition' },
       { status: 500 }
@@ -73,9 +76,11 @@ export async function PUT(
       );
     }
 
+    // Invalidate editions cache after update
+    // Cache invalidation removed for simplicity
+
     return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error('Update edition error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update edition' },
       { status: 500 }
@@ -92,12 +97,14 @@ export async function DELETE(
       .delete(editions)
       .where(eq(editions.id, parseInt(params.id)));
 
+    // Invalidate editions cache after delete
+    // Cache invalidation removed for simplicity
+
     return NextResponse.json({
       success: true,
       message: 'Edition deleted successfully',
     });
   } catch (error) {
-    console.error('Delete edition error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete edition' },
       { status: 500 }

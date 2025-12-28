@@ -188,7 +188,18 @@ export default function AreaMapsPage() {
 
   const fetchAvailableAreaMaps = async () => {
     try {
-      const response = await fetch(`/api/editions/${editionId}/all-area-maps`);
+      // Add cache busting for available area maps
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(7);
+      
+      const response = await fetch(`/api/editions/${editionId}/all-area-maps?_t=${timestamp}&_r=${random}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       const result = await response.json();
       if (result.success) {
         setAvailableAreaMaps(result.data || []);
@@ -214,7 +225,18 @@ export default function AreaMapsPage() {
 
   const fetchAreaMaps = async () => {
     try {
-      const response = await fetch(`/api/editions/${editionId}/pages/${pageId}/area-maps`);
+      // Add cache busting for area maps
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(7);
+      
+      const response = await fetch(`/api/editions/${editionId}/pages/${pageId}/area-maps?_t=${timestamp}&_r=${random}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       const result = await response.json();
       if (result.success) {
         const maps = result.data || [];
@@ -281,8 +303,20 @@ export default function AreaMapsPage() {
         
         // Always fetch fresh data from database to ensure consistency
         // This ensures we have the latest linked_area_ids and all other data
+        console.log('🔄 Forcing fresh data reload...');
+        
+        // Wait a bit for database to commit
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
         await fetchAreaMaps();
         await fetchAvailableAreaMaps();
+        
+        // Double refresh after delay to ensure data is loaded
+        setTimeout(async () => {
+          console.log('🔄 Double refresh for area maps...');
+          await fetchAreaMaps();
+          await fetchAvailableAreaMaps();
+        }, 1000);
         
         console.log('🔄 Fresh data loaded after save');
       } else {
@@ -677,8 +711,20 @@ export default function AreaMapsPage() {
         alert('All area maps saved successfully with bidirectional linking!');
         
         // Refresh data to ensure UI is in sync with database
+        console.log('🔄 Refreshing after bulk save...');
+        
+        // Wait for database commit
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
         await fetchAreaMaps();
         await fetchAvailableAreaMaps();
+        
+        // Double refresh
+        setTimeout(async () => {
+          console.log('🔄 Double refresh after bulk save...');
+          await fetchAreaMaps();
+          await fetchAvailableAreaMaps();
+        }, 1000);
       } else {
         console.error('❌ Save failed:', result.error);
         alert('Error: ' + result.error);
@@ -1546,8 +1592,21 @@ export default function AreaMapsPage() {
                         const result = await response.json();
                         if (result.success) {
                           alert('Area map saved successfully!');
+                          
+                          console.log('🔄 Area map saved, forcing refresh...');
+                          
+                          // Wait for database commit
+                          await new Promise(resolve => setTimeout(resolve, 300));
+                          
                           fetchAreaMaps();
                           fetchAvailableAreaMaps();
+                          
+                          // Double refresh
+                          setTimeout(() => {
+                            console.log('🔄 Double refresh after area map save...');
+                            fetchAreaMaps();
+                            fetchAvailableAreaMaps();
+                          }, 1000);
                         } else {
                           alert('Error: ' + result.error);
                         }

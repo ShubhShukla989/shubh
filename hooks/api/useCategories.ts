@@ -51,19 +51,6 @@ const categoriesApi = {
     return response.json();
   },
 
-  // Get featured categories
-  getFeatured: async (): Promise<{ data: Category[] }> => {
-    const response = await fetch('/api/epaper/categories?featured=true', {
-      headers: {
-        'Cache-Control': 'max-age=600', // 10 minutes client cache
-      },
-    });
-    if (!response.ok) {
-      throw new Error('Failed to fetch featured categories');
-    }
-    return response.json();
-  },
-
   // Get single category
   getById: async (id: string | number): Promise<{ data: Category }> => {
     const response = await fetch(`/api/categories/${id}`);
@@ -127,18 +114,6 @@ export const useCategories = () => {
   });
 };
 
-export const useFeaturedCategories = () => {
-  return useQuery({
-    queryKey: queryKeys.featuredCategories,
-    queryFn: categoriesApi.getFeatured,
-    select: (data) => data.data,
-    // Cache featured categories for longer since they change less frequently
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 20 * 60 * 1000, // 20 minutes
-    refetchOnWindowFocus: false,
-  });
-};
-
 export const useCategory = (id: string | number) => {
   return useQuery({
     queryKey: queryKeys.category(id),
@@ -157,11 +132,6 @@ export const useCreateCategory = () => {
     onSuccess: (data) => {
       // Invalidate categories list
       queryClient.invalidateQueries({ queryKey: queryKeys.categories });
-      
-      // If it's featured, invalidate featured categories
-      if (data.data.is_featured) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.featuredCategories });
-      }
       
       // Add to cache
       queryClient.setQueryData(queryKeys.category(data.data.id), { data: data.data });
@@ -183,9 +153,6 @@ export const useUpdateCategory = () => {
       
       // Invalidate categories list
       queryClient.invalidateQueries({ queryKey: queryKeys.categories });
-      
-      // Invalidate featured categories (featured status might have changed)
-      queryClient.invalidateQueries({ queryKey: queryKeys.featuredCategories });
     },
     onError: (error) => {
       console.error('Failed to update category:', error);
@@ -204,7 +171,6 @@ export const useDeleteCategory = () => {
       
       // Invalidate lists
       queryClient.invalidateQueries({ queryKey: queryKeys.categories });
-      queryClient.invalidateQueries({ queryKey: queryKeys.featuredCategories });
     },
     onError: (error) => {
       console.error('Failed to delete category:', error);

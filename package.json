@@ -20,7 +20,9 @@
     "setup:admin": "node scripts/create-admin-user.js",
     "setup:prod": "node scripts/production-setup.js",
     "build:prod": "NODE_ENV=production npm run build:hostinger",
-    "test:imagemagick": "node scripts/test-imagemagick.js"
+    "test:imagemagick": "node scripts/test-imagemagick.js",
+    "analytics:cleanup": "node scripts/cleanup-analytics.js",
+    "analytics:test": "node scripts/test-analytics.js"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",

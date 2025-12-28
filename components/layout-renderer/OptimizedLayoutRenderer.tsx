@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useMemo, useState, useEffect } from 'react';
+import React, { Suspense, useMemo, useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { SkeletonLoader, CardSkeleton } from '@/components/ui/SkeletonLoader';
 import { OptimizedWidget as PerformanceWidget } from '@/components/ui/PerformanceOptimizer';
@@ -65,105 +65,149 @@ export function OptimizedLayoutRenderer({
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   
-  console.log('🎨 OptimizedLayoutRenderer mounted:', { layoutName, hasLayout: !!layout, loading, mounted });
-  
   useEffect(() => {
     setMounted(true);
   }, []);
   
   useEffect(() => {
-    console.log('🔄 useEffect triggered:', { layoutName, layout, hasLayoutData: !!layoutData, mounted });
     if (mounted && layoutName && !layout && !layoutData) {
-      console.log('🚀 Starting layout fetch...');
       fetchLayout();
     }
   }, [layoutName, layout, layoutData, mounted]);
   
-  const fetchLayout = async () => {
+  const fetchLayout = useCallback(async () => {
     if (!layoutName) return;
     
     try {
       setLoading(true);
-      console.log('�  Fetching layout:', layoutName);
-      const response = await fetch(`/api/layouts/${encodeURIComponent(layoutName)}`);
-      console.log('� Layout AAPI response status:', response.status);
+      
+      // Add timeout and abort controller
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      
+      const response = await fetch(`/api/layouts/${encodeURIComponent(layoutName)}`, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const result = await response.json();
-      console.log('📄 Layout API result:', result);
       
       if (result.success && result.data) {
-        console.log('✅ Layout loaded:', result.data);
-        console.log('📊 Layout structure:', result.data.structure);
         setLayoutData(result.data);
       } else {
-        console.warn('⚠️ Layout not found, using fallback');
-        // Fallback layout for homepage
-        setLayoutData({
-          widgets: [
-            { type: 'navigation', enabled: true },
-            { type: 'epaper-featured', enabled: true },
-            { type: 'epaper-calendar', enabled: true }
-          ]
-        });
+        throw new Error(result.message || 'Layout not found');
       }
     } catch (error) {
-      console.error('❌ Error fetching layout:', error);
-      // Fallback layout
-      setLayoutData({
+      console.error('Layout fetch error:', error);
+      
+      // Set configurable fallback layout instead of hardcoded
+      const fallbackLayout = {
         widgets: [
-          { type: 'navigation', enabled: true },
-          { type: 'epaper-featured', enabled: true }
+          { type: 'navigation', enabled: true, config: {} },
+          { type: 'epaper-featured', enabled: true, config: {} }
         ]
-      });
+      };
+      
+      setLayoutData(fallbackLayout);
     } finally {
       setLoading(false);
     }
-  };
+  }, [layoutName]);
   
-  // Memoize layout processing for performance
+  // Memoize layout processing for performance with comprehensive error handling
   const processedLayout = useMemo(() => {
     const currentLayout = layoutData || layout;
     if (!currentLayout) return null;
     
-    // Handle different layout structures
-    let widgets = [];
-    
-    if (currentLayout.structure) {
-      // Parse layout structure if it's a string
-      const layoutStructure = typeof currentLayout.structure === 'string' 
-        ? JSON.parse(currentLayout.structure) 
-        : currentLayout.structure;
+    try {
+      let widgets: any[] = [];
       
-      // Extract widgets from layout structure
-      if (layoutStructure.rows) {
-        layoutStructure.rows.forEach((row: any) => {
-          row.columns?.forEach((column: any) => {
-            column.widgets?.forEach((widget: any) => {
-              widgets.push({
-                type: widget.type,
-                enabled: true,
-                config: widget.config || {},
-                ...widget
+      if (currentLayout.structure) {
+        // Parse layout structure with better error handling
+        let layoutStructure;
+        try {
+          layoutStructure = typeof currentLayout.structure === 'string' 
+            ? JSON.parse(currentLayout.structure) 
+            : currentLayout.structure;
+        } catch (parseError) {
+          console.warn('Failed to parse layout structure:', parseError);
+          return null;
+        }
+        
+        // Extract widgets from layout structure with comprehensive validation
+        if (layoutStructure && layoutStructure.rows && Array.isArray(layoutStructure.rows)) {
+          layoutStructure.rows.forEach((row: any) => {
+            if (row && row.columns && Array.isArray(row.columns)) {
+              row.columns.forEach((column: any) => {
+                if (column && column.widgets && Array.isArray(column.widgets)) {
+                  column.widgets.forEach((widget: any) => {
+                    if (widget && widget.type && typeof widget.type === 'string') {
+                      widgets.push({
+                        type: widget.type,
+                        enabled: widget.enabled !== false,
+                        config: widget.config || {},
+                        deviceVisibility: widget.deviceVisibility || 'both',
+                        ...widget
+                      });
+                    }
+                  });
+                }
+                
+                // Handle nested rows
+                if (column && column.rows && Array.isArray(column.rows)) {
+                  column.rows.forEach((nestedRow: any) => {
+                    if (nestedRow && nestedRow.columns && Array.isArray(nestedRow.columns)) {
+                      nestedRow.columns.forEach((nestedColumn: any) => {
+                        if (nestedColumn && nestedColumn.widgets && Array.isArray(nestedColumn.widgets)) {
+                          nestedColumn.widgets.forEach((widget: any) => {
+                            if (widget && widget.type && typeof widget.type === 'string') {
+                              widgets.push({
+                                type: widget.type,
+                                enabled: widget.enabled !== false,
+                                config: widget.config || {},
+                                deviceVisibility: widget.deviceVisibility || 'both',
+                                ...widget
+                              });
+                            }
+                          });
+                        }
+                      });
+                    }
+                  });
+                }
               });
-            });
+            }
           });
-        });
+        }
+      } else if (currentLayout.widgets && Array.isArray(currentLayout.widgets)) {
+        // Direct widgets array with validation
+        widgets = currentLayout.widgets.filter((w: any) => w && w.type && typeof w.type === 'string').map((w: any) => ({
+          type: w.type,
+          enabled: w.enabled !== false,
+          config: w.config || {},
+          deviceVisibility: w.deviceVisibility || 'both',
+          ...w
+        }));
       }
-    } else if (currentLayout.widgets) {
-      // Direct widgets array
-      widgets = currentLayout.widgets;
+      
+      // Filter widgets for user-facing pages
+      if (isUserFacing) {
+        widgets = widgets.filter((widget: any) => 
+          !widget.adminOnly && widget.enabled !== false
+        );
+      }
+      
+      return { widgets };
+    } catch (error) {
+      console.error('Error processing layout:', error);
+      return null;
     }
-    
-    // Simplify layout for user-facing pages
-    if (isUserFacing) {
-      widgets = widgets.filter((widget: any) => 
-        !widget.adminOnly && widget.enabled !== false
-      );
-    }
-    
-    return { widgets };
   }, [layoutData, layout, isUserFacing]);
-
-  console.log('🎨 Processed layout:', processedLayout);
 
   if (!processedLayout) {
     if (loading) {

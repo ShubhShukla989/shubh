@@ -33,7 +33,6 @@ export const queryKeys = {
   // Categories
   categories: ['categories'] as const,
   category: (id: string | number) => ['categories', id] as const,
-  featuredCategories: ['categories', 'featured'] as const,
   
   // Pages
   pages: ['pages'] as const,

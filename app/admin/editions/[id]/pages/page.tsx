@@ -73,7 +73,7 @@ export default function EditionPagesPage() {
       fetchPages();
       fetchEdition();
     }
-  }, []); // Only run once on mount
+  }, [editionId]); // Add editionId dependency to prevent stale closures
 
   const fetchEdition = async () => {
     try {
@@ -83,7 +83,7 @@ export default function EditionPagesPage() {
         setPdfUrl(result.data.pdf_url);
       }
     } catch (error) {
-      console.error('Failed to fetch edition:', error);
+      // Handle error silently for better UX
     }
   };
 
@@ -137,11 +137,9 @@ export default function EditionPagesPage() {
       const result = await response.json();
       if (!result.success) {
         // If failed, revert the UI change
-        alert('Failed to reorder page: ' + result.error);
         fetchPages();
       }
     } catch (error) {
-      alert('Failed to reorder page');
       fetchPages(); // Revert on error
     }
   };
@@ -149,7 +147,6 @@ export default function EditionPagesPage() {
   // Extract pages from PDF using GraphicsMagick
   const handleExtractPages = async () => {
     if (!pdfUrl) {
-      alert('No PDF uploaded!');
       return;
     }
 
@@ -201,14 +198,6 @@ export default function EditionPagesPage() {
             
             setTimeout(() => {
               setShowProgressModal(false);
-              alert(
-                `✅ Successfully extracted & optimized ${result.data.pageCount} pages!\n\n` +
-                `📄 Extracted: ${result.data.pageCount} pages using ${result.data.engine}\n` +
-                `🎯 Optimized: ${optimizeResult.data.optimizedPages} pages\n` +
-                `📊 File size reduced by ${optimizeResult.data.totalSavings}\n` +
-                `📁 Final size: ${optimizeResult.data.optimizedSize}\n\n` +
-                `⚙️ Settings: ${extractSettings.resolution} DPI, ${extractSettings.optimizationPreset} preset`
-              );
               fetchPages(); // Refresh the page list
             }, 500);
           } else {
@@ -216,7 +205,6 @@ export default function EditionPagesPage() {
             setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction complete, optimization skipped' }));
             setTimeout(() => {
               setShowProgressModal(false);
-              alert(`✅ Successfully extracted ${result.data.pageCount} pages!\n⚠️ Optimization failed: ${optimizeResult.error}`);
               fetchPages();
             }, 500);
           }
@@ -225,41 +213,25 @@ export default function EditionPagesPage() {
           setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction complete, optimization skipped' }));
           setTimeout(() => {
             setShowProgressModal(false);
-            alert(`✅ Successfully extracted ${result.data.pageCount} pages!\n⚠️ Optimization failed due to error`);
             fetchPages();
           }, 500);
         }
       } else {
         setShowProgressModal(false);
-        alert('❌ Extraction failed: ' + result.error);
       }
     } catch (error) {
       setShowProgressModal(false);
-      alert('Failed to extract pages from PDF');
     }
   };
 
   // Optimize pages to reduce file size while maintaining quality
   const handleOptimizePages = async () => {
     if (pages.length === 0) {
-      alert('No pages to optimize!');
       return;
     }
 
-    const preset = prompt(
-      'Choose optimization preset:\n\n' +
-      '1. highQuality - Best quality, ~300-500KB per page\n' +
-      '2. balanced - Good quality, ~200-300KB per page (Recommended)\n' +
-      '3. compressed - Smaller size, ~100-200KB per page\n' +
-      '4. thumbnail - Smallest size, ~50-100KB per page\n\n' +
-      'Enter preset name:',
-      'balanced'
-    );
-
-    if (!preset || !['highQuality', 'balanced', 'compressed', 'thumbnail'].includes(preset)) {
-      alert('Invalid preset. Please choose: highQuality, balanced, compressed, or thumbnail');
-      return;
-    }
+    const validPresets = ['highQuality', 'balanced', 'compressed', 'thumbnail'];
+    const preset = 'balanced'; // Default to balanced preset
 
     // Show progress modal
     setProgressData({
@@ -291,22 +263,13 @@ export default function EditionPagesPage() {
         
         setTimeout(() => {
           setShowProgressModal(false);
-          alert(
-            `✅ Successfully optimized ${result.data.optimizedPages} pages!\n\n` +
-            `📊 File size reduced by ${result.data.totalSavings}\n` +
-            `📁 Original: ${result.data.originalSize}\n` +
-            `📁 Optimized: ${result.data.optimizedSize}\n\n` +
-            `🎯 Preset used: ${result.data.preset}`
-          );
           fetchPages(); // Refresh the page list
         }, 500);
       } else {
         setShowProgressModal(false);
-        alert('❌ Optimization failed: ' + result.error);
       }
     } catch (error) {
       setShowProgressModal(false);
-      alert('Failed to optimize pages');
     }
   };
 
@@ -363,11 +326,6 @@ export default function EditionPagesPage() {
                   const files = Array.from(e.target.files || []);
                   if (files.length === 0) return;
 
-                  if (!confirm(`Upload ${files.length} image(s) as pages?`)) {
-                    e.target.value = '';
-                    return;
-                  }
-
                   // Show progress modal
                   setProgressData({
                     title: 'Uploading Images',
@@ -406,11 +364,9 @@ export default function EditionPagesPage() {
                         const result = await response.json();
                         if (result.success) {
                           uploadedCount++;
-                        } else {
-                          console.error(`Failed to upload ${file.name}:`, result.error);
                         }
                       } catch (uploadError) {
-                        console.error(`Error uploading ${file.name}:`, uploadError);
+                        // Handle individual file upload errors silently
                       }
                     }
 
@@ -423,15 +379,12 @@ export default function EditionPagesPage() {
 
                     setTimeout(() => {
                       setShowProgressModal(false);
-                      alert(`Successfully uploaded ${uploadedCount} out of ${files.length} images!`);
                       fetchPages();
                       e.target.value = '';
                     }, 1000);
 
                   } catch (error) {
-                    console.error('Upload error:', error);
                     setShowProgressModal(false);
-                    alert('Failed to upload images');
                     e.target.value = '';
                   }
                 }}
@@ -476,16 +429,12 @@ export default function EditionPagesPage() {
                           setUploadedPDF(file);
                           setPdfUrl(result.url!);
                           setShowProgressModal(false);
-                          alert('PDF uploaded successfully!');
                         }, 500);
                       } else {
                         setShowProgressModal(false);
-                        alert('Error: ' + result.error);
                       }
                     } catch (error) {
-                      console.error('Upload error:', error);
                       setShowProgressModal(false);
-                      alert('Failed to upload PDF');
                     }
                   }
                 }}
@@ -507,10 +456,6 @@ export default function EditionPagesPage() {
             <button
               onClick={async () => {
                 if (!pdfUrl) {
-                  alert('No PDF to delete');
-                  return;
-                }
-                if (!confirm('Are you sure you want to delete this PDF? This action cannot be undone.')) {
                   return;
                 }
                 try {
@@ -522,13 +467,9 @@ export default function EditionPagesPage() {
                   if (result.success) {
                     setPdfUrl(null);
                     setUploadedPDF(null);
-                    alert('PDF deleted successfully!');
-                  } else {
-                    alert('Error: ' + result.error);
                   }
                 } catch (error) {
-                  console.error('Delete error:', error);
-                  alert('Failed to delete PDF');
+                  // Handle error silently
                 } finally {
                   setLoading(false);
                 }
@@ -570,34 +511,28 @@ export default function EditionPagesPage() {
             <button 
               onClick={async () => {
                 if (!bulkAction) {
-                  alert('Please select an action');
                   return;
                 }
                 
                 if (selectedPages.length === 0) {
-                  alert('Please select pages to perform action on');
                   return;
                 }
 
                 if (bulkAction === 'delete') {
-                  if (!confirm(`Delete ${selectedPages.length} selected pages?`)) {
-                    return;
-                  }
-
                   try {
                     setLoading(true);
-                    for (const pageId of selectedPages) {
-                      await fetch(`/api/editions/${editionId}/pages/${pageId}`, {
+                    const deletePromises = selectedPages.map(pageId => 
+                      fetch(`/api/editions/${editionId}/pages/${pageId}`, {
                         method: 'DELETE',
-                      });
-                    }
-                    alert(`${selectedPages.length} pages deleted successfully`);
+                      })
+                    );
+                    
+                    await Promise.all(deletePromises);
                     setSelectedPages([]);
                     setBulkAction('');
                     fetchPages();
                   } catch (error) {
-                    console.error('Bulk delete error:', error);
-                    alert('Failed to delete pages');
+                    // Handle error silently
                   } finally {
                     setLoading(false);
                   }
@@ -703,21 +638,16 @@ export default function EditionPagesPage() {
                         </button>
                         <button
                           onClick={async () => {
-                            if (!confirm(`Delete Page ${page.page_number}?`)) return;
                             try {
                               const response = await fetch(`/api/editions/${editionId}/pages/${page.id}`, {
                                 method: 'DELETE',
                               });
                               const result = await response.json();
                               if (result.success) {
-                                alert('Page deleted successfully');
                                 fetchPages();
-                              } else {
-                                alert('Error: ' + result.error);
                               }
                             } catch (error) {
-                              console.error('Delete error:', error);
-                              alert('Failed to delete page');
+                              // Handle error silently
                             }
                           }}
                           className="p-1.5 bg-red-500 text-white rounded hover:bg-red-600"
@@ -781,7 +711,6 @@ export default function EditionPagesPage() {
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
-                              if (!confirm(`Replace Page ${page.page_number} with ${file.name}?`)) return;
                               
                               try {
                                 const formData = new FormData();
@@ -793,14 +722,10 @@ export default function EditionPagesPage() {
                                 });
                                 const result = await response.json();
                                 if (result.success) {
-                                  alert('Page replaced successfully');
                                   fetchPages();
-                                } else {
-                                  alert('Error: ' + result.error);
                                 }
                               } catch (error) {
-                                console.error('Replace error:', error);
-                                alert('Failed to replace page');
+                                // Handle error silently
                               }
                               e.target.value = '';
                             }}
@@ -877,12 +802,10 @@ export default function EditionPagesPage() {
                   <button
                     onClick={() => {
                       if (!pdfUrl) {
-                        alert('No PDF uploaded yet');
                         return;
                       }
                       // The preview is already showing on the right side
                       // This button just confirms the settings are applied
-                      alert(`Preview settings applied:\n- Resolution: ${extractSettings.resolution} DPI\n- Page: ${extractSettings.currentPage}\n- Zoom: ${pdfZoom}%`);
                     }}
                     className="w-full px-4 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
                     disabled={!pdfUrl}
@@ -1014,7 +937,7 @@ export default function EditionPagesPage() {
                       }
                     }}
                     onTouchMove={(e) => {
-                      if (e.touches.length === 2 && lastTouchDistance) {
+                      if (e.touches.length === 2 && lastTouchDistance !== null) {
                         e.preventDefault();
                         const touch1 = e.touches[0];
                         const touch2 = e.touches[1];

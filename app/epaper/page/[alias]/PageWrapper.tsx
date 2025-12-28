@@ -1,5 +1,7 @@
 'use client';
 
+import AnalyticsTracker from '@/components/AnalyticsTracker';
+
 interface PageWrapperProps {
   children: React.ReactNode;
   headerCode?: string;
@@ -9,6 +11,8 @@ interface PageWrapperProps {
 export default function PageWrapper({ children, headerCode, footerCode }: PageWrapperProps) {
   return (
     <>
+      <AnalyticsTracker />
+      
       {/* Header Code Injection */}
       {headerCode && (
         <div dangerouslySetInnerHTML={{ __html: headerCode }} />

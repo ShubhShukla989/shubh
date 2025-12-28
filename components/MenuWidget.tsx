@@ -118,8 +118,8 @@ export function MenuWidget({ config }: MenuWidgetProps) {
               className="flex-1 px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-100 rounded transition-colors block fw-bold"
               target={item.type === 'external' ? '_blank' : '_self'}
               style={{ paddingLeft: `${12 + level * 16}px` }}
-              dangerouslySetInnerHTML={{ __html: item.title }}
             >
+              {item.title}
             </Link>
             {hasChildren && (
               <button
@@ -149,8 +149,13 @@ export function MenuWidget({ config }: MenuWidgetProps) {
             href={itemUrl}
             className="px-4 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-100 rounded transition-colors flex items-center gap-1 fw-semibold"
             target={item.type === 'external' ? '_blank' : '_self'}
-            dangerouslySetInnerHTML={{ __html: item.title + (hasChildren ? ' <svg class="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>' : '') }}
           >
+            {item.title}
+            {hasChildren && (
+              <svg className="w-4 h-4 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            )}
           </Link>
         </div>
         {hasChildren && (
@@ -161,8 +166,8 @@ export function MenuWidget({ config }: MenuWidgetProps) {
                   href={getItemUrl(child)}
                   className="block px-4 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors fw-bold"
                   target={child.type === 'external' ? '_blank' : '_self'}
-                  dangerouslySetInnerHTML={{ __html: child.title }}
                 >
+                  {child.title}
                 </Link>
               </li>
             ))}
@@ -173,16 +178,22 @@ export function MenuWidget({ config }: MenuWidgetProps) {
   };
 
   const renderDropdownMenu = () => {
-    const flattenItems = (items: MenuItem[], level: number = 0): JSX.Element[] => {
-      const elements: JSX.Element[] = [];
+    const flattenItems = (items: MenuItem[], level: number = 0): Array<{ value: string; label: string }> => {
+      const options: Array<{ value: string; label: string }> = [];
       items.forEach(item => {
-        elements.push(renderMenuItem(item, level));
+        const indent = '  '.repeat(level);
+        options.push({
+          value: getItemUrl(item),
+          label: `${indent}${item.title}`
+        });
         if (item.children && item.children.length > 0) {
-          elements.push(...flattenItems(item.children, level + 1));
+          options.push(...flattenItems(item.children, level + 1));
         }
       });
-      return elements;
+      return options;
     };
+
+    const options = flattenItems(menuItems);
 
     return (
       <select
@@ -195,7 +206,11 @@ export function MenuWidget({ config }: MenuWidgetProps) {
         defaultValue=""
       >
         <option value="">-- Select Page --</option>
-        {flattenItems(menuItems)}
+        {options.map((option, index) => (
+          <option key={index} value={option.value}>
+            {option.label}
+          </option>
+        ))}
       </select>
     );
   };

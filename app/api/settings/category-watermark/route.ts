@@ -9,21 +9,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('category_id');
     
-    console.log('🔍 API: Fetching watermark settings for category:', categoryId);
-    
     if (!categoryId) {
-      console.log('❌ API: No category ID provided');
       return NextResponse.json(
         { success: false, error: 'Category ID is required' },
         { status: 400 }
       );
-    }
-
-    try {
-      const allSettings = await db.select().from(category_watermark_settings).limit(5);
-      console.log('🔍 API: All category watermark settings in DB:', allSettings);
-    } catch (dbError) {
-      console.error('❌ API: Database table error:', dbError);
     }
 
     const [settings] = await db
@@ -31,10 +21,7 @@ export async function GET(request: NextRequest) {
       .from(category_watermark_settings)
       .where(eq(category_watermark_settings.category_id, parseInt(categoryId)));
 
-    console.log('🔍 API: Found settings for category', categoryId, ':', settings);
-
     if (!settings) {
-      console.log('⚠️ API: No settings found, returning defaults');
       // Return default settings if none exist
       return NextResponse.json({
         success: true,
@@ -80,8 +67,6 @@ export async function GET(request: NextRequest) {
       center_watermark_opacity: settings.center_watermark_opacity || 100,
     };
 
-    console.log('✅ API: Returning settings:', responseData);
-
     return NextResponse.json({
       success: true,
       data: responseData
@@ -101,11 +86,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { category_id, ...settings } = body;
     
-    console.log('💾 API: Saving watermark settings for category:', category_id);
-    console.log('💾 API: Settings to save:', settings);
-    
     if (!category_id) {
-      console.log('❌ API: No category ID provided for save');
       return NextResponse.json(
         { success: false, error: 'Category ID is required' },
         { status: 400 }
@@ -130,8 +111,6 @@ export async function POST(request: NextRequest) {
       info_text_font: settings.info_text_font || 'English',
     };
 
-    console.log('💾 API: Database settings to save:', dbSettings);
-
     // Insert or update settings
     const result = await db
       .insert(category_watermark_settings)
@@ -155,8 +134,6 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString(),
         }
       });
-
-    console.log('✅ API: Settings saved successfully:', result);
 
     return NextResponse.json({
       success: true,

@@ -11,13 +11,10 @@ export async function GET(
 ) {
   try {
     const editionId = parseInt(params.id);
-    console.log('[GET /api/editions/[id]/pages] Edition ID:', editionId);
 
     // Get query parameters - DEFAULT to true for watermark
     const removeLogo = request.nextUrl.searchParams.get('remove_logo') !== 'false';
     const applyWatermark = request.nextUrl.searchParams.get('apply_watermark') !== 'false';
-
-    console.log('[GET /api/editions/[id]/pages] 🔧 Parameters - removeLogo:', removeLogo, 'applyWatermark:', applyWatermark);
 
     // Fetch edition details first (needed for watermark context)
     const [edition] = await db
@@ -39,8 +36,6 @@ export async function GET(
       .from(edition_pages)
       .where(eq(edition_pages.edition_id, editionId))
       .orderBy(asc(edition_pages.page_number));
-
-    console.log('[GET /api/editions/[id]/pages] Pages count:', pages.length);
 
     // Fetch area maps for all pages
     if (pages.length > 0) {
@@ -119,21 +114,12 @@ export async function GET(
           page.file_size = 'Unknown';
         }
       } catch (error) {
-        console.error(`[GET /api/editions/[id]/pages] Error calculating file size for page ${page.page_number}:`, error);
         page.file_size = 'Error';
       }
     }
 
-    // Process images if requested - DISABLED TO FIX BLANK AREA ISSUE
-    // if ((removeLogo || applyWatermark) && pages.length > 0) {
-    //   console.log('[GET /api/editions/[id]/pages] Processing images - removeLogo:', removeLogo, 'applyWatermark:', applyWatermark);
-    //   // ... watermark processing code disabled
-    // }
-
-    console.log('[GET /api/editions/[id]/pages] Returning', pages.length, 'pages');
     return NextResponse.json({ success: true, data: pages });
   } catch (error) {
-    console.error('[GET /api/editions/[id]/pages] Error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch pages' },
       { status: 500 }
@@ -149,8 +135,6 @@ export async function PUT(
     const editionId = parseInt(params.id);
     const body = await request.json();
     const { pageId, title, alias, description } = body;
-
-    console.log('[PUT /api/editions/[id]/pages] Updating page:', { editionId, pageId, title, alias, description });
 
     if (!pageId) {
       return NextResponse.json(
@@ -177,14 +161,12 @@ export async function PUT(
       );
     }
 
-    console.log('[PUT /api/editions/[id]/pages] Page updated successfully:', updatedPage.id);
     return NextResponse.json({ 
       success: true, 
       data: updatedPage,
       message: 'Page updated successfully' 
     });
   } catch (error) {
-    console.error('[PUT /api/editions/[id]/pages] Error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update page' },
       { status: 500 }

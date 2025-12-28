@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CustomCodeModal } from './CustomCodeModal';
 import { LayoutStructure, Row } from './types';
 import { LayoutRow } from './LayoutRow';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { generateRowId, generateColumnId, generateWidgetId } from '@/lib/utils/idGenerator';
 
 interface LayoutBuilderProps {
   structure: LayoutStructure;
@@ -26,20 +28,43 @@ export function LayoutBuilder({
   const [screenSize, setScreenSize] = useState<'xl' | 'lg' | 'md' | 'sm' | 'xs'>('xl');
   const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [rowToDelete, setRowToDelete] = useState<{ id: string; widgetCount: number } | null>(null);
 
   const addRow = () => {
     const newRow: Row = {
-      id: `row-${Date.now()}`,
+      id: generateRowId(),
       columns: [],
     };
     onChange({ ...structure, rows: [...structure.rows, newRow] });
   };
 
   const deleteRow = (rowId: string) => {
+    const rowToDeleteData = structure.rows.find(r => r.id === rowId);
+    
+    // Check if row has content
+    if (rowToDeleteData && rowToDeleteData.columns && rowToDeleteData.columns.length > 0) {
+      const totalWidgets = rowToDeleteData.columns.reduce((count, col) => count + (col.widgets?.length || 0), 0);
+      if (totalWidgets > 0) {
+        setRowToDelete({ id: rowId, widgetCount: totalWidgets });
+        return;
+      }
+    }
+    
+    // Delete immediately if no widgets
     onChange({
       ...structure,
       rows: structure.rows.filter(r => r.id !== rowId),
     });
+  };
+
+  const confirmDeleteRow = () => {
+    if (rowToDelete) {
+      onChange({
+        ...structure,
+        rows: structure.rows.filter(r => r.id !== rowToDelete.id),
+      });
+      setRowToDelete(null);
+    }
   };
 
   const duplicateRow = (rowId: string) => {
@@ -48,18 +73,52 @@ export function LayoutBuilder({
     
     const rowToDuplicate = structure.rows[rowIndex];
     const newRow = JSON.parse(JSON.stringify(rowToDuplicate));
-    newRow.id = `row-${Date.now()}`;
+    
+    // Generate unique IDs for duplicated row and all nested elements
+    newRow.id = generateRowId();
+    
+    // Update column IDs and widget IDs to prevent conflicts
+    newRow.columns = newRow.columns.map((col: any) => ({
+      ...col,
+      id: generateColumnId(),
+      widgets: col.widgets.map((widget: any) => ({
+        ...widget,
+        id: generateWidgetId()
+      }))
+    }));
     
     const newRows = [...structure.rows];
     newRows.splice(rowIndex + 1, 0, newRow);
     onChange({ ...structure, rows: newRows });
   };
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      setDraggedRowId(null);
+      setDropTargetIndex(null);
+      setRowToDelete(null);
+    };
+  }, []);
+
   const updateRow = (rowId: string, updatedRow: any) => {
-    onChange({
-      ...structure,
-      rows: structure.rows.map(r => r.id === rowId ? updatedRow : r),
-    });
+    // Comprehensive validation of the updated row structure
+    if (!updatedRow || !updatedRow.id || !Array.isArray(updatedRow.columns)) {
+      return;
+    }
+    
+    // Validate each column in the row
+    const validColumns = updatedRow.columns.filter((col: any) => 
+      col && col.id && Array.isArray(col.widgets) && Array.isArray(col.rows || [])
+    );
+    
+    // Only update if all columns are valid
+    if (validColumns.length === updatedRow.columns.length) {
+      onChange({
+        ...structure,
+        rows: structure.rows.map(r => r.id === rowId ? { ...updatedRow, columns: validColumns } : r),
+      });
+    }
   };
 
   const moveRow = (rowId: string, direction: 'up' | 'down') => {
@@ -153,7 +212,12 @@ export function LayoutBuilder({
         </div>
         
         <button
-          onClick={() => setScreenSize(screenSize === 'xl' ? 'lg' : 'xl')}
+          onClick={() => {
+            const sizes: ('xl' | 'lg' | 'md' | 'sm' | 'xs')[] = ['xl', 'lg', 'md', 'sm', 'xs'];
+            const currentIndex = sizes.indexOf(screenSize);
+            const nextIndex = (currentIndex + 1) % sizes.length;
+            setScreenSize(sizes[nextIndex]);
+          }}
           className={`px-4 py-2 rounded font-medium shadow-md transition-all hover:shadow-lg flex items-center gap-2 ${
             screenSize === 'xl'
               ? 'bg-yellow-400 text-black hover:bg-yellow-500'
@@ -163,7 +227,7 @@ export function LayoutBuilder({
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
           </svg>
-          {screenSize === 'xl' ? 'Extra Large' : 'Large'}
+          {screenSizes[screenSize].label}
         </button>
       </div>
 
@@ -226,6 +290,20 @@ export function LayoutBuilder({
           onCssChange={onCustomCssChange}
           onJsChange={onCustomJsChange}
           onClose={() => setShowCustomCode(false)}
+        />
+      )}
+
+      {/* Row Delete Confirmation Modal */}
+      {rowToDelete && (
+        <ConfirmModal
+          isOpen={true}
+          title="Delete Row"
+          message={`This row contains ${rowToDelete.widgetCount} widget(s). Are you sure you want to delete it? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          type="danger"
+          onConfirm={confirmDeleteRow}
+          onCancel={() => setRowToDelete(null)}
         />
       )}
     </div>

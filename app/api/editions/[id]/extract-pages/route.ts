@@ -39,9 +39,6 @@ export async function POST(
     const resolution = Math.min(body.resolution || 200, 300); // Increased to 300 DPI max for better quality
     const format = body.format || 'jpg'; // Use JPEG for smaller files
     const quality = body.quality || 88; // ENHANCED quality for newspapers (was 75)
-    
-    console.log('🚀 Starting HIGH-QUALITY PDF extraction');
-    console.log('📋 Settings:', { editionId, resolution, format, quality });
 
     // Get edition details
     const edition = await db
@@ -58,14 +55,11 @@ export async function POST(
     }
 
     const pdfPath = join(process.cwd(), 'public', edition[0].pdf_url);
-    console.log('📄 PDF Path:', pdfPath);
 
     // Read PDF to get page count
     const pdfBuffer = await readFile(pdfPath);
     const pdfDoc = await PDFDocument.load(pdfBuffer);
     const pageCount = pdfDoc.getPageCount();
-    
-    console.log('📊 PDF has', pageCount, 'pages');
 
     // Create uploads directory if it doesn't exist
     const uploadsDir = join(process.cwd(), 'public', 'uploads');
@@ -135,22 +129,15 @@ export async function POST(
       ].filter(Boolean).join(' ');
     }
 
-    console.log('⚙️ Executing PDF extraction with platform-specific tools');
-    console.log('🔧 Tool:', isUbuntu ? 'pdftoppm' : 'Ghostscript');
-
     // Execute extraction command
     const { stdout, stderr } = await execAsync(extractCommand);
     
     if (stderr && !stderr.includes('Warning')) {
-      console.error('❌ Extraction error:', stderr);
+      // Handle extraction errors silently in production
     }
-    
-    console.log('✅ Extraction completed successfully');
-    if (stdout) console.log('📝 Output:', stdout);
 
     // Clear existing pages for this edition
     await db.delete(edition_pages).where(eq(edition_pages.edition_id, editionId));
-    console.log('🗑️ Cleared existing pages');
 
     // Insert new pages into database
     const newPages = [];
@@ -183,7 +170,6 @@ export async function POST(
     }
 
     const insertedPages = await db.insert(edition_pages).values(newPages).returning();
-    console.log('💾 Inserted', insertedPages.length, 'pages into database');
 
     return NextResponse.json({
       success: true,
@@ -198,8 +184,6 @@ export async function POST(
     });
 
   } catch (error: any) {
-    console.error('💥 PDF extraction failed:', error);
-    
     // Platform detection for error messages
     const isUbuntu = process.platform === 'linux';
     

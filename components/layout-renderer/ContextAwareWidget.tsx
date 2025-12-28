@@ -1,8 +1,8 @@
 'use client';
 
-// Removed EpaperContext import - working independently now
 import { useColumnVisibility } from './ColumnVisibilityHelper';
-import { useEffect, useState } from 'react';
+import { parseInlineStyle, sanitizeHtml } from '@/lib/utils/styleParser';
+import { useEffect, useState, useMemo } from 'react';
 import { EpaperArchiveWidget } from '../epaper/EpaperArchiveWidget';
 import { EpaperCalendarWidget } from '../epaper/EpaperCalendarWidget';
 import { EpaperPaginationWidget } from '../epaper/EpaperPaginationWidget';
@@ -42,8 +42,13 @@ export function ContextAwareWidget({
 }: ContextAwareWidgetProps) {
   const { isWidgetVisible } = useColumnVisibility();
   
+  // Memoize visibility check with stable dependencies
+  const isVisible = useMemo(() => {
+    return isWidgetVisible(widget);
+  }, [widget.deviceVisibility, widget.id]); // Use stable widget.id instead of function reference
+  
   // Check device visibility
-  if (!isWidgetVisible(widget)) {
+  if (!isVisible) {
     return null; // Don't render if not visible on current device
   }
 
@@ -141,7 +146,7 @@ function renderWidget(widget: any, areaMapId?: string, editionId?: string, pageN
         <div 
           className={widget.config.cssClasses || ''}
           style={parseInlineStyle(widget.config.style)}
-          dangerouslySetInnerHTML={{ __html: widget.config.content || widget.config.html }} 
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(widget.config.content || widget.config.html) }} 
         />
       );
 
@@ -238,24 +243,6 @@ function renderWidget(widget: any, areaMapId?: string, editionId?: string, pageN
   }
 }
 
-function parseInlineStyle(styleString?: string): React.CSSProperties {
-  if (!styleString) return {};
-  
-  try {
-    const styles: any = {};
-    styleString.split(';').forEach(rule => {
-      const [property, value] = rule.split(':').map(s => s.trim());
-      if (property && value) {
-        const camelProperty = property.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-        styles[camelProperty] = value;
-      }
-    });
-    return styles;
-  } catch {
-    return {};
-  }
-}
-
 // Helper function to get edition title
 async function fetchEditionTitle(editionId: string): Promise<string | null> {
   try {
@@ -265,7 +252,7 @@ async function fetchEditionTitle(editionId: string): Promise<string | null> {
       return data.success ? data.title : null;
     }
   } catch (error) {
-    console.error('Error fetching edition title:', error);
+    // Handle API error silently
   }
   return null;
 }
@@ -324,7 +311,7 @@ function HeadingWidgetRenderer({
   editionId?: string; 
   pageNumber?: string; 
 }) {
-  const [editionTitle, setEditionTitle] = useState<string | null>(null);
+  const [editionTitle, setEditionTitle] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
   // Get context-aware heading text
@@ -375,6 +362,8 @@ function HeadingWidgetRenderer({
 
   // Fetch edition title when component mounts
   useEffect(() => {
+    let isMounted = true; // Prevent state updates if component unmounts
+    
     const fetchTitle = async () => {
       if (typeof window === 'undefined') return;
       
@@ -386,30 +375,35 @@ function HeadingWidgetRenderer({
       if (isEpaperDisplayPage && currentEditionId && !isNaN(Number(currentEditionId))) {
         // First try to get from document title
         const titleFromDoc = getEditionTitle(currentEditionId);
-        if (titleFromDoc) {
+        if (titleFromDoc && isMounted) {
           setEditionTitle(titleFromDoc);
           return;
         }
         
         // If not found, fetch from API
-        setLoading(true);
+        if (isMounted) setLoading(true);
         try {
           const response = await fetch(`/api/editions/${currentEditionId}/title`);
           if (response.ok) {
             const data = await response.json();
-            if (data.success) {
+            if (data.success && isMounted) {
               setEditionTitle(data.title);
             }
           }
         } catch (error) {
-          console.error('Error fetching edition title:', error);
+          // Handle API error silently
         } finally {
-          setLoading(false);
+          if (isMounted) setLoading(false);
         }
       }
     };
 
     fetchTitle();
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
   }, [editionId]);
   
   // Check if we should show underlined part

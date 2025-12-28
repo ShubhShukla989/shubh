@@ -4,6 +4,10 @@ import { area_maps, editions, category_watermark_settings, area_map_watermark_se
 import { eq } from 'drizzle-orm';
 import { applyWatermarkToBase64, WatermarkSettings } from '@/lib/watermark';
 
+// Disable Next.js caching for area maps
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { areaMapId: string } }
@@ -107,7 +111,13 @@ export async function GET(
     }
     */
 
-    return NextResponse.json({ success: true, data: parsedData });
+    return NextResponse.json({ success: true, data: parsedData }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     console.error('Get area map error:', error);
     return NextResponse.json(
@@ -215,6 +225,12 @@ export async function PUT(
             success: true,
             data: updated,
             message: 'Watermark regenerated successfully'
+          }, {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
           });
         } else {
           return NextResponse.json({

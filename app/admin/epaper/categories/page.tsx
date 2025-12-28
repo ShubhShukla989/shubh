@@ -28,10 +28,15 @@ export default function CategoriesPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/epaper/categories', {
+      // Simple cache busting
+      const timestamp = Date.now();
+      
+      const response = await fetch(`/api/epaper/categories?_t=${timestamp}`, {
         cache: 'no-store',
         headers: {
-          'Cache-Control': 'no-cache',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         },
       });
       const result = await response.json();
@@ -50,43 +55,24 @@ export default function CategoriesPage() {
     if (!confirm(`Are you sure you want to ${action} "${title}"?`)) return;
 
     try {
-      // First get the full category data
-      const getResponse = await fetch(`/api/epaper/categories/${id}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
-      });
-      const getResult = await getResponse.json();
-      
-      if (!getResult.success) {
-        alert('Error: ' + getResult.error);
-        return;
-      }
-
-      const category = getResult.data;
-
-      // Update with all fields
+      // Simple toggle without unnecessary GET request
       const response = await fetch(`/api/epaper/categories/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...category,
           is_featured: !currentFeatured,
         }),
       });
 
       const result = await response.json();
       if (result.success) {
-        // Immediately update local state
+        // Update local state immediately
         setCategories(categories.map(cat => 
           cat.id === id ? { ...cat, is_featured: !currentFeatured } : cat
         ));
         alert(`Category ${currentFeatured ? 'removed from' : 'added to'} featured successfully`);
-        // Also fetch fresh data
-        setTimeout(() => fetchCategories(), 500);
       } else {
         alert('Error: ' + result.error);
       }
@@ -97,7 +83,7 @@ export default function CategoriesPage() {
   };
 
   const handleDelete = async (id: number, title: string) => {
-    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+    if (!confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) return;
 
     try {
       const response = await fetch(`/api/epaper/categories/${id}`, {
@@ -106,8 +92,9 @@ export default function CategoriesPage() {
 
       const result = await response.json();
       if (result.success) {
+        // Remove from local state immediately
+        setCategories(categories.filter(cat => cat.id !== id));
         alert('Category deleted successfully');
-        fetchCategories();
       } else {
         alert('Error: ' + result.error);
       }

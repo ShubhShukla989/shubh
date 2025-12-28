@@ -3,6 +3,10 @@ import { db } from '@/lib/db';
 import { area_maps } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 
+// Disable Next.js caching for area maps
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string; pageId: string } }
@@ -22,7 +26,13 @@ export async function GET(
         : []
     }));
 
-    return NextResponse.json({ success: true, data: parsedData });
+    return NextResponse.json({ success: true, data: parsedData }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     console.error('Get area maps error:', error);
     return NextResponse.json(
@@ -212,7 +222,14 @@ export async function POST(
       console.log('🔗 ========== BIDIRECTIONAL LINKING END ==========');
       console.log('✅ Bulk save completed:', finalParsedData.length, 'areas processed');
       console.log('📊 Final area maps with bidirectional links:', finalParsedData);
-      return NextResponse.json({ success: true, data: finalParsedData }, { status: 200 });
+      return NextResponse.json({ success: true, data: finalParsedData }, { 
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
     } else {
       // Single area map creation
       // Validate required fields
@@ -271,7 +288,14 @@ export async function POST(
         .values(cleanData)
         .returning();
 
-      return NextResponse.json({ success: true, data: newAreaMap }, { status: 201 });
+      return NextResponse.json({ success: true, data: newAreaMap }, { 
+        status: 201,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
     }
   } catch (error) {
     console.error('Create area map error:', error);

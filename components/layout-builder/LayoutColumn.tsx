@@ -5,6 +5,8 @@ import { Column, Widget, Row } from './types';
 import { WidgetComponent } from './WidgetComponent';
 import { WidgetModal } from './WidgetModal';
 import { ColumnPropertiesModal } from './ColumnPropertiesModal';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { generateUniqueId, generateNestedRowId, generateColumnId } from '@/lib/utils/idGenerator';
 
 interface LayoutColumnProps {
   column: Column;
@@ -18,10 +20,15 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
   const [editingWidget, setEditingWidget] = useState<Widget | null>(null);
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [widgetToDelete, setWidgetToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const addWidget = (type: Widget['type']) => {
+    // Generate unique ID ensuring it doesn't already exist
+    const existingIds = column.widgets.map(w => w.id);
+    const newId = generateUniqueId('widget', existingIds);
+    
     const newWidget: Widget = {
-      id: `widget-${Date.now()}`,
+      id: newId,
       type,
       config: getDefaultConfig(type),
     };
@@ -38,23 +45,37 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
   };
 
   const deleteWidget = (widgetId: string) => {
-    onUpdate({
-      ...column,
-      widgets: column.widgets.filter(w => w.id !== widgetId),
-    });
+    const widget = column.widgets.find(w => w.id === widgetId);
+    const widgetName = widget ? widget.type.replace('-', ' ') : 'widget';
+    
+    setWidgetToDelete({ id: widgetId, name: widgetName });
+  };
+
+  const confirmDeleteWidget = () => {
+    if (widgetToDelete) {
+      onUpdate({
+        ...column,
+        widgets: column.widgets.filter(w => w.id !== widgetToDelete.id),
+      });
+      setWidgetToDelete(null);
+    }
   };
 
   const duplicateWidget = (widgetId: string) => {
     const widget = column.widgets.find(w => w.id === widgetId);
     if (!widget) return;
     
-    const newWidget = { ...widget, id: `widget-${Date.now()}` };
+    // Generate unique ID for duplicated widget
+    const existingIds = column.widgets.map(w => w.id);
+    const newId = generateUniqueId('widget', existingIds);
+    
+    const newWidget = { ...widget, id: newId };
     onUpdate({ ...column, widgets: [...column.widgets, newWidget] });
   };
 
   const addNestedRow = () => {
     const newRow: Row = {
-      id: `nested-row-${Date.now()}`,
+      id: generateNestedRowId(),
       columns: [],
     };
     onUpdate({ ...column, rows: [...column.rows, newRow] });
@@ -125,7 +146,6 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
       name: 'External Epaper',
       widgets: [
         { type: 'social' as const, label: 'Social Links' },
-        { type: 'social' as const, label: 'Social Sharing' },
       ]
     },
     {
@@ -182,7 +202,6 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
         { type: 'epaper-category' as const, label: 'Epaper CategoryWise Epapers' },
         { type: 'epaper-gallery' as const, label: 'Epaper Galleries' },
         { type: 'epaper-featured' as const, label: 'Epaper Featured Editions' },
-        { type: 'epaper-featured' as const, label: 'Epaper Featured Categories' },
         { type: 'epaper-archive' as const, label: 'Epaper Archive Page' },
         { type: 'epaper-calendar' as const, label: 'Epaper Calendar' },
         { type: 'epaper-display' as const, label: 'Epaper Display Page: Epaper Display' },
@@ -380,6 +399,20 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
           onClose={() => setEditingWidget(null)}
         />
       )}
+
+      {/* Widget Delete Confirmation Modal */}
+      {widgetToDelete && (
+        <ConfirmModal
+          isOpen={true}
+          title="Delete Widget"
+          message={`Are you sure you want to delete this ${widgetToDelete.name}? This action cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          type="danger"
+          onConfirm={confirmDeleteWidget}
+          onCancel={() => setWidgetToDelete(null)}
+        />
+      )}
     </div>
   );
 }
@@ -391,7 +424,7 @@ function NestedLayoutRow({ row, onUpdate, onDelete }: { row: Row; onUpdate: (row
     const defaultWidth = existingColumns === 0 ? '12' : '6';
     
     const newColumn: Column = {
-      id: `col-${Date.now()}`,
+      id: generateColumnId(),
       width: 12,
       widgets: [],
       rows: [],

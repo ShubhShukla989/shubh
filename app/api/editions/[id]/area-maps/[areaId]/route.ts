@@ -3,6 +3,10 @@ import { db } from '@/lib/db';
 import { area_maps } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 
+// Disable Next.js caching for area maps
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string; areaId: string } }
@@ -162,7 +166,13 @@ export async function PUT(
     };
 
     console.log('✅ PUT area-maps: Successfully updated with bidirectional links:', parsedUpdated);
-    return NextResponse.json({ success: true, data: parsedUpdated });
+    return NextResponse.json({ success: true, data: parsedUpdated }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     console.error('💥 PUT area-maps error:', error);
     return NextResponse.json(

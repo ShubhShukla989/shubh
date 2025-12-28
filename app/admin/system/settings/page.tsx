@@ -115,7 +115,7 @@ export default function SettingsPage() {
         setInfoTextFont(data.info_text_font || 'English');
       }
     } catch (error) {
-      console.error('Failed to load settings:', error);
+      // Silently handle error - user will see default values
     }
   };
 
@@ -139,7 +139,6 @@ export default function SettingsPage() {
         alert('❌ Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Save error:', error);
       alert('❌ Failed to save site settings');
     } finally {
       setSaving(false);
@@ -162,7 +161,6 @@ export default function SettingsPage() {
         alert('❌ Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Save error:', error);
       alert('❌ Failed to save ads.txt');
     } finally {
       setSaving(false);
@@ -185,7 +183,6 @@ export default function SettingsPage() {
         alert('❌ Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Save error:', error);
       alert('❌ Failed to save robots.txt');
     } finally {
       setSaving(false);
@@ -208,7 +205,6 @@ export default function SettingsPage() {
         alert('❌ Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Save error:', error);
       alert('❌ Failed to save analytics settings');
     } finally {
       setSaving(false);
@@ -239,7 +235,6 @@ export default function SettingsPage() {
         alert('❌ Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Save error:', error);
       alert('❌ Failed to save epaper settings');
     } finally {
       setSaving(false);
@@ -276,7 +271,6 @@ export default function SettingsPage() {
         alert('❌ Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Save error:', error);
       alert('❌ Failed to save watermark settings');
     } finally {
       setSaving(false);

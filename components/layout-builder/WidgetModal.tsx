@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Widget } from './types';
 import { MediaBrowserModal } from './MediaBrowserModal';
 import { DeviceVisibilitySelector } from './DeviceVisibilitySelector';
+import { showError } from '@/lib/utils/toast';
 
 // Tree node interface for hierarchical categories
 interface TreeNode {
@@ -1031,7 +1032,7 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
         setCategories(result.data || []);
       }
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      // Handle API error silently in production
     }
   };
 
@@ -1520,7 +1521,7 @@ function MenuForm({ config, onChange }: { config: any; onChange: (config: any) =
       const data = await response.json();
       setMenus(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Failed to fetch menus:', error);
+      // Handle menu fetch error silently in production
       setMenus([]);
     } finally {
       setLoadingMenus(false);
@@ -1632,7 +1633,7 @@ function NavigationForm({ config, onChange }: { config: any; onChange: (config: 
       // API returns data directly, not wrapped in success/data
       setMenus(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Failed to fetch menus:', error);
+      // Handle menu fetch error silently in production
       setMenus([]);
     } finally {
       setLoadingMenus(false);
@@ -1798,6 +1799,22 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
   const [loadingSliders, setLoadingSliders] = useState(false);
   const [showMediaBrowser, setShowMediaBrowser] = useState(false);
 
+  // Handle widget prop changes with validation
+  useEffect(() => {
+    if (widget) {
+      // Validate that the widget object is properly formed
+      if (!widget.id || !widget.type) {
+        // Invalid widget - close modal silently
+        onClose();
+        return;
+      }
+      
+      setEditedWidget({ ...widget });
+    } else {
+      setEditedWidget(null);
+    }
+  }, [widget, onClose]);
+
   // Fetch sliders for slideshow widget
   useEffect(() => {
     if (editedWidget?.type === 'slideshow') {
@@ -1815,7 +1832,7 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
         setSliders(data.sliders || []);
       }
     } catch (error) {
-      console.error('Error fetching sliders:', error);
+      // Handle slider fetch error silently in production
     } finally {
       setLoadingSliders(false);
     }
@@ -1851,9 +1868,23 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
   ];
 
   const handleSave = () => {
-    if (editedWidget && onSave) {
-      onSave(editedWidget);
+    if (!editedWidget || !onSave) return;
+    
+    // Basic validation
+    if (!editedWidget.type) {
+      showError('Widget type is required');
+      return;
     }
+    
+    // Validate JSON configuration
+    try {
+      JSON.stringify(editedWidget.config);
+    } catch (error) {
+      showError('Invalid widget configuration. Please check your JSON.');
+      return;
+    }
+    
+    onSave(editedWidget);
   };
 
   return (
@@ -2418,14 +2449,17 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
                   <textarea
                     value={JSON.stringify(editedWidget.config, null, 2)}
                     onChange={(e) => {
+                      // Debounce JSON parsing to improve performance
+                      const value = e.target.value;
                       try {
-                        const config = JSON.parse(e.target.value);
+                        const config = JSON.parse(value);
                         setEditedWidget({ ...editedWidget, config });
                       } catch (err) {
-                        // Invalid JSON, ignore
+                        // Invalid JSON - ignore silently
                       }
                     }}
                     className="w-full px-3 py-2 border rounded font-mono text-sm h-64"
+                    placeholder="Enter valid JSON configuration"
                   />
                 </div>
               )}

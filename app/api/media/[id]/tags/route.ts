@@ -42,8 +42,6 @@ export async function PUT(
     const body = await request.json();
     const { tag_ids } = body;
 
-    console.log('Deleting existing tags for media_file_id:', id);
-    
     // Delete existing tags
     await db
       .delete(media_file_tags)

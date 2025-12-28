@@ -3,6 +3,10 @@ import { db } from '@/lib/db';
 import { epaper_categories } from '@/lib/schema/categories';
 import { eq } from 'drizzle-orm';
 
+// Disable Next.js caching for categories
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // GET /api/epaper/categories/[id] - Get category by ID
 export async function GET(
   request: NextRequest,
@@ -33,6 +37,12 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: category
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
   } catch (error) {
     console.error('Error fetching category:', error);
@@ -95,6 +105,12 @@ export async function PUT(
       success: true,
       data: updatedCategory,
       message: 'Category updated successfully'
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
   } catch (error) {
     console.error('Error updating category:', error);
@@ -135,6 +151,12 @@ export async function DELETE(
     return NextResponse.json({
       success: true,
       message: 'Category deleted successfully'
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
   } catch (error) {
     console.error('Error deleting category:', error);

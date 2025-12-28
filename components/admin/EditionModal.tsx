@@ -6,7 +6,7 @@ import { X, Save } from 'lucide-react';
 interface EditionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: () => Promise<void>; // Make onSave async
 }
 
 export default function EditionModal({ isOpen, onClose, onSave }: EditionModalProps) {
@@ -80,7 +80,9 @@ export default function EditionModal({ isOpen, onClose, onSave }: EditionModalPr
       const result = await response.json();
       if (result.success) {
         alert('Edition scheduled successfully!');
-        onSave();
+        
+        // Wait for parent list to refresh before closing modal
+        await onSave();
         onClose();
         resetForm();
       } else {
@@ -110,7 +112,9 @@ export default function EditionModal({ isOpen, onClose, onSave }: EditionModalPr
       if (result.success) {
         const statusText = status === 'published' ? 'published' : 'saved as draft';
         alert(`Edition ${statusText} successfully!`);
-        onSave();
+        
+        // Wait for parent list to refresh before closing modal
+        await onSave();
         onClose();
         resetForm();
       } else {

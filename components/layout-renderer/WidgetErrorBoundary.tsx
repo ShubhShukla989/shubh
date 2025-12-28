@@ -23,9 +23,21 @@ export class WidgetErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Widget Error Boundary caught an error:', error, errorInfo);
-    console.error('Widget type:', this.props.widgetType);
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Widget Error Boundary caught an error:', error, errorInfo);
+      console.error('Widget type:', this.props.widgetType);
+      console.error('Error stack:', error.stack);
+      console.error('Component stack:', errorInfo.componentStack);
+    }
   }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: undefined });
+    
+    // Force component re-render without page reload
+    // The component will re-mount naturally
+  };
 
   render() {
     if (this.state.hasError) {
@@ -47,7 +59,7 @@ export class WidgetErrorBoundary extends Component<Props, State> {
             </details>
           )}
           <button
-            onClick={() => this.setState({ hasError: false, error: undefined })}
+            onClick={this.handleRetry}
             className="mt-2 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
           >
             Retry

@@ -46,7 +46,7 @@ export default function CategoryWatermarkSettingsPage() {
         setCategoryName(result.data.title);
       }
     } catch (error) {
-      console.error('Error fetching category:', error);
+      // Silently handle error - user will see loading state
     }
   };
 
@@ -59,7 +59,7 @@ export default function CategoryWatermarkSettingsPage() {
         setSettings(result.data);
       }
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      // Silently handle error - user will see loading state
     } finally {
       setLoading(false);
     }
@@ -85,7 +85,6 @@ export default function CategoryWatermarkSettingsPage() {
         alert('❌ Failed to save settings: ' + (result.error || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Error saving settings:', error);
       alert('❌ Error saving settings');
     } finally {
       setSaving(false);

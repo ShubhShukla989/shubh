@@ -49,8 +49,6 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  console.log('Current view:', currentView);
-  console.log('Category tree:', config.categoryTree);
 
   useEffect(() => {
     fetchCategoriesData();

@@ -211,7 +211,6 @@ export default async function HomePage() {
     console.log('📚 Epaper Archive mode activated');
     // Check for featured categories first
     const featuredCategoryAlias = await getFirstFeaturedCategory();
-    console.log('Featured category:', featuredCategoryAlias);
     
     if (featuredCategoryAlias) {
       redirect(`/epaper/category/${featuredCategoryAlias}`);

@@ -5,15 +5,30 @@ import Link from 'next/link';
 import {
   Search,
   ChevronDown,
-  FileText,
   Filter,
+  FileText,
 } from 'lucide-react';
 import { Edition, User } from '@/lib/types';
 import ActionIcons from '@/components/ActionIcons';
 import { useAuth } from '@/contexts/AuthContext';
 import EditionModal from '@/components/admin/EditionModal';
 
+// Disable SSR to prevent hydration issues
 export default function EditionsPage() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return <EditionsPageContent />;
+}
+
+function EditionsPageContent() {
   const { hasPermission, isSuperAdmin, loading: authLoading } = useAuth();
   const [editions, setEditions] = useState<Edition[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -22,7 +37,6 @@ export default function EditionsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [perPage, setPerPage] = useState(15);
   const [filterByUser, setFilterByUser] = useState('all');
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
   
@@ -40,8 +54,6 @@ export default function EditionsPage() {
     ownedBy: true,
     status: true,
   });
-
-  const [isClient, setIsClient] = useState(false);
   
   // Bulk actions state
   const [selectedEditions, setSelectedEditions] = useState<number[]>([]);
@@ -51,8 +63,6 @@ export default function EditionsPage() {
   const [showNewEditionModal, setShowNewEditionModal] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
-    
     // Load column visibility from localStorage after component mounts
     const saved = localStorage.getItem('editions-columns-visibility');
     if (saved) {
@@ -103,6 +113,8 @@ export default function EditionsPage() {
 
   const fetchEditions = async () => {
     try {
+      setLoading(true);
+      
       let url = '/api/editions?';
       const params = new URLSearchParams();
       
@@ -116,10 +128,22 @@ export default function EditionsPage() {
         params.append('created_by', filterByUser);
       }
       
+      // Simple cache busting
+      params.append('_t', Date.now().toString());
+      
       url += params.toString();
       
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      
       const data = await response.json();
+      
       if (data.success) {
         setEditions(data.data);
       }
@@ -140,7 +164,7 @@ export default function EditionsPage() {
       const data = await response.json();
       if (data.success) {
         alert('Edition deleted successfully');
-        fetchEditions();
+        await fetchEditions(); // Wait for refresh to complete
       } else {
         alert('Error: ' + data.error);
       }
@@ -180,7 +204,7 @@ export default function EditionsPage() {
       const data = await response.json();
       if (data.success) {
         alert(`Edition ${currentFeatured ? 'removed from' : 'featured on'} homepage successfully`);
-        fetchEditions();
+        await fetchEditions(); // Wait for refresh to complete
       } else {
         alert('Error: ' + data.error);
       }
@@ -281,7 +305,7 @@ export default function EditionsPage() {
         alert(`Successfully ${bulkAction === 'delete' ? 'deleted' : 'updated'} ${successCount} edition(s)!${errorCount > 0 ? ` ${errorCount} failed.` : ''}`);
         setSelectedEditions([]);
         setBulkAction('');
-        fetchEditions();
+        await fetchEditions(); // Wait for refresh to complete
       } else {
         alert(`Failed to ${bulkAction} any editions.`);
       }
@@ -291,20 +315,12 @@ export default function EditionsPage() {
     }
   };
 
-  const handleGoFilter = () => {
-    fetchEditions();
-  };
-
   const handleResetFilter = () => {
     setSearchTerm('');
     setStatusFilter('all');
     setCategoryFilter('all');
     setFilterByUser('all');
-    setPerPage(15);
-    // Refetch with reset filters
-    setTimeout(() => {
-      fetchEditions();
-    }, 100);
+    fetchEditions();
   };
 
   // Filter editions based on search term
@@ -313,16 +329,11 @@ export default function EditionsPage() {
     edition.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Paginate editions
-  const paginatedEditions = filteredEditions.slice(0, perPage);
-
   // Save column visibility to localStorage
   const updateColumnVisibility = (columnKey: string, visible: boolean) => {
     const newCols = { ...cols, [columnKey]: visible };
     setCols(newCols);
-    if (isClient) {
-      localStorage.setItem('editions-columns-visibility', JSON.stringify(newCols));
-    }
+    localStorage.setItem('editions-columns-visibility', JSON.stringify(newCols));
   };
 
   return (
@@ -411,16 +422,6 @@ export default function EditionsPage() {
             </select>
             
             <select
-              value={perPage}
-              onChange={(e) => setPerPage(Number(e.target.value))}
-              className="px-3 py-2 border border-gray-300 rounded text-sm"
-            >
-              <option value="15">Perpage - 15</option>
-              <option value="25">Perpage - 25</option>
-              <option value="50">Perpage - 50</option>
-            </select>
-            
-            <select
               value={filterByUser}
               onChange={(e) => setFilterByUser(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded text-sm"
@@ -432,13 +433,6 @@ export default function EditionsPage() {
                 </option>
               ))}
             </select>
-            
-            <button 
-              onClick={handleGoFilter}
-              className="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-            >
-              Go
-            </button>
             
             <button 
               onClick={handleResetFilter}
@@ -493,10 +487,10 @@ export default function EditionsPage() {
                   <input 
                     type="checkbox" 
                     className="rounded border-gray-300"
-                    checked={selectedEditions.length === paginatedEditions.length && paginatedEditions.length > 0}
+                    checked={selectedEditions.length === filteredEditions.length && filteredEditions.length > 0}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedEditions(paginatedEditions.map(ed => ed.id));
+                        setSelectedEditions(filteredEditions.map(ed => ed.id));
                       } else {
                         setSelectedEditions([]);
                       }
@@ -548,14 +542,14 @@ export default function EditionsPage() {
                     Loading editions...
                   </td>
                 </tr>
-              ) : paginatedEditions.length === 0 ? (
+              ) : filteredEditions.length === 0 ? (
                 <tr>
                   <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
                     No editions found. Create your first edition!
                   </td>
                 </tr>
               ) : (
-                paginatedEditions.map((edition, index) => (
+                filteredEditions.map((edition, index) => (
                   <tr
                     key={edition.id}
                     className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
@@ -703,19 +697,10 @@ export default function EditionsPage() {
           </table>
         </div>
 
-        {/* Pagination */}
-        <div className="p-4 border-t border-gray-200 flex items-center justify-between">
+        {/* Status Info */}
+        <div className="p-4 border-t border-gray-200">
           <div className="text-sm text-gray-600">
-            Showing {paginatedEditions.length} of {filteredEditions.length} editions
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors">
-              Previous
-            </button>
-            <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm">1</button>
-            <button className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors">
-              Next
-            </button>
+            Showing {filteredEditions.length} editions
           </div>
         </div>
       </div>
@@ -724,8 +709,8 @@ export default function EditionsPage() {
       <EditionModal
         isOpen={showNewEditionModal}
         onClose={() => setShowNewEditionModal(false)}
-        onSave={() => {
-          fetchEditions(); // Refresh the list after saving
+        onSave={async () => {
+          await fetchEditions();
         }}
       />
     </div>

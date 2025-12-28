@@ -40,7 +40,7 @@ export function SliderWidget({
         const data = await sliderService.getSliderByAlias(alias);
         setSlider(data);
       } catch (error) {
-        console.error('Error fetching slider:', error);
+        // Silently handle error - component will show null if no slider data
       } finally {
         setIsLoading(false);
       }
@@ -156,6 +156,11 @@ export function SliderWidget({
               alt={slide.alt || `Slide ${index + 1}`}
               className="w-full h-full object-cover"
               loading={index === 0 ? 'eager' : 'lazy'}
+              onError={(e) => {
+                // Hide broken images
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
             />
             
             {/* Caption */}

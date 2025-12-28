@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
 import { ClientLayout } from '@/components/ClientLayout';
+import { ToastContainer } from '@/components/ui/ToastContainer';
+import AnalyticsTracker from '@/components/AnalyticsTracker';
 
 export const metadata: Metadata = {
   title: 'Epaper CMS',
@@ -63,9 +65,11 @@ export default function RootLayout({
       </head>
       <body className="font-sans">
         <GoogleAnalytics />
+        <AnalyticsTracker />
         <ClientLayout>
           {children}
         </ClientLayout>
+        <ToastContainer />
         <script 
           src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
         ></script>
