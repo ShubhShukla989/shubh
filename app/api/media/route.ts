@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { media_files } from '@/lib/schema/media';
-import { desc } from 'drizzle-orm';
 
 // GET /api/media - Get all media files
 export async function GET() {
   try {
+    // During build time, return empty data to prevent build failures
+    if (process.env.SKIP_BUILD_STATIC_GENERATION === 'true') {
+      return NextResponse.json({
+        success: true,
+        data: []
+      });
+    }
+
     console.log('🔍 Media API called at:', new Date().toISOString());
+    
+    const { db } = await import('@/lib/db');
+    const { media_files } = await import('@/lib/schema/media');
+    const { desc } = await import('drizzle-orm');
+    
     const files = await db.select().from(media_files).orderBy(desc(media_files.created_at));
     console.log('📁 Found files in database:', files.length);
     
@@ -35,7 +45,7 @@ export async function GET() {
   } catch (error) {
     console.error('Error fetching media:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch media files' },
+      { success: false, error: 'Failed to fetch media files', data: [] },
       { status: 500 }
     );
   }

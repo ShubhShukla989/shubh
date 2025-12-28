@@ -8,6 +8,14 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
   
+  // Build configuration for Hostinger VPS
+  output: 'standalone',
+  
+  // Skip build-time database calls
+  env: {
+    SKIP_BUILD_STATIC_GENERATION: process.env.NODE_ENV === 'production' ? 'true' : 'false',
+  },
+  
   // Image optimization
   images: {
     domains: ['localhost'],

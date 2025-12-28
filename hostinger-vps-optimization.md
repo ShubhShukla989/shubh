@@ -171,8 +171,8 @@ cp .env.local.example .env.local
 npm run setup:db
 npm run setup:admin
 
-# 5. Build for production
-npm run build:prod
+# 5. Build for production (Hostinger-specific)
+npm run build:hostinger  # Skips database calls during build
 
 # 6. Start with PM2 on port 3002
 pm2 start ecosystem.resume.config.js

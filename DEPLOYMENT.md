@@ -59,7 +59,7 @@ npm run setup:admin
 
 ### 4. Build & Start on Port 3002
 ```bash
-npm run build:prod
+npm run build:hostinger  # Use Hostinger-specific build (skips database calls during build)
 PORT=3002 npm start
 ```
 
@@ -238,4 +238,16 @@ pm2 monit
 
 # 4. Test the site
 curl -I https://resume.publicvm.com
+```
+
+## 🔧 Hostinger Build Fix
+
+If you encounter build errors on Hostinger VPS, use the Hostinger-specific build command:
+
+```bash
+# Instead of: npm run build
+# Use this for Hostinger VPS:
+npm run build:hostinger
+
+# This skips database calls during build time to prevent errors
 ```

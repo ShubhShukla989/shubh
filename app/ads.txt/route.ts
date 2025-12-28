@@ -1,10 +1,21 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { settings } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
 
 export async function GET() {
   try {
+    // During build time, return empty content
+    if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+      return new NextResponse('', {
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'public, max-age=3600',
+        },
+      });
+    }
+
+    const { db } = await import('@/lib/db');
+    const { settings } = await import('@/lib/schema');
+    const { eq } = await import('drizzle-orm');
+
     const [data] = await db
       .select()
       .from(settings)
