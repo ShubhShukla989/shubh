@@ -23,25 +23,25 @@ export async function POST(
       );
     }
 
-    // Setup output directory
+    // Setup output directory - USE CONSISTENT PATH
     const mediaPath = process.env.MEDIA_PATH || './public/uploads';
-    const outputDir = join(mediaPath, 'page-assets');
+    const outputDir = mediaPath; // Save directly to uploads folder for consistency
     await mkdir(outputDir, { recursive: true });
 
-    // Save image file
+    // Save image file with CONSISTENT naming
     const fileName = `edition-${id}-page-${pageNumber}.png`;
     const imagePath = join(outputDir, fileName);
     
     const imageBuffer = Buffer.from(await imageFile.arrayBuffer());
     await writeFile(imagePath, imageBuffer);
 
-    // Create database record
+    // Create database record with CONSISTENT path
     const [pageData] = await db
       .insert(edition_pages)
       .values({
         edition_id: editionId,
         page_number: pageNumber,
-        image_url: `/uploads/page-assets/${fileName}`,
+        image_url: `/uploads/${fileName}`, // Consistent with extract-pages API
       })
       .returning();
 

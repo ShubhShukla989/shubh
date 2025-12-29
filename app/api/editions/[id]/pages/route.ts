@@ -75,16 +75,44 @@ export async function GET(
     for (const page of pages as any[]) {
       try {
         if (page.image_url && !page.image_url.startsWith('data:image')) {
-          // Calculate file size for file-based images
+          // Calculate file size for file-based images with FALLBACK LOGIC
           const fs = require('fs');
           const path = require('path');
           
           let filePath = page.image_url;
+          let fileExists = false;
+          
+          // Try original path first
           if (filePath.startsWith('/uploads/')) {
-            filePath = path.join(process.cwd(), 'public', filePath);
+            const originalPath = path.join(process.cwd(), 'public', filePath);
+            if (fs.existsSync(originalPath)) {
+              filePath = originalPath;
+              fileExists = true;
+            } else {
+              // FALLBACK: Try different path variations for existing files
+              const filename = path.basename(filePath);
+              
+              // Try direct uploads folder
+              const directPath = path.join(process.cwd(), 'public', 'uploads', filename);
+              if (fs.existsSync(directPath)) {
+                filePath = directPath;
+                fileExists = true;
+                // Update the database with correct path
+                page.image_url = `/uploads/${filename}`;
+              } else {
+                // Try page-assets subfolder
+                const pageAssetsPath = path.join(process.cwd(), 'public', 'uploads', 'page-assets', filename);
+                if (fs.existsSync(pageAssetsPath)) {
+                  filePath = pageAssetsPath;
+                  fileExists = true;
+                  // Update the database with correct path
+                  page.image_url = `/uploads/page-assets/${filename}`;
+                }
+              }
+            }
           }
           
-          if (fs.existsSync(filePath)) {
+          if (fileExists) {
             const stats = fs.statSync(filePath);
             const fileSizeInBytes = stats.size;
             const fileSizeInKB = (fileSizeInBytes / 1024).toFixed(2);
@@ -96,7 +124,8 @@ export async function GET(
               page.file_size = `${fileSizeInKB} KB`;
             }
           } else {
-            page.file_size = 'Unknown';
+            page.file_size = 'File Not Found';
+            page.image_url_error = 'File missing - may need re-extraction';
           }
         } else if (page.image_url && page.image_url.startsWith('data:image')) {
           // Calculate size for base64 images
