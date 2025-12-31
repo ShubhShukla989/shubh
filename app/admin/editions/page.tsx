@@ -128,18 +128,10 @@ function EditionsPageContent() {
         params.append('created_by', filterByUser);
       }
       
-      // Simple cache busting
-      params.append('_t', Date.now().toString());
-      
       url += params.toString();
       
       const response = await fetch(url, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
+        cache: 'no-store'
       });
       
       const data = await response.json();

@@ -6,9 +6,6 @@ import PDFThumbnail from '@/components/PDFThumbnail';
 import ResizeHandle from '@/components/admin/ResizeHandle';
 import { EpaperAreaMapDisplayWidget } from './EpaperAreaMapDisplayWidget';
 import { SocialWidget } from '../SocialWidget';
-import { OptimizedImage, PageImage } from '@/components/ui/OptimizedImage';
-import { ProgressiveImage } from '@/components/ui/ProgressiveImage';
-import { getEpaperImageSizes } from '@/lib/image-utils';
 
 interface Page {
   number: number;
@@ -39,8 +36,6 @@ interface PageViewerProps {
   loading: boolean;
   editionId?: string;
   onPageNavigate?: (pageNumber: number) => void;
-  containerWidth?: string;
-  containerHeight?: string;
 }
 
 export default function PageViewer({
@@ -53,9 +48,7 @@ export default function PageViewer({
   onClipCancel,
   loading,
   editionId,
-  onPageNavigate,
-  containerWidth = 'auto',
-  containerHeight = 'auto'
+  onPageNavigate
 }: PageViewerProps) {
   const [clipStart, setClipStart] = useState<{ x: number; y: number } | null>(null);
   const [clipEnd, setClipEnd] = useState<{ x: number; y: number } | null>(null);
@@ -115,40 +108,154 @@ export default function PageViewer({
     const containerRect = containerRef.current.getBoundingClientRect();
     const imgRect = imageRef.current.getBoundingClientRect();
     
-    // Better responsive box size for mobile
+    // Responsive box size - smaller on mobile
     const isMobile = window.innerWidth <= 768;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const defaultWidth = isMobile ? Math.min(280, imgRect.width * 0.8) : 600;
+    const defaultHeight = isMobile ? Math.min(350, imgRect.height * 0.5) : 400;
     
-    let defaultWidth, defaultHeight;
-    
-    if (isMobile) {
-      // Mobile: Use percentage of image size with better constraints
-      defaultWidth = Math.min(
-        viewportWidth * 0.7,  // 70% of viewport width
-        imgRect.width * 0.8,  // 80% of image width
-        300  // Max 300px
-      );
-      defaultHeight = Math.min(
-        viewportHeight * 0.4,  // 40% of viewport height
-        imgRect.height * 0.6,  // 60% of image height
-        400  // Max 400px
-      );
-    } else {
-      // Desktop: Original sizes
-      defaultWidth = 600;
-      defaultHeight = 400;
-    }
-    
-    // Calculate center position relative to image
-    const centerX = Math.max(0, (imgRect.width - defaultWidth) / 2);
-    const centerY = Math.max(0, (imgRect.height - defaultHeight) / 2);
+    // Calculate center position relative to container
+    const centerX = (imgRect.width - defaultWidth) / 2;
+    const centerY = (imgRect.height - defaultHeight) / 2;
     
     setClipStart({ x: centerX, y: centerY });
     setClipEnd({ x: centerX + defaultWidth, y: centerY + defaultHeight });
   };
 
-  // Removed problematic useEffect that was causing infinite loop
+  useEffect(() => {
+    if (page?.id && editionId) {
+      fetchAreaMaps();
+      fetchEditionData();
+      fetchMediaCache(); // Pre-fetch logo
+    }
+  }, [page?.id, editionId]);
+
+  const fetchMediaCache = async () => {
+    if (mediaCache) return; // Already cached
+    
+    try {
+      const mediaResponse = await fetch('/api/media');
+      const mediaData = await mediaResponse.json();
+      
+      if (mediaData.success && mediaData.data) {
+        setMediaCache(mediaData.data);
+        
+        // Find and cache logo
+        const logoFile = mediaData.data.find((file: any) => {
+          const title = file.title?.toLowerCase() || '';
+          const name = file.name?.toLowerCase() || '';
+          return title === 'logo' || name.includes('logo');
+        });
+        
+        if (logoFile?.url) {
+          console.log('✅ Logo cached:', logoFile.url);
+          setLogoCache(logoFile.url);
+        } else {
+          console.warn('⚠️ No logo found in media');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to cache media:', error);
+    }
+  };
+
+  const fetchAreaMaps = async () => {
+    if (!page?.id || !editionId) {
+      console.warn('⚠️ Missing page.id or editionId:', { pageId: page?.id, editionId });
+      return;
+    }
+    
+    try {
+      const url = `/api/editions/${editionId}/pages/${page.id}/area-maps`;
+      console.log('🔍 Fetching area maps from:', url);
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+      
+      console.log('📡 Response status:', response.status, response.statusText);
+      
+      const result = await response.json();
+      console.log('📍 API Response:', result);
+      console.log('📊 Area maps count:', result.data?.length || 0);
+      
+      if (result.success) {
+        const maps = result.data || [];
+        console.log('✅ Setting area maps:', maps);
+        setAreaMaps(maps);
+        
+        if (maps.length === 0) {
+          console.log('⚠️ No area maps found for this page. Create some in admin panel first!');
+        }
+      } else {
+        console.error('❌ API returned error:', result.error);
+      }
+    } catch (error) {
+      console.error('💥 Network error fetching area maps:', error);
+    }
+  };
+
+  const fetchEditionData = async () => {
+    if (!editionId) return;
+    
+    try {
+      const response = await fetch(`/api/editions/${editionId}`);
+      const result = await response.json();
+      if (result.success) {
+        setEditionData(result.data);
+        
+        // Fetch category watermark settings for logo and info text
+        if (result.data?.category_id) {
+          const categoryId = result.data.category_id;
+          
+          // Try category-specific settings first
+          const categoryResponse = await fetch(`/api/settings/category-watermark?category_id=${categoryId}`);
+          const categoryResult = await categoryResponse.json();
+          
+          let finalSettings = null;
+          let logoUrl = null;
+          
+          // Check if category has custom settings with logo
+          if (categoryResult.success && categoryResult.data) {
+            const data = categoryResult.data;
+            
+            if (data.enable_watermarking && (data.logo_url || data.center_watermark_url)) {
+              finalSettings = data;
+              logoUrl = data.logo_url || data.center_watermark_url;
+              console.log('✅ Using category-specific watermark settings for PageViewer');
+            }
+          }
+          
+          // Fallback to global area map watermark settings
+          if (!finalSettings || !logoUrl) {
+            const globalResponse = await fetch('/api/settings/area-map-watermark');
+            const globalResult = await globalResponse.json();
+            
+            if (globalResult.success && globalResult.data) {
+              const globalData = globalResult.data;
+              
+              if (globalData.enable_watermarking && (globalData.logo_url || globalData.center_watermark_url)) {
+                finalSettings = globalData;
+                logoUrl = globalData.logo_url || globalData.center_watermark_url;
+                console.log('✅ Using global watermark settings for PageViewer');
+              }
+            }
+          }
+          
+          // Set final settings and logo
+          if (finalSettings && logoUrl) {
+            setWatermarkSettings(finalSettings);
+            setCategoryLogoUrl(logoUrl);
+            setLogoCache(logoUrl); // Also set in logoCache for compatibility
+            console.log('✅ Watermark settings loaded for PageViewer:', finalSettings);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch edition data:', error);
+    }
+  };
 
   // Handle moving the clip box
   const handleClipMoveStart = (e: React.MouseEvent | React.TouchEvent) => {
@@ -168,11 +275,11 @@ export default function PageViewer({
     
     setIsMovingClip(true);
     
-    // Add global mouse/touch move and up listeners with passive: false for better mobile performance
-    document.addEventListener('mousemove', handleClipMoveMove, { passive: false });
-    document.addEventListener('mouseup', handleClipMoveEnd, { passive: false });
-    document.addEventListener('touchmove', handleClipMoveTouchMove, { passive: false });
-    document.addEventListener('touchend', handleClipMoveEnd, { passive: false });
+    // Add global mouse/touch move and up listeners
+    document.addEventListener('mousemove', handleClipMoveMove);
+    document.addEventListener('mouseup', handleClipMoveEnd);
+    document.addEventListener('touchmove', handleClipMoveTouchMove);
+    document.addEventListener('touchend', handleClipMoveEnd);
   };
 
   const handleClipMoveMove = (e: MouseEvent) => {
@@ -193,7 +300,6 @@ export default function PageViewer({
   };
 
   const handleClipMoveTouchMove = (e: TouchEvent) => {
-    e.preventDefault(); // Prevent scrolling while dragging
     const state = clipMoveStateRef.current;
     if (!state.originalStart || !state.originalEnd) return;
     
@@ -415,261 +521,38 @@ export default function PageViewer({
     document.removeEventListener('touchend', handleClipResizeEnd);
   };
 
-  const createCombinedClipFromLinkedAreas = async (mainArea: AreaMap) => {
-    if (!canvasRef.current) return null;
-
-    try {
-      console.time('⚡ Simplified combined clip generation');
-      
-      // Fetch all linked area maps IN PARALLEL
-      const linkedIds = mainArea.linked_area_ids || [];
-      
-      // Parallel fetch with Promise.all for speed
-      const linkedAreas = await Promise.all(
-        linkedIds.map(async (areaId) => {
-          try {
-            const response = await fetch(`/api/editions/${editionId}/area-maps/${areaId}`);
-            const result = await response.json();
-            return result.success ? result.data : null;
-          } catch {
-            return null;
-          }
-        })
-      ).then(results => results.filter(Boolean));
-      
-      const allAreas = [mainArea, ...linkedAreas];
-      
-      // Sort by page number if available
-      allAreas.sort((a: any, b: any) => (a.page_number || 0) - (b.page_number || 0));
-      
-      // SIMPLIFIED APPROACH: Create clean combined canvas without complex header
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return null;
-
-      const spacing = 20; // Space between areas
-      
-      // Calculate total height needed (NO HEADER - logo will be HTML overlay)
-      let totalHeight = 0;
-      const areaImages: { area: any; img: HTMLImageElement; height: number }[] = [];
-      
-      // Load all area images
-      for (const area of allAreas) {
-        const img = await loadAreaImage(area);
-        if (img) {
-          const areaHeight = area.height;
-          areaImages.push({ area, img, height: areaHeight });
-          totalHeight += areaHeight + spacing;
-        }
-      }
-      
-      // Find max width
-      const maxWidth = Math.max(...areaImages.map(ai => ai.area.width));
-      
-      // Set canvas size (NO HEADER SPACE)
-      canvas.width = maxWidth;
-      canvas.height = totalHeight;
-      
-      // Draw all areas vertically (CLEAN - NO HEADER)
-      let currentY = 0;
-      for (const { area, img, height } of areaImages) {
-        ctx.drawImage(
-          img,
-          area.x, area.y, area.width, area.height,
-          0, currentY, area.width, area.height
-        );
-        currentY += height + spacing;
-        
-        // Draw separator line
-        if (currentY < totalHeight) {
-          ctx.strokeStyle = '#e5e7eb';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(0, currentY - spacing / 2);
-          ctx.lineTo(maxWidth, currentY - spacing / 2);
-          ctx.stroke();
-        }
-      }
-      
-      const dataUrl = canvas.toDataURL('image/png', 0.95);
-      console.timeEnd('⚡ Simplified combined clip generation');
-      console.log('✅ Clean combined clip created - logo will be added via server-side watermarking');
-      return dataUrl;
-    } catch (error) {
-      console.error('❌ Failed to create combined clip:', error);
-      console.timeEnd('⚡ Simplified combined clip generation');
-      return null;
-    }
-  };
-
-  const loadAreaImage = (area: any): Promise<HTMLImageElement | null> => {
-    return new Promise((resolve) => {
-      // For now, use the current page image
-      // In production, you'd fetch the specific page image
-      if (imageRef.current) {
-        resolve(imageRef.current);
-      } else {
-        resolve(null);
-      }
-    });
-  };
-
-  const drawHeaderWithLogo = async (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    // Use category logo from cache
-    try {
-      const logoUrl = categoryLogoUrl || logoCache;
-      if (logoUrl) {
-        console.log('🎨 Drawing category logo from cache...', logoUrl);
-        const logo = new Image();
-        logo.crossOrigin = 'anonymous';
-        
-        await new Promise<void>((resolve) => {
-          const timeout = setTimeout(() => {
-            console.warn('⏱️ Logo load timeout');
-            resolve();
-          }, 2000); // 2s timeout
-          
-          logo.onload = () => {
-            clearTimeout(timeout);
-            // Make logo bigger - 75% of header height
-            const logoHeight = height * 0.75;
-            const logoWidth = (logo.width / logo.height) * logoHeight;
-            const logoX = (width - logoWidth) / 2;
-            const logoY = 15; // Slightly lower from top
-            
-            // NO LOGO - Logo will be added by EpaperClipDisplayWidget later
-            // ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
-            console.log(`ℹ️ Skipping logo drawing in PageViewer - will be added by EpaperClipDisplayWidget`);
-            resolve();
-          };
-          logo.onerror = (err) => {
-            clearTimeout(timeout);
-            console.error('❌ Logo load error:', err);
-            resolve();
-          };
-          logo.src = logoUrl;
-        });
-      } else {
-        console.warn('⚠️ No category logo available');
-      }
-    } catch (error) {
-      console.error('❌ Failed to load logo:', error);
-    }
-    
-    // Draw text below logo
-    ctx.fillStyle = '#1f2937'; // Dark gray
-    ctx.textAlign = 'center';
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(`${window.location.origin}/epaper/view/${editionId}`, width / 2, height - 40);
-    
-    if (editionData?.date) {
-      ctx.font = '12px Arial';
-      ctx.fillStyle = '#6b7280'; // Medium gray
-      const date = new Date(editionData.date).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-      });
-      ctx.fillText(`${date} - Page ${page?.number}`, width / 2, height - 20);
-    }
-  };
-
-  const createClipFromArea = async (area: AreaMap) => {
-    if (!imageRef.current || !canvasRef.current) return null;
+  const createClip = async () => {
+    if (!clipStart || !clipEnd || !imageRef.current || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+    if (!ctx) return;
 
     const img = imageRef.current;
-    
-    // Area coordinates are already in natural image coordinates
-    const sourceX = area.x;
-    const sourceY = area.y;
-    const sourceWidth = area.width;
-    const sourceHeight = area.height;
+    const scaleX = img.naturalWidth / img.width;
+    const scaleY = img.naturalHeight / img.height;
 
-    // SIMPLIFIED APPROACH: NO HEADER - clean clip only
-    canvas.width = sourceWidth;
-    canvas.height = sourceHeight;
+    const x = Math.min(clipStart.x, clipEnd.x) * scaleX;
+    const y = Math.min(clipStart.y, clipEnd.y) * scaleY;
+    const width = Math.abs(clipEnd.x - clipStart.x) * scaleX;
+    const height = Math.abs(clipEnd.y - clipStart.y) * scaleY;
 
-    // Draw ONLY the selected area (CLEAN - NO HEADER)
-    ctx.drawImage(
-      img,
-      sourceX, sourceY, sourceWidth, sourceHeight,  // Source rectangle (what to clip)
-      0, 0, sourceWidth, sourceHeight               // Destination rectangle (where to draw)
-    );
+    // NO HEADER - Clean clip without header space
+    const headerHeight = 0; // No header needed since EpaperClipDisplayWidget will add logo/text
+    canvas.width = width;
+    canvas.height = height; // No extra header height needed
+
+    // Draw clipped portion directly (no header offset needed)
+    ctx.drawImage(img, x, y, width, height, 0, 0, width, height);
 
     const dataUrl = canvas.toDataURL('image/png', 0.95);
-    console.log('✅ Clean clip created - logo will be added via server-side watermarking');
-    return dataUrl;
-  };
-
-
-
-  const createClip = async () => {
-    if (!clipStart || !clipEnd || !imageRef.current || !canvasRef.current) {
-      console.error('❌ Missing required elements for clipping');
-      return;
-    }
-
-    try {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        console.error('❌ Could not get canvas context');
-        return;
-      }
-
-      const img = imageRef.current;
-      
-      // Wait for image to be fully loaded
-      if (!img.complete || img.naturalWidth === 0) {
-        console.error('❌ Image not fully loaded');
-        return;
-      }
-
-      const scaleX = img.naturalWidth / img.width;
-      const scaleY = img.naturalHeight / img.height;
-
-      const x = Math.min(clipStart.x, clipEnd.x) * scaleX;
-      const y = Math.min(clipStart.y, clipEnd.y) * scaleY;
-      const width = Math.abs(clipEnd.x - clipStart.x) * scaleX;
-      const height = Math.abs(clipEnd.y - clipStart.y) * scaleY;
-
-      // Validate dimensions
-      if (width <= 0 || height <= 0) {
-        console.error('❌ Invalid clip dimensions:', { width, height });
-        return;
-      }
-
-      console.log('📏 Clip dimensions:', { x, y, width, height, scaleX, scaleY });
-
-      // Set canvas size
-      canvas.width = width;
-      canvas.height = height;
-
-      // Clear canvas
-      ctx.clearRect(0, 0, width, height);
-
-      // Draw clipped portion
-      ctx.drawImage(img, x, y, width, height, 0, 0, width, height);
-
-      // Convert to data URL
-      const dataUrl = canvas.toDataURL('image/png', 0.95);
-      
-      console.log('✅ Clip created successfully');
-      
-      // Reset clip state and exit clipping mode
-      setClipStart(null);
-      setClipEnd(null);
-      
-      // Call parent callback to open ShareModal
-      onClipComplete(dataUrl);
-      
-    } catch (error) {
-      console.error('❌ Error creating clip:', error);
-    }
+    
+    // Reset clip state and exit clipping mode
+    setClipStart(null);
+    setClipEnd(null);
+    
+    // Call parent callback to open ShareModal
+    onClipComplete(dataUrl);
   };
 
   // Memoize clipRect calculation for better performance
@@ -681,33 +564,23 @@ export default function PageViewer({
   } : null;
 
   return (
-    <div 
-      className="flex-1 flex items-center justify-center bg-white relative overflow-auto p-1 md:p-2"
-      style={{
-        width: containerWidth,
-        height: containerHeight,
-        maxWidth: '100%',
-        maxHeight: '100%'
-      }}
-    >
-      {/* Navigation Buttons - Responsive - 6x size on desktop */}
+    <div className="flex-1 flex items-center justify-center bg-white relative overflow-auto p-1 md:p-2">
+      {/* Navigation Buttons - Responsive */}
       <button
         onClick={onPrevPage}
-        className="absolute left-1 md:left-4 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white p-2 md:p-12 rounded-full shadow-lg transition-all z-10"
+        className="absolute left-1 md:left-4 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white p-2 md:p-3 rounded-full shadow-lg transition-all z-10"
         title="Previous Page (←)"
       >
-        <ChevronLeft className="w-4 h-4 md:w-24 md:h-24 text-gray-900" />
+        <ChevronLeft className="w-4 h-4 md:w-6 md:h-6 text-gray-900" />
       </button>
 
       <button
         onClick={onNextPage}
-        className="absolute right-1 md:right-4 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white p-2 md:p-12 rounded-full shadow-lg transition-all z-10"
+        className="absolute right-1 md:right-4 top-1/2 transform -translate-y-1/2 bg-white/90 hover:bg-white p-2 md:p-3 rounded-full shadow-lg transition-all z-10"
         title="Next Page (→)"
       >
-        <ChevronRight className="w-4 h-4 md:w-24 md:h-24 text-gray-900" />
+        <ChevronRight className="w-4 h-4 md:w-6 md:h-6 text-gray-900" />
       </button>
-
-
 
       {/* Page Container */}
       <div
@@ -730,37 +603,21 @@ export default function PageViewer({
         ) : page ? (
           <>
             {page.imageUrl?.endsWith('.pdf') ? (
-              <div className="relative" style={{ 
-                width: containerWidth !== 'auto' ? containerWidth : '900px',
-                height: containerHeight !== 'auto' ? containerHeight : 'auto',
-                maxWidth: '100%',
-                maxHeight: '100%'
-              }}>
-                <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-600 p-8" style={{ height: '1200px' }}>
-                  <svg className="w-16 h-16 mb-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-lg font-semibold mb-2">PDF Preview</span>
-                  <span className="text-sm text-center">PDF viewer temporarily disabled</span>
-                  <a 
-                    href={page.imageUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                  >
-                    Open PDF
-                  </a>
-                </div>
+              <div className="relative" style={{ maxWidth: '900px' }}>
+                <iframe
+                  ref={imageRef as any}
+                  src={`${page.imageUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                  className="w-full border-0 select-none"
+                  style={{ height: '1200px', pointerEvents: 'none' }}
+                  onLoad={() => {
+                    setImageScale(1);
+                  }}
+                />
               </div>
             ) : (
               <div 
                 className={`w-full md:w-auto ${!isClipping && areaMaps.length === 0 ? 'cursor-pointer' : ''}`} 
-                style={{ 
-                  width: containerWidth !== 'auto' ? containerWidth : '100%',
-                  height: containerHeight !== 'auto' ? containerHeight : 'auto',
-                  maxWidth: '100%',
-                  maxHeight: '100%'
-                }}
+                style={{ maxWidth: '900px' }}
                 onClick={(e) => {
                   // If no area maps and not in clipping mode, show full page zoom
                   if (!isClipping && areaMaps.length === 0 && page.imageUrl) {
@@ -771,31 +628,20 @@ export default function PageViewer({
                   }
                 }}
               >
-                <OptimizedImage
+                <img
                   ref={imageRef}
                   src={page.imageUrl}
                   alt={`Page ${page.number}`}
-                  preset="page"
-                  sizes={getEpaperImageSizes('page')}
-                  className="h-auto select-none"
-                  style={{
-                    width: containerWidth !== 'auto' ? containerWidth : '100%',
-                    height: containerHeight !== 'auto' ? containerHeight : 'auto',
-                    maxWidth: '100%',
-                    maxHeight: '100%',
-                    objectFit: 'contain'
-                  }}
-                  priority={page.number === 1} // Prioritize first page
-                  quality={85}
-                  showLoadingSpinner={true}
+                  className="h-auto select-none w-full"
+                  draggable={false}
+                  crossOrigin="anonymous"
                   onLoad={(e) => {
                     const img = e.target as HTMLImageElement;
                     setImageScale(img.clientWidth / img.naturalWidth);
                   }}
                   onError={(e) => {
                     // Fallback placeholder
-                    const img = e.currentTarget as HTMLImageElement;
-                    img.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='1100'%3E%3Crect fill='%23f3f4f6' width='800' height='1100'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%239ca3af' font-size='24' font-family='Arial'%3EPage ${page.number}%3C/text%3E%3C/svg%3E`;
+                    e.currentTarget.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='1100'%3E%3Crect fill='%23f3f4f6' width='800' height='1100'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%239ca3af' font-size='24' font-family='Arial'%3EPage ${page.number}%3C/text%3E%3C/svg%3E`;
                   }}
                 />
               </div>
@@ -846,7 +692,7 @@ export default function PageViewer({
                 top: `${clipRect.top}px`,
                 width: `${clipRect.width}px`,
                 height: `${clipRect.height}px`,
-                border: window.innerWidth <= 768 ? '3px solid #3b82f6' : '4px solid #3b82f6', // Thicker border on mobile
+                border: '4px solid #3b82f6',
                 backgroundColor: 'rgba(59, 130, 246, 0.15)',
                 boxShadow: isMovingClip 
                   ? '0 0 0 1px rgba(59, 130, 246, 0.5), 0 8px 24px rgba(59, 130, 246, 0.4)' 
@@ -856,13 +702,10 @@ export default function PageViewer({
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden',
                 transition: isMovingClip ? 'none' : 'box-shadow 0.2s ease',
-                cursor: window.innerWidth <= 768 ? 'grab' : 'move', // Better mobile cursor
+                cursor: 'move', // Move cursor on entire box
                 pointerEvents: 'auto',
                 touchAction: 'none', // Prevent default touch behaviors
-                zIndex: 20,
-                // Better mobile touch target
-                minWidth: window.innerWidth <= 768 ? '200px' : 'auto',
-                minHeight: window.innerWidth <= 768 ? '150px' : 'auto'
+                zIndex: 20
               }}
               onMouseDown={handleClipMoveStart}
               onTouchStart={handleClipMoveStart}
@@ -913,22 +756,15 @@ export default function PageViewer({
         )}
       </div>
 
-      {/* Cancel and Share buttons - Better mobile positioning */}
+      {/* Cancel and Share buttons - Fixed at bottom on mobile, positioned near clip on desktop */}
       {clipRect && (
         <div 
-          className="fixed bottom-4 left-1/2 transform -translate-x-1/2 md:absolute md:bottom-auto md:left-auto md:transform-none flex gap-3 pointer-events-auto z-[100] px-4"
+          className="fixed md:absolute bottom-4 md:bottom-auto left-1/2 md:left-auto transform -translate-x-1/2 md:translate-x-0 flex gap-2 md:gap-2 pointer-events-auto z-[100]"
           style={{
             ...(containerRef.current && window.innerWidth > 768 ? {
               left: `${containerRef.current.getBoundingClientRect().left - containerRef.current.parentElement!.getBoundingClientRect().left + clipRect.left * zoom}px`,
               top: `${containerRef.current.getBoundingClientRect().top - containerRef.current.parentElement!.getBoundingClientRect().top + (clipRect.top + clipRect.height + 10) * zoom}px`,
-            } : {
-              // Mobile: ensure buttons are always visible and accessible
-              bottom: '20px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 'auto',
-              maxWidth: 'calc(100vw - 32px)'
-            })
+            } : {})
           }}
         >
           <button
@@ -937,9 +773,9 @@ export default function PageViewer({
               console.log('❌ Cancel button clicked');
               onClipCancel();
             }}
-            className="px-6 py-4 md:px-16 md:py-12 bg-red-600 text-white rounded-xl md:rounded shadow-lg hover:bg-red-700 active:bg-red-800 transition-colors font-medium flex items-center gap-2 text-base md:text-4xl min-w-[140px] md:min-w-[400px] justify-center touch-manipulation"
+            className="px-4 md:px-4 py-3 md:py-2 bg-red-600 text-white rounded-lg md:rounded shadow-lg hover:bg-red-700 active:bg-red-800 transition-colors font-medium flex items-center gap-2 text-sm md:text-base min-w-[120px] justify-center"
           >
-            <X className="w-5 h-5 md:w-16 md:h-16" />
+            <X className="w-5 h-5 md:w-4 md:h-4" />
             Cancel
           </button>
           <button
@@ -948,9 +784,9 @@ export default function PageViewer({
               console.log('📤 Share button clicked - opening clipped image');
               createClip();
             }}
-            className="px-6 py-4 md:px-16 md:py-12 bg-green-600 text-white rounded-xl md:rounded shadow-lg hover:bg-green-700 active:bg-green-800 transition-colors font-medium flex items-center gap-2 text-base md:text-4xl min-w-[140px] md:min-w-[400px] justify-center touch-manipulation"
+            className="px-4 md:px-4 py-3 md:py-2 bg-green-600 text-white rounded-lg md:rounded shadow-lg hover:bg-green-700 active:bg-green-800 transition-colors font-medium flex items-center gap-2 text-sm md:text-base min-w-[120px] justify-center"
           >
-            <svg className="w-5 h-5 md:w-16 md:h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
             Share
@@ -996,9 +832,9 @@ export default function PageViewer({
               setIsZoomedIn(false);
               setZoomOrigin({ x: 50, y: 50 }); // Reset zoom origin
             }}
-            className="absolute top-4 right-4 bg-white/90 hover:bg-white p-3 md:p-12 rounded-full shadow-lg z-20"
+            className="absolute top-4 right-4 bg-white/90 hover:bg-white p-3 rounded-full shadow-lg z-20"
           >
-            <X className="w-6 h-6 md:w-24 md:h-24 text-gray-900" />
+            <X className="w-6 h-6 text-gray-900" />
           </button>
           
           {/* Combined Image Container - CANVAS APPROACH */}
@@ -1013,11 +849,9 @@ export default function PageViewer({
             onTouchMove={(e) => e.stopPropagation()}
           >
             <div className="p-6">
-              <OptimizedImage 
+              <img 
                 src={zoomModalImage} 
                 alt="Article"
-                preset="gallery"
-                quality={90}
                 className={`h-auto transition-transform duration-300 ease-in-out ${
                   selectedArea 
                     ? (isZoomedIn ? 'w-auto cursor-zoom-out' : 'w-full cursor-zoom-in')
@@ -1060,9 +894,9 @@ export default function PageViewer({
                 link.download = `article-${Date.now()}.png`;
                 link.click();
               }}
-              className="px-6 py-3 md:px-24 md:py-12 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 text-base md:text-4xl"
+              className="px-6 py-3 bg-green-600 text-white rounded-lg shadow-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
             >
-              <svg className="w-5 h-5 md:w-16 md:h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
               Download

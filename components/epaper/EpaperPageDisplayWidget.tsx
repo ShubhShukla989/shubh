@@ -92,7 +92,7 @@ export function EpaperPageDisplayWidget({ config }: EpaperPageDisplayWidgetProps
     }
   };
   
-  // Get dimensions from config with mobile optimization
+  // Get dimensions from config with mobile optimization for newspaper display
   const getWidgetDimensions = () => {
     const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
     
@@ -114,28 +114,38 @@ export function EpaperPageDisplayWidget({ config }: EpaperPageDisplayWidgetProps
     let width = toPx(config.width);
     let height = toPx(config.height);
     
-    // Mobile optimization: ensure minimum dimensions
+    // Mobile optimization: newspaper aspect ratio and responsive sizing
     if (isMobile) {
-      if (width === 'auto') width = '100%';
-      if (height === 'auto') height = '70vh'; // 70% of viewport height on mobile
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Calculate optimal newspaper size for mobile
+      const maxWidth = Math.min(viewportWidth - 20, 380); // 10px margin on each side, max 380px
+      const newspaperHeight = Math.floor(maxWidth * 1.4); // Newspaper aspect ratio (closer to A4)
+      
+      // Ensure it fits in viewport with some margin for other elements
+      const maxHeight = Math.min(viewportHeight * 0.6, newspaperHeight); // Max 60% of viewport height
+      
+      width = `${maxWidth}px`;
+      height = `${maxHeight}px`;
     } else {
-      // Desktop: Apply configured dimensions directly, no auto fallback
+      // Desktop: Apply configured dimensions with newspaper proportions
       if (config.width) {
         width = toPx(config.width);
         // Ensure minimum width on desktop
         const widthNum = parseInt(width);
-        if (widthNum < 300) width = '300px';
+        if (widthNum < 400) width = '400px';
       } else {
-        width = '900px'; // Default desktop width
+        width = '500px'; // Compact default desktop width
       }
       
       if (config.height) {
         height = toPx(config.height);
         // Ensure minimum height on desktop
         const heightNum = parseInt(height);
-        if (heightNum < 200) height = '200px';
+        if (heightNum < 300) height = '300px';
       } else {
-        height = 'auto'; // Default desktop height
+        height = '700px'; // Default desktop height with newspaper ratio
       }
     }
     
@@ -318,16 +328,16 @@ export function EpaperPageDisplayWidget({ config }: EpaperPageDisplayWidgetProps
   return (
     <>
       <div 
-        className={`${config.cssClasses || ''} relative`}
+        className={`${config.cssClasses || ''} relative bg-white border border-gray-200 rounded-lg shadow-md overflow-hidden`}
         style={{
           width: widgetWidth,
           height: widgetHeight,
-          overflow: 'hidden',
-          minHeight: typeof window !== 'undefined' && window.innerWidth <= 768 ? '400px' : 'auto',
+          minHeight: typeof window !== 'undefined' && window.innerWidth <= 768 ? '300px' : 'auto',
           boxSizing: 'border-box',
           minWidth: widgetWidth, // Force minimum width
           maxWidth: widgetWidth, // Force maximum width to prevent shrinking
           flexShrink: 0, // Prevent flex shrinking
+          margin: typeof window !== 'undefined' && window.innerWidth <= 768 ? '0 auto' : '0', // Center on mobile
           ...parseInlineStyle(config.style)
         }}
       >
@@ -356,8 +366,6 @@ export function EpaperPageDisplayWidget({ config }: EpaperPageDisplayWidgetProps
               onNextPage={handleNextPage}
               loading={loading}
               editionId={editionId}
-              containerWidth={widgetWidth}
-              containerHeight={config.title ? 'calc(100% - 3rem)' : widgetHeight}
             />
           </div>
         ) : (

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { editions } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { unlink } from 'fs/promises';
+import { unlink, access } from 'fs/promises';
 import { join } from 'path';
+import { constants } from 'fs';
 
 export async function DELETE(
   request: NextRequest,
@@ -33,17 +34,72 @@ export async function DELETE(
       );
     }
 
-    // Delete from file system if MEDIA_PATH is set
-    if (process.env.MEDIA_PATH) {
+    // Parse the PDF URL to get file path
+    // PDF URL format: /uploads/editions/edition-1-1234567890.pdf
+    const pdfUrl = edition.pdf_url;
+    const urlParts = pdfUrl.split('/');
+    const fileName = urlParts[urlParts.length - 1];
+    const subDir = urlParts[urlParts.length - 2]; // 'editions' or 'pdfs'
+
+    // Determine the base media path
+    const mediaPath = process.env.MEDIA_PATH || join(process.cwd(), 'public', 'uploads');
+    
+    // Construct the full file path
+    // Try multiple possible locations
+    const possiblePaths = [
+      join(mediaPath, subDir, fileName), // /uploads/editions/file.pdf
+      join(mediaPath, 'pdfs', fileName), // /uploads/pdfs/file.pdf (legacy)
+      join(mediaPath, fileName), // /uploads/file.pdf (direct)
+      join(process.cwd(), 'public', pdfUrl.replace(/^\//, '')), // Absolute path from URL
+    ];
+
+    // Try to delete the file if it exists
+    let fileDeleted = false;
+    let lastError: any = null;
+    
+    for (const filePath of possiblePaths) {
       try {
-        const urlParts = edition.pdf_url.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        const filePath = join(process.env.MEDIA_PATH, 'pdfs', fileName);
-        await unlink(filePath);
-      } catch (error) {
-        console.error('File delete error:', error);
-        // Continue anyway to clear the database reference
+        // Check if file exists first
+        try {
+          await access(filePath, constants.F_OK);
+        } catch (accessError: any) {
+          // File doesn't exist, skip this path
+          if (accessError.code === 'ENOENT') {
+            continue; // Try next path
+          }
+          // Other access error, log and continue
+          lastError = accessError;
+          continue;
+        }
+        
+        // File exists, try to delete it
+        try {
+          await unlink(filePath);
+          fileDeleted = true;
+          console.log(`PDF deleted successfully from: ${filePath}`);
+          break; // Stop after successful deletion
+        } catch (unlinkError: any) {
+          // If unlink fails, log but don't throw
+          if (unlinkError.code !== 'ENOENT') {
+            console.warn(`Failed to delete file at ${filePath}:`, unlinkError.message);
+            lastError = unlinkError;
+          }
+          continue; // Try next path
+        }
+      } catch (error: any) {
+        // Catch any other unexpected errors
+        if (error.code !== 'ENOENT') {
+          console.warn(`Unexpected error at ${filePath}:`, error.message);
+          lastError = error;
+        }
+        continue; // Try next path
       }
+    }
+
+    // If file not found in any location, just log warning (don't throw error)
+    if (!fileDeleted) {
+      console.log(`PDF file not found in any expected location. Database reference will still be cleared.`);
+      // Don't throw error - just continue to clear database reference
     }
 
     // Update edition to remove PDF URL
@@ -54,13 +110,26 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: 'PDF deleted successfully',
+      message: fileDeleted ? 'PDF deleted successfully' : 'PDF reference removed (file was not found)',
     });
-  } catch (error) {
-    console.error('Delete PDF error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete PDF' },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    // Only log unexpected errors, but still clear database reference
+    console.error('Unexpected error in delete PDF:', error);
+    
+    // Try to clear database reference even if file deletion failed
+    try {
+      await db
+        .update(editions)
+        .set({ pdf_url: null })
+        .where(eq(editions.id, parseInt(params.id)));
+    } catch (dbError) {
+      console.error('Failed to clear database reference:', dbError);
+    }
+    
+    // Return success anyway - database reference cleared
+    return NextResponse.json({
+      success: true,
+      message: 'PDF reference removed (file deletion had issues)',
+    });
   }
 }

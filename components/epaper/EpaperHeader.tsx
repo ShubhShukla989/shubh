@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Home, ZoomIn, ZoomOut, Scissors, Menu, Calendar } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import CalendarModal from './CalendarModal';
+import { EpaperPdfDownloadWidget } from './EpaperPdfDownloadWidget';
 
 interface EpaperHeaderProps {
   editionId: string;
@@ -220,32 +221,40 @@ export default function EpaperHeader({
             {/* Right: Action Buttons - Responsive */}
             <div className="flex items-center gap-1 md:gap-2">
               <button
-                onClick={onDownloadPDF}
-                className="px-2 md:px-4 py-1 md:py-1.5 bg-orange-500 text-white hover:bg-orange-600 transition-colors text-xs md:text-sm font-medium rounded"
-                title="Download PDF"
-              >
-                PDF
-              </button>
-              <button
                 onClick={onClipStart}
                 className="px-2 md:px-4 py-1 md:py-1.5 bg-blue-500 text-white hover:bg-blue-600 transition-colors text-xs md:text-sm font-medium rounded"
                 title="Clip Article"
               >
                 Clip
               </button>
-              <div className="relative">
-                <button
-                  onClick={() => setShowCalendar(!showCalendar)}
-                  className="px-2 md:px-4 py-1 md:py-1.5 bg-red-600 text-white hover:bg-red-700 transition-colors text-xs md:text-sm font-medium rounded"
-                  title="Archive"
-                >
-                  Archive
-                </button>
+              
+              {/* Archive button with mobile PDF widget */}
+              <div className="flex items-center gap-1">
+                {/* Mobile-only PDF Download Widget */}
+                <div className="block md:hidden">
+                  <EpaperPdfDownloadWidget 
+                    config={{
+                      buttonText: 'PDF',
+                      target: 'new-window',
+                      cssClasses: 'inline-block'
+                    }}
+                  />
+                </div>
                 
-                {/* Calendar Modal */}
-                {showCalendar && (
-                  <CalendarModal onClose={() => setShowCalendar(false)} />
-                )}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowCalendar(!showCalendar)}
+                    className="px-2 md:px-4 py-1 md:py-1.5 bg-red-600 text-white hover:bg-red-700 transition-colors text-xs md:text-sm font-medium rounded"
+                    title="Archive"
+                  >
+                    Archive
+                  </button>
+                  
+                  {/* Calendar Modal */}
+                  {showCalendar && (
+                    <CalendarModal onClose={() => setShowCalendar(false)} />
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -133,8 +133,6 @@ export default function SettingsPage() {
         // Trigger revalidation of homepage
         await fetch('/api/revalidate?path=/', { method: 'POST' });
         alert('✅ Site settings saved successfully! Homepage will update on next visit.');
-        // Force reload to clear any client-side cache
-        window.location.reload();
       } else {
         alert('❌ Error: ' + data.error);
       }

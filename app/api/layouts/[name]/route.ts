@@ -48,31 +48,62 @@ export async function GET(
         .limit(1);
     }
 
-    // If still no layout found, create a minimal default
+    // If still no layout found, create a working default based on layout type
     if (!data) {
-      console.log('No layouts found, creating minimal default');
+      console.log('No layouts found, creating working default for:', layoutName);
+      
+      // Create appropriate default based on layout name
+      let defaultStructure;
+      if (layoutName.toLowerCase().includes('epaper') || layoutName.toLowerCase().includes('display')) {
+        // Epaper display layout
+        defaultStructure = {
+          rows: [{
+            id: 'epaper-row',
+            columns: [{
+              id: 'epaper-col',
+              width: 12,
+              widgets: [{
+                id: 'epaper-display-widget',
+                type: 'epaper-page-display',
+                config: {
+                  title: 'Epaper Display',
+                  width: 500,
+                  height: 700,
+                  enableNavigation: true,
+                  enableZoom: true,
+                  cssClasses: 'mx-auto'
+                }
+              }]
+            }]
+          }]
+        };
+      } else {
+        // Generic layout
+        defaultStructure = {
+          rows: [{
+            id: 'default-row',
+            columns: [{
+              id: 'default-col',
+              width: 12,
+              widgets: [{
+                id: 'default-widget',
+                type: 'text',
+                config: {
+                  content: `<div class="text-center p-8"><h2>Welcome</h2><p>Layout "${layoutName}" is loading...</p></div>`,
+                  cssClasses: 'text-center p-8'
+                }
+              }]
+            }]
+          }]
+        };
+      }
+      
       return NextResponse.json({ 
         success: true, 
         data: {
           id: 0,
           name: layoutName,
-          structure: JSON.stringify({
-            rows: [{
-              id: 'default-row',
-              columns: [{
-                id: 'default-col',
-                width: 12,
-                widgets: [{
-                  id: 'default-widget',
-                  type: 'text',
-                  config: {
-                    content: `<h2>Layout "${layoutName}" not found</h2><p>Please configure this layout in the admin panel.</p>`,
-                    cssClasses: 'text-center p-8'
-                  }
-                }]
-              }]
-            }]
-          }),
+          structure: JSON.stringify(defaultStructure),
           status: 'published',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()

@@ -28,16 +28,8 @@ export default function CategoriesPage() {
 
   const fetchCategories = async () => {
     try {
-      // Simple cache busting
-      const timestamp = Date.now();
-      
-      const response = await fetch(`/api/epaper/categories?_t=${timestamp}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        },
+      const response = await fetch(`/api/epaper/categories`, {
+        cache: 'no-store'
       });
       const result = await response.json();
       if (result.success) {

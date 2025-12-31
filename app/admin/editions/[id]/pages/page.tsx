@@ -30,6 +30,8 @@ export default function EditionPagesPage() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfZoom, setPdfZoom] = useState(100);
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null);
+  const [imageCacheKey, setImageCacheKey] = useState(Date.now());
+  const [showDeletePdfConfirm, setShowDeletePdfConfirm] = useState(false);
   
   // Edit page modal state
   const [showEditPageModal, setShowEditPageModal] = useState(false);
@@ -98,11 +100,38 @@ export default function EditionPagesPage() {
       const result = await response.json();
       if (result.success) {
         setPages(result.data || []);
+        // Update cache key to force image refresh
+        setImageCacheKey(Date.now());
       }
     } catch (error) {
       // Handle error silently or show user-friendly message
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeletePdf = async () => {
+    if (!pdfUrl) {
+      return;
+    }
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/editions/${editionId}/delete-pdf`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      if (result.success) {
+        setPdfUrl(null);
+        setUploadedPDF(null);
+        fetchPages(); // Refresh pages list
+      } else {
+        alert('Error: ' + (result.error || 'Failed to delete PDF'));
+      }
+    } catch (error) {
+      alert('Failed to delete PDF. Please try again.');
+    } finally {
+      setLoading(false);
+      setShowDeletePdfConfirm(false);
     }
   };
 
@@ -178,47 +207,50 @@ export default function EditionPagesPage() {
 
       const result = await response.json();
       
-      if (result.success) {
-        setProgressData(prev => ({ ...prev, progress: 60, status: 'Optimizing images for smaller file size...' }));
-        
-        // Auto-optimize extracted pages
-        try {
-          const optimizeResponse = await fetch(`/api/editions/${editionId}/optimize-pages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ preset: extractSettings.optimizationPreset }),
-          });
-
-          setProgressData(prev => ({ ...prev, progress: 90, status: 'Finalizing optimization...' }));
-
-          const optimizeResult = await optimizeResponse.json();
-          
-          if (optimizeResult.success) {
-            setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction & optimization complete!' }));
+          if (result.success) {
+            setProgressData(prev => ({ ...prev, progress: 60, status: 'Optimizing images for smaller file size...' }));
             
-            setTimeout(() => {
-              setShowProgressModal(false);
-              fetchPages(); // Refresh the page list
-            }, 500);
+            // Auto-optimize extracted pages
+            try {
+              const optimizeResponse = await fetch(`/api/editions/${editionId}/optimize-pages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ preset: extractSettings.optimizationPreset }),
+              });
+
+              setProgressData(prev => ({ ...prev, progress: 90, status: 'Finalizing optimization...' }));
+
+              const optimizeResult = await optimizeResponse.json();
+              
+              if (optimizeResult.success) {
+                setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction & optimization complete!' }));
+                
+                setTimeout(() => {
+                  setShowProgressModal(false);
+                  // Force refresh pages and clear image cache
+                  fetchPages();
+                }, 500);
+              } else {
+                // Extraction succeeded but optimization failed
+                setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction complete, optimization skipped' }));
+                setTimeout(() => {
+                  setShowProgressModal(false);
+                  fetchPages();
+                }, 500);
+              }
+            } catch (optimizeError) {
+              // Extraction succeeded but optimization failed
+              setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction complete, optimization skipped' }));
+              setTimeout(() => {
+                setShowProgressModal(false);
+                fetchPages();
+                window.location.hash = `refresh-${Date.now()}`;
+              }, 500);
+            }
           } else {
-            // Extraction succeeded but optimization failed
-            setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction complete, optimization skipped' }));
-            setTimeout(() => {
-              setShowProgressModal(false);
-              fetchPages();
-            }, 500);
-          }
-        } catch (optimizeError) {
-          // Extraction succeeded but optimization failed
-          setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction complete, optimization skipped' }));
-          setTimeout(() => {
             setShowProgressModal(false);
-            fetchPages();
-          }, 500);
-        }
-      } else {
-        setShowProgressModal(false);
-      }
+            alert('Error: ' + (result.error || 'Failed to extract pages'));
+          }
     } catch (error) {
       setShowProgressModal(false);
     }
@@ -454,25 +486,9 @@ export default function EditionPagesPage() {
               <Download className="w-4 h-4" /> Download PDF
             </button>
             <button
-              onClick={async () => {
-                if (!pdfUrl) {
-                  return;
-                }
-                try {
-                  setLoading(true);
-                  const response = await fetch(`/api/editions/${editionId}/delete-pdf`, {
-                    method: 'DELETE',
-                  });
-                  const result = await response.json();
-                  if (result.success) {
-                    setPdfUrl(null);
-                    setUploadedPDF(null);
-                  }
-                } catch (error) {
-                  // Handle error silently
-                } finally {
-                  setLoading(false);
-                }
+              onClick={() => {
+                if (!pdfUrl) return;
+                setShowDeletePdfConfirm(true);
               }}
               disabled={!pdfUrl}
               className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
@@ -519,6 +535,10 @@ export default function EditionPagesPage() {
                 }
 
                 if (bulkAction === 'delete') {
+                  const selectedCount = selectedPages.length;
+                  if (!confirm(`Are you sure you want to delete ${selectedCount} page(s)? This action cannot be undone.`)) {
+                    return;
+                  }
                   try {
                     setLoading(true);
                     const deletePromises = selectedPages.map(pageId => 
@@ -527,12 +547,19 @@ export default function EditionPagesPage() {
                       })
                     );
                     
-                    await Promise.all(deletePromises);
+                    const results = await Promise.all(deletePromises);
+                    const jsonResults = await Promise.all(results.map(r => r.json()));
+                    const failed = jsonResults.filter(r => !r.success);
+                    
+                    if (failed.length > 0) {
+                      alert(`Failed to delete ${failed.length} page(s). Please try again.`);
+                    }
+                    
                     setSelectedPages([]);
                     setBulkAction('');
                     fetchPages();
                   } catch (error) {
-                    // Handle error silently
+                    alert('Failed to delete pages. Please try again.');
                   } finally {
                     setLoading(false);
                   }
@@ -638,6 +665,9 @@ export default function EditionPagesPage() {
                         </button>
                         <button
                           onClick={async () => {
+                            if (!confirm(`Are you sure you want to delete Page ${page.page_number}? This action cannot be undone.`)) {
+                              return;
+                            }
                             try {
                               const response = await fetch(`/api/editions/${editionId}/pages/${page.id}`, {
                                 method: 'DELETE',
@@ -645,9 +675,11 @@ export default function EditionPagesPage() {
                               const result = await response.json();
                               if (result.success) {
                                 fetchPages();
+                              } else {
+                                alert('Error: ' + (result.error || 'Failed to delete page'));
                               }
                             } catch (error) {
-                              // Handle error silently
+                              alert('Failed to delete page. Please try again.');
                             }
                           }}
                           className="p-1.5 bg-red-500 text-white rounded hover:bg-red-600"
@@ -666,12 +698,13 @@ export default function EditionPagesPage() {
                         />
                       ) : (
                         <img
-                          src={page.image_url}
+                          src={`${page.image_url}${page.image_url.includes('?') ? '&' : '?'}v=${imageCacheKey}`}
                           alt={`Page ${page.page_number}`}
                           className="w-16 h-20 object-cover border border-gray-200 rounded"
                           onError={(e) => {
                             e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="80"><rect width="64" height="80" fill="%23f3f4f6"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="10">No Image</text></svg>';
                           }}
+                          key={`${page.id}-${imageCacheKey}`}
                         />
                       )}
                     </td>
@@ -975,11 +1008,16 @@ export default function EditionPagesPage() {
                     {pdfUrl && (
                       <div className="p-4 text-center border-t border-gray-200 bg-white">
                         <p className="text-sm text-gray-600">
-                          Page {extractSettings.currentPage} Preview • Zoom: {pdfZoom}%
+                          PDF Page {extractSettings.currentPage} Preview • Zoom: {pdfZoom}%
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
                           Use zoom controls above or scroll with Ctrl+wheel
                         </p>
+                        {pages.length > 0 && (
+                          <p className="text-xs text-green-600 mt-2 font-medium">
+                            ✓ {pages.length} page(s) extracted • Click "Refresh Pages" to see extracted images
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1060,12 +1098,13 @@ export default function EditionPagesPage() {
                 <div className="border border-gray-200 rounded p-4 bg-gray-50">
                   {editingPage.image_url ? (
                     <img
-                      src={editingPage.image_url}
+                      src={`${editingPage.image_url}${editingPage.image_url.includes('?') ? '&' : '?'}v=${imageCacheKey}`}
                       alt={`Page ${editingPage.page_number}`}
                       className="w-32 h-40 object-cover border border-gray-300 rounded mx-auto"
                       onError={(e) => {
                         e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="128" height="160"><rect width="128" height="160" fill="%23f3f4f6"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="12">No Image</text></svg>';
                       }}
+                      key={`edit-${editingPage.id}-${imageCacheKey}`}
                     />
                   ) : (
                     <div className="w-32 h-40 bg-gray-200 flex items-center justify-center mx-auto rounded">
@@ -1123,6 +1162,38 @@ export default function EditionPagesPage() {
                 className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete PDF Confirmation Modal */}
+      {showDeletePdfConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-lg">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-700">Delete PDF?</h3>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-gray-600">
+                This will remove the PDF and all extracted pages for this edition.
+                This action cannot be undone.
+              </p>
+              <p className="text-xs text-red-600">Are you sure you want to continue?</p>
+            </div>
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => setShowDeletePdfConfirm(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeletePdf}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+              >
+                Delete PDF
               </button>
             </div>
           </div>

@@ -139,8 +139,9 @@ export async function POST(
     // Clear existing pages for this edition
     await db.delete(edition_pages).where(eq(edition_pages.edition_id, editionId));
 
-    // Insert new pages into database
+    // Insert new pages into database with VALIDATION
     const newPages = [];
+    const fs = require('fs');
     
     if (isUbuntu) {
       // pdftoppm creates files like: edition-1-page-01.jpg, edition-1-page-02.jpg, etc.
@@ -148,38 +149,63 @@ export async function POST(
         const pageNum = i.toString().padStart(2, '0'); // 01, 02, 03...
         const filename = `edition-${editionId}-page-${pageNum}.jpg`;
         const imagePath = `/uploads/${filename}`;
+        const fullPath = join(uploadsDir, filename);
         
-        newPages.push({
-          edition_id: editionId,
-          page_number: i,
-          image_url: imagePath,
-        });
+        // VALIDATE file exists before adding to database
+        if (fs.existsSync(fullPath)) {
+          newPages.push({
+            edition_id: editionId,
+            page_number: i,
+            image_url: imagePath,
+          });
+        } else {
+          console.error(`❌ Page ${i} not extracted: ${fullPath}`);
+        }
       }
     } else {
       // Ghostscript creates files like: edition-1-page-1.jpg, edition-1-page-2.jpg, etc.
       for (let i = 1; i <= pageCount; i++) {
         const filename = `edition-${editionId}-page-${i}.${format}`;
         const imagePath = `/uploads/${filename}`;
+        const fullPath = join(uploadsDir, filename);
         
-        newPages.push({
-          edition_id: editionId,
-          page_number: i,
-          image_url: imagePath,
-        });
+        // VALIDATE file exists before adding to database
+        if (fs.existsSync(fullPath)) {
+          newPages.push({
+            edition_id: editionId,
+            page_number: i,
+            image_url: imagePath,
+          });
+        } else {
+          console.error(`❌ Page ${i} not extracted: ${fullPath}`);
+        }
       }
+    }
+
+    // Only proceed if we have extracted pages
+    if (newPages.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: `No pages were successfully extracted. Expected ${pageCount} pages.`,
+        details: 'All extraction attempts failed - check PDF file and extraction tools',
+        tool: isUbuntu ? 'pdftoppm' : 'Ghostscript',
+        platform: process.platform
+      }, { status: 500 });
     }
 
     const insertedPages = await db.insert(edition_pages).values(newPages).returning();
 
     return NextResponse.json({
       success: true,
-      message: `Successfully extracted ${pageCount} pages`,
+      message: `Successfully extracted ${newPages.length} of ${pageCount} pages`,
       data: {
-        pageCount,
+        pageCount: newPages.length,
+        totalPages: pageCount,
         pages: insertedPages,
         settings: { resolution, format, quality },
         tool: isUbuntu ? 'pdftoppm' : 'Ghostscript',
-        platform: process.platform
+        platform: process.platform,
+        failedPages: pageCount - newPages.length
       }
     });
 

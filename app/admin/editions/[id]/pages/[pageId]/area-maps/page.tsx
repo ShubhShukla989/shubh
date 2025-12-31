@@ -43,6 +43,7 @@ export default function AreaMapsPage() {
   const [loading, setLoading] = useState(true);
   const [areaMaps, setAreaMaps] = useState<AreaMap[]>([]);
   const [imageScale, setImageScale] = useState(1);
+  const [imageCacheKey, setImageCacheKey] = useState(Date.now());
   const [availableAreaMaps, setAvailableAreaMaps] = useState<AvailableAreaMap[]>([]);
   const [editingArea, setEditingArea] = useState<AreaMap | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -188,17 +189,8 @@ export default function AreaMapsPage() {
 
   const fetchAvailableAreaMaps = async () => {
     try {
-      // Add cache busting for available area maps
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(7);
-      
-      const response = await fetch(`/api/editions/${editionId}/all-area-maps?_t=${timestamp}&_r=${random}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
+      const response = await fetch(`/api/editions/${editionId}/all-area-maps`, {
+        cache: 'no-store'
       });
       const result = await response.json();
       if (result.success) {
@@ -211,10 +203,17 @@ export default function AreaMapsPage() {
 
   const fetchPage = async () => {
     try {
-      const response = await fetch(`/api/editions/${editionId}/pages/${pageId}`);
+      const response = await fetch(`/api/editions/${editionId}/pages/${pageId}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       const result = await response.json();
       if (result.success) {
         setPage(result.data);
+        // Update cache key to force image refresh
+        setImageCacheKey(Date.now());
       }
       setLoading(false);
     } catch (error) {
@@ -225,17 +224,8 @@ export default function AreaMapsPage() {
 
   const fetchAreaMaps = async () => {
     try {
-      // Add cache busting for area maps
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(7);
-      
-      const response = await fetch(`/api/editions/${editionId}/pages/${pageId}/area-maps?_t=${timestamp}&_r=${random}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
+      const response = await fetch(`/api/editions/${editionId}/pages/${pageId}/area-maps`, {
+        cache: 'no-store'
       });
       const result = await response.json();
       if (result.success) {
@@ -298,27 +288,9 @@ export default function AreaMapsPage() {
       
       const result = await response.json();
       if (result.success) {
-        console.log('✅ Area map updated and saved successfully');
-        console.log('📊 Updated data:', result.data);
-        
-        // Always fetch fresh data from database to ensure consistency
-        // This ensures we have the latest linked_area_ids and all other data
-        console.log('🔄 Forcing fresh data reload...');
-        
-        // Wait a bit for database to commit
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
+        // Simple refresh after save
         await fetchAreaMaps();
         await fetchAvailableAreaMaps();
-        
-        // Double refresh after delay to ensure data is loaded
-        setTimeout(async () => {
-          console.log('🔄 Double refresh for area maps...');
-          await fetchAreaMaps();
-          await fetchAvailableAreaMaps();
-        }, 1000);
-        
-        console.log('🔄 Fresh data loaded after save');
       } else {
         console.error('❌ Failed to save updated area map:', result.error);
         alert('Error saving changes: ' + result.error);
@@ -447,8 +419,6 @@ export default function AreaMapsPage() {
         area.width = Math.min(area.width, imgWidth - area.x);
         area.height = Math.min(area.height, imgHeight - area.y);
         
-        console.log('✅ Created area within bounds:', area, 'Image size:', imgWidth, 'x', imgHeight);
-        
         area.isNew = false;
         setAreaMaps([...areaMaps, area]);
       } else {
@@ -564,8 +534,6 @@ export default function AreaMapsPage() {
   const handleResizeMove = (e: MouseEvent) => {
     const state = resizeStateRef.current;
     if (state.index === null || !state.originalArea || !state.handle) return;
-    
-    console.log('🔄 Resizing...', e.clientX, e.clientY);
     
     const deltaX = (e.clientX - state.startX) / imageScale;
     const deltaY = (e.clientY - state.startY) / imageScale;
@@ -688,8 +656,6 @@ export default function AreaMapsPage() {
   const handleSaveAll = async () => {
     try {
       setIsSaving(true);
-      console.log('💾 Saving all area maps:', areaMaps.length, 'areas');
-      console.log('📊 Area maps data:', areaMaps);
       
       // Log linked area IDs for each area
       areaMaps.forEach((area, index) => {
@@ -706,25 +672,11 @@ export default function AreaMapsPage() {
       
       const result = await response.json();
       if (result.success) {
-        console.log('✅ All area maps saved successfully:', result.data?.length || 0, 'areas');
-        console.log('📊 Saved areas with bidirectional links:', result.data);
         alert('All area maps saved successfully with bidirectional linking!');
         
-        // Refresh data to ensure UI is in sync with database
-        console.log('🔄 Refreshing after bulk save...');
-        
-        // Wait for database commit
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
+        // Simple refresh after bulk save
         await fetchAreaMaps();
         await fetchAvailableAreaMaps();
-        
-        // Double refresh
-        setTimeout(async () => {
-          console.log('🔄 Double refresh after bulk save...');
-          await fetchAreaMaps();
-          await fetchAvailableAreaMaps();
-        }, 1000);
       } else {
         console.error('❌ Save failed:', result.error);
         alert('Error: ' + result.error);
@@ -1491,7 +1443,7 @@ export default function AreaMapsPage() {
           <div className="relative">
             <img
               ref={imageRef}
-              src={page.image_url}
+              src={`${page.image_url}${page.image_url.includes('?') ? '&' : '?'}v=${imageCacheKey}`}
               alt={`Page ${page.page_number}`}
               className="w-full h-auto"
               onLoad={handleImageLoad}
@@ -1499,6 +1451,7 @@ export default function AreaMapsPage() {
                 console.error('Failed to load page image:', page.image_url);
               }}
               draggable={false}
+              key={`area-map-image-${imageCacheKey}`}
             />
           </div>
           
@@ -1593,20 +1546,9 @@ export default function AreaMapsPage() {
                         if (result.success) {
                           alert('Area map saved successfully!');
                           
-                          console.log('🔄 Area map saved, forcing refresh...');
-                          
-                          // Wait for database commit
-                          await new Promise(resolve => setTimeout(resolve, 300));
-                          
+                          // Simple refresh after save
                           fetchAreaMaps();
                           fetchAvailableAreaMaps();
-                          
-                          // Double refresh
-                          setTimeout(() => {
-                            console.log('🔄 Double refresh after area map save...');
-                            fetchAreaMaps();
-                            fetchAvailableAreaMaps();
-                          }, 1000);
                         } else {
                           alert('Error: ' + result.error);
                         }

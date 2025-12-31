@@ -150,28 +150,57 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
 
       {/* Pagination Control (Full) */}
       {format === 'pagination-control' && (
-        <div className="inline-flex items-center gap-1 justify-center">
-          {/* Previous button */}
-          <button
-            onClick={goToPrevious}
-            disabled={currentPage === 1}
-            className="h-6 px-2 sm:h-8 sm:px-3 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-          >
-            <span className="text-sm sm:text-base font-bold" style={{ lineHeight: '1' }}>‹‹</span>
-          </button>
-          
-          {/* Current page / Total pages */}
-          <div className="h-6 px-2 sm:h-8 sm:px-3 bg-gray-100 rounded text-sm sm:text-base font-bold text-gray-800 whitespace-nowrap flex-shrink-0 inline-flex items-center justify-center" style={{ lineHeight: '1', fontFamily: 'monospace' }}>
-            {currentPage}/{pages.length}
+        <div className="flex items-center gap-2 justify-center">
+          <div className="inline-flex items-center gap-1">
+            {/* Previous button */}
+            <button
+              onClick={goToPrevious}
+              disabled={currentPage === 1}
+              className="h-6 px-2 sm:h-8 sm:px-3 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            >
+              <span className="text-sm sm:text-base font-bold" style={{ lineHeight: '1' }}>‹‹</span>
+            </button>
+            
+            {/* Current page / Total pages */}
+            <div className="h-6 px-2 sm:h-8 sm:px-3 bg-gray-100 rounded text-sm sm:text-base font-bold text-gray-800 whitespace-nowrap flex-shrink-0 inline-flex items-center justify-center" style={{ lineHeight: '1', fontFamily: 'monospace' }}>
+              {currentPage}/{pages.length}
+            </div>
+            
+            {/* Next button */}
+            <button
+              onClick={goToNext}
+              disabled={currentPage === pages.length}
+              className="h-6 px-2 sm:h-8 sm:px-3 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            >
+              <span className="text-sm sm:text-base font-bold" style={{ lineHeight: '1' }}>››</span>
+            </button>
           </div>
           
-          {/* Next button */}
+          {/* PDF Download Button */}
           <button
-            onClick={goToNext}
-            disabled={currentPage === pages.length}
-            className="h-6 px-2 sm:h-8 sm:px-3 flex items-center justify-center bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            onClick={() => {
+              if (editionId) {
+                fetch(`/api/editions/${editionId}`)
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.success && data.data?.pdf_url) {
+                      window.open(data.data.pdf_url, '_blank');
+                    } else {
+                      alert('PDF not available for this edition');
+                    }
+                  })
+                  .catch(() => {
+                    alert('Failed to download PDF');
+                  });
+              }
+            }}
+            className="h-6 px-2 sm:h-8 sm:px-3 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors flex items-center gap-1 flex-shrink-0"
+            title="Download PDF"
           >
-            <span className="text-sm sm:text-base font-bold" style={{ lineHeight: '1' }}>››</span>
+            <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+            <span className="text-xs sm:text-sm font-bold">PDF</span>
           </button>
         </div>
       )}
@@ -197,6 +226,30 @@ export function EpaperPaginationWidget({ config }: EpaperPaginationWidgetProps) 
             className="px-2 py-1 sm:px-3 sm:py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-xs sm:text-sm"
           >
             &gt;&gt;
+          </button>
+          
+          {/* PDF Download Button */}
+          <button
+            onClick={() => {
+              if (editionId) {
+                fetch(`/api/editions/${editionId}`)
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.success && data.data?.pdf_url) {
+                      window.open(data.data.pdf_url, '_blank');
+                    } else {
+                      alert('PDF not available for this edition');
+                    }
+                  })
+                  .catch(() => {
+                    alert('Failed to download PDF');
+                  });
+              }
+            }}
+            className="px-2 py-1 sm:px-3 sm:py-1 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors text-xs sm:text-sm"
+            title="Download PDF"
+          >
+            PDF
           </button>
         </div>
       )}
