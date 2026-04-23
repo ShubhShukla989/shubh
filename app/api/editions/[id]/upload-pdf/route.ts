@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { editions, epaper_categories } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import { revalidatePath } from 'next/cache';
 import { invalidateWidgetCachesAsync } from '@/lib/cache/universal';
+import { createClient } from '@supabase/supabase-js';
+
+export const maxDuration = 60;
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(
   request: NextRequest,
@@ -17,59 +23,57 @@ export async function POST(
     const file = formData.get('pdf') as File;
 
     if (!file) {
-      return NextResponse.json(
-        { success: false, error: 'No file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
     }
 
-    // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Use default media path if not configured
-    const mediaPath = process.env.MEDIA_PATH || './public/uploads';
-    const pdfDir = join(mediaPath, 'editions');
-    await mkdir(pdfDir, { recursive: true });
-
-    // Save to file system
     const fileName = `edition-${editionId}-${Date.now()}.pdf`;
-    const filePath = join(pdfDir, fileName);
-    await writeFile(filePath, buffer);
+    const filePath = `editions/${fileName}`;
 
-    // Construct URL (matching the media path structure)
-    const pdfUrl = `/uploads/editions/${fileName}`;
+    const { error: uploadError } = await supabase.storage
+      .from('uploads')
+      .upload(filePath, buffer, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
 
-    // Update edition with PDF URL
+    if (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+      return NextResponse.json({ success: false, error: uploadError.message }, { status: 500 });
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('uploads')
+      .getPublicUrl(filePath);
+
     const [updatedEdition] = await db
       .update(editions)
-      .set({ pdf_url: pdfUrl })
+      .set({ pdf_url: publicUrl })
       .where(eq(editions.id, editionId))
       .returning();
 
-    // 🚀 AUTO-CLEAR CACHE after PDF upload
     invalidateWidgetCachesAsync();
-    
-    // Revalidate pages if edition is published
+
     if (updatedEdition?.status === 'published') {
       try {
         revalidatePath('/', 'page');
         revalidatePath('/epaper/display', 'page');
-        
+
         if (updatedEdition.category_id) {
           const [cat] = await db
             .select({ alias: epaper_categories.alias })
             .from(epaper_categories)
             .where(eq(epaper_categories.id, updatedEdition.category_id))
             .limit(1);
-          
+
           if (cat?.alias) {
             revalidatePath(`/epaper/category/${cat.alias}`, 'page');
           }
         }
-        
+
         revalidatePath(`/epaper/view/${editionId}`, 'page');
-        console.log('✅ Cache cleared after PDF upload');
       } catch (e) {
         console.error('Failed to clear cache:', e);
       }
@@ -77,12 +81,10 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      data: { pdf_url: pdfUrl, file_name: file.name },
+      data: { pdf_url: publicUrl, file_name: file.name },
     });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: 'Failed to upload PDF' },
-      { status: 500 }
-    );
+    console.error('Upload PDF error:', error);
+    return NextResponse.json({ success: false, error: 'Failed to upload PDF' }, { status: 500 });
   }
 }
