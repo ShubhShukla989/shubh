@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { createClient } from '@supabase/supabase-js';
+
+// Increase body size limit for this route
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+// Allow up to 50MB
+export const maxDuration = 60;
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,51 +22,39 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File;
 
     if (!file) {
-      return NextResponse.json(
-        { success: false, error: 'No file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
     }
 
-    // Validate file type
     if (file.type !== 'application/pdf') {
-      return NextResponse.json(
-        { success: false, error: 'Only PDF files are allowed' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'Only PDF files are allowed' }, { status: 400 });
     }
 
-    // Validate file size (50MB max)
     const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
-      return NextResponse.json(
-        { success: false, error: 'File size exceeds 50MB limit' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'File size exceeds 50MB limit' }, { status: 400 });
     }
 
-    // Generate unique filename with timestamp
     const timestamp = Date.now();
     const fileName = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     const filePath = `editions/${fileName}`;
 
-    // Convert File to ArrayBuffer then to Buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Save to local file system
-    const mediaPath = process.env.MEDIA_PATH || './public/uploads';
-    const fullPath = join(mediaPath, filePath);
-    const dirPath = join(mediaPath, 'editions');
+    const { error } = await supabase.storage
+      .from('uploads')
+      .upload(filePath, buffer, {
+        contentType: 'application/pdf',
+        upsert: false,
+      });
 
-    // Ensure directory exists
-    await mkdir(dirPath, { recursive: true });
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
 
-    // Write file
-    await writeFile(fullPath, buffer);
-
-    // Generate public URL - use uploads path to match MEDIA_PATH
-    const publicUrl = `/uploads/${filePath}`;
+    const { data: { publicUrl } } = supabase.storage
+      .from('uploads')
+      .getPublicUrl(filePath);
 
     return NextResponse.json({
       success: true,
