@@ -35,6 +35,11 @@ next-env.d.ts
 
 # Database (exclude personal data)
 database/epapercms.db
+database/epapercms.db-shm
+database/epapercms.db-wal
+database/*.db
+database/*.db-shm
+database/*.db-wal
 
 # Uploads (exclude user files)
 public/uploads/*
