@@ -77,7 +77,7 @@ export default function DynamicLayout({ layoutName, fallback }: DynamicLayoutPro
                   style={{ flex: col.width || 1 }}
                 >
                   {col.widgets?.map((widget: any, widgetIndex: number) => (
-                    <div key={widgetIndex} className="widget mb-4">
+                    <div key={widgetIndex} className="widget">
                       {renderWidget(widget)}
                     </div>
                   ))}

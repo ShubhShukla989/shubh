@@ -41,9 +41,7 @@ const categoriesApi = {
   // Get all categories
   getAll: async (): Promise<{ data: Category[] }> => {
     const response = await fetch('/api/epaper/categories', {
-      headers: {
-        'Cache-Control': 'max-age=300', // 5 minutes client cache
-      },
+      cache: 'no-store',
     });
     if (!response.ok) {
       throw new Error('Failed to fetch categories');
@@ -108,9 +106,9 @@ export const useCategories = () => {
     queryKey: queryKeys.categories,
     queryFn: categoriesApi.getAll,
     select: (data) => data.data,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnWindowFocus: false,
+    staleTime: 0, // always fetch fresh
+    gcTime: 0,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -136,8 +134,8 @@ export const useCreateCategory = () => {
       // Add to cache
       queryClient.setQueryData(queryKeys.category(data.data.id), { data: data.data });
     },
-    onError: (error) => {
-      console.error('Failed to create category:', error);
+    onError: () => {
+      // Silent fail - error handled by UI
     },
   });
 };
@@ -154,8 +152,8 @@ export const useUpdateCategory = () => {
       // Invalidate categories list
       queryClient.invalidateQueries({ queryKey: queryKeys.categories });
     },
-    onError: (error) => {
-      console.error('Failed to update category:', error);
+    onError: () => {
+      // Silent fail - error handled by UI
     },
   });
 };
@@ -172,8 +170,8 @@ export const useDeleteCategory = () => {
       // Invalidate lists
       queryClient.invalidateQueries({ queryKey: queryKeys.categories });
     },
-    onError: (error) => {
-      console.error('Failed to delete category:', error);
+    onError: () => {
+      // Silent fail - error handled by UI
     },
   });
 };

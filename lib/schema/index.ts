@@ -8,3 +8,5 @@ export * from './sliders';
 export * from './layouts';
 export * from './settings';
 export * from './analytics';
+export * from './clips';
+export * from './notes';

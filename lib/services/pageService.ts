@@ -76,7 +76,8 @@ class PageService {
     if (!response.ok) {
       throw new Error('Failed to fetch page');
     }
-    return response.json();
+    const result = await response.json();
+    return result.data || result;
   }
 
   /**
@@ -142,11 +143,18 @@ class PageService {
    * Check if alias is available
    */
   async checkAliasAvailability(alias: string, excludeId?: number): Promise<boolean> {
-    const response = await fetch(
-      `${this.baseUrl}/check-alias?alias=${alias}${excludeId ? `&excludeId=${excludeId}` : ''}`
-    );
-    const data = await response.json();
-    return data.available;
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/check-alias?alias=${alias}${excludeId ? `&excludeId=${excludeId}` : ''}`
+      );
+      if (!response.ok) {
+        throw new Error(`Alias check failed with status ${response.status}`);
+      }
+      const data = await response.json();
+      return data.available;
+    } catch (error) {
+      throw error;
+    }
   }
 }
 

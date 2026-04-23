@@ -1,0 +1,873 @@
+/* E-paper 70% Width Layout - Global Styles */
+
+/* Main container for e-paper display pages - NO GAPS */
+.epaper-display-page {
+  width: 100%;
+  min-height: 100vh;
+  background: #f8fafc;
+  margin: 0;
+  padding: 0;
+}
+
+/* PC/Desktop: Centered layout with grey background */
+@media (min-width: 769px) {
+  /* Global page background */
+  /* PC/Desktop: Full width layout without borders */
+  body {
+    background-color: #ffffff !important; /* White background - no grey */
+  }
+  
+  .pc-epaper-centered-container {
+    width: 100% !important; /* Full width instead of 70% */
+    margin: 0 !important; /* No centering margin */
+    max-width: none !important; /* No max width limit */
+    min-width: 0 !important; /* No min width limit */
+    padding: 0;
+    box-sizing: border-box;
+    background-color: #ffffff !important; /* White content area */
+    box-shadow: none !important; /* Removed shadow - no border effect */
+    min-height: 100vh !important;
+  }
+  
+  /* Ensure all child elements fit within the container */
+  .pc-epaper-centered-container * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  
+  /* Center the epaper widgets within the container */
+  .pc-epaper-centered-container .epaper-container,
+  .pc-epaper-centered-container .epaper-page-display,
+  .pc-epaper-centered-container [class*="epaper"] {
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Enhanced layout columns for better spacing */
+  .pc-epaper-centered-container .layout-column {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: flex-start;
+    align-self: flex-start;
+    gap: 16px !important; /* Increased gap for better spacing */
+  }
+  
+  /* Special handling for small control widgets */
+  .pc-epaper-centered-container .layout-column.control-widgets {
+    flex-wrap: nowrap;
+    gap: 12px !important; /* Consistent spacing for controls */
+  }
+  
+  /* Special class for no-gap horizontal widgets */
+  .pc-epaper-centered-container .layout-column.no-gap {
+    gap: 0 !important;
+  }
+  
+  .pc-epaper-centered-container .layout-column.no-gap .widget {
+    margin: 0 !important;
+  }
+}
+
+/* Mobile: Full width with enhanced touch targets */
+@media (max-width: 768px) {
+  /* Mobile keeps full width */
+  body {
+    background-color: #ffffff !important; /* White background on mobile */
+  }
+  
+  .pc-epaper-centered-container {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important; /* No shadow on mobile */
+  }
+  
+  /* Enhanced mobile button sizing */
+  .pc-epaper-centered-container button,
+  .pc-epaper-centered-container select {
+    min-height: 56px !important;
+    font-size: 18px !important;
+    padding: 12px 20px !important;
+  }
+  
+  /* Mobile-specific spacing */
+  .pc-epaper-centered-container .layout-column {
+    gap: 12px !important;
+  }
+
+  /* Hide desktop sidebar on mobile */
+  .desktop-sidebar {
+    display: none !important;
+  }
+
+  /* Mobile content adjustments */
+  .mobile-content {
+    margin-bottom: 60px !important; /* Reduced for smaller footer */
+    box-shadow: none !important;
+  }
+
+  /* Mobile header styling */
+  .mobile-header {
+    padding: 16px !important;
+    text-align: center !important;
+  }
+
+  .mobile-header h1 {
+    font-size: 18px !important;
+  }
+
+  /* Mobile page display */
+  .mobile-page-display {
+    padding: 12px !important;
+  }
+
+  /* Mobile thumbnail strip */
+  .mobile-thumbnails {
+    display: block !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: #ffffff !important;
+    border-top: 2px solid #d1d5db !important;
+    padding: 12px !important;
+    z-index: 1000 !important;
+  }
+
+  /* Hide desktop controls on mobile */
+  .desktop-controls {
+    display: none !important;
+  }
+}
+
+/* Desktop: Full width layout without borders */
+@media (min-width: 769px) {
+  .pc-epaper-centered-container {
+    width: 100% !important; /* Full width instead of 85% */
+    padding: 0;
+    max-width: none; /* No max width limit */
+  }
+  
+  /* Desktop-specific button sizing */
+  .pc-epaper-centered-container button,
+  .pc-epaper-centered-container select {
+    min-height: 50px !important;
+    font-size: 17px !important;
+  }
+
+  /* Show desktop sidebar */
+  .desktop-sidebar {
+    display: block !important;
+    height: calc(150vh) !important; /* Further increased height to show even more pages */
+  }
+
+  /* Custom scrollbar styling for desktop sidebar - Override global styles */
+  .desktop-sidebar::-webkit-scrollbar {
+    width: 10px !important; /* Reduced from 12px (20% decrease) */
+  }
+
+  .desktop-sidebar::-webkit-scrollbar-track {
+    background: #f3f4f6 !important; /* Light grey track */
+    border-radius: 8px !important; /* More rounded */
+  }
+
+  .desktop-sidebar::-webkit-scrollbar-thumb {
+    background: #d1d5db !important; /* Light grey color (normal state) */
+    border-radius: 8px !important; /* More rounded */
+    border: 1px solid #f3f4f6 !important; /* Border for definition */
+    transition: background-color 0.2s ease !important;
+  }
+
+  .desktop-sidebar::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af !important; /* Grey color (hover state) */
+  }
+
+  /* Scrollbar styling for the inner container - Override global styles */
+  .desktop-sidebar > div::-webkit-scrollbar {
+    width: 10px !important; /* Reduced from 12px (20% decrease) */
+  }
+
+  .desktop-sidebar > div::-webkit-scrollbar-track {
+    background: #f3f4f6 !important; /* Light grey track */
+    border-radius: 8px !important; /* More rounded */
+  }
+
+  .desktop-sidebar > div::-webkit-scrollbar-thumb {
+    background: #d1d5db !important; /* Light grey color (normal state) */
+    border-radius: 8px !important; /* More rounded */
+    border: 1px solid #f3f4f6 !important; /* Border for definition */
+    transition: background-color 0.2s ease !important;
+  }
+
+  .desktop-sidebar > div::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af !important; /* Grey color (hover state) */
+  }
+
+  /* Scrollbar buttons with triangles for desktop sidebar */
+  .desktop-sidebar::-webkit-scrollbar-button:single-button {
+    background-color: #f3f4f6 !important; /* Light grey background */
+    display: block !important;
+    border-style: solid !important;
+    height: 12px !important; /* Increased back for better triangle visibility */
+    width: 10px !important; /* Keep width reduced */
+    border-radius: 6px !important; /* Rounded button */
+  }
+
+  /* Up arrow (start) */
+  .desktop-sidebar::-webkit-scrollbar-button:single-button:vertical:decrement {
+    border-width: 0 4px 6px 4px !important; /* Triangle pointing up */
+    border-color: transparent transparent #d1d5db transparent !important; /* Light grey */
+    background-color: #f3f4f6 !important;
+    border-radius: 6px 6px 0 0 !important; /* Rounded top */
+  }
+
+  .desktop-sidebar::-webkit-scrollbar-button:single-button:vertical:decrement:hover {
+    border-color: transparent transparent #9ca3af transparent !important; /* Grey on hover */
+    background-color: #e5e7eb !important; /* Slightly darker background on hover */
+  }
+
+  /* Down arrow (end) */
+  .desktop-sidebar::-webkit-scrollbar-button:single-button:vertical:increment {
+    border-width: 6px 4px 0 4px !important; /* Triangle pointing down */
+    border-color: #d1d5db transparent transparent transparent !important; /* Light grey */
+    background-color: #f3f4f6 !important;
+    border-radius: 0 0 6px 6px !important; /* Rounded bottom */
+  }
+
+  .desktop-sidebar::-webkit-scrollbar-button:single-button:vertical:increment:hover {
+    border-color: #9ca3af transparent transparent transparent !important; /* Grey on hover */
+    background-color: #e5e7eb !important; /* Slightly darker background on hover */
+  }
+
+  /* Inner container scrollbar buttons */
+  .desktop-sidebar > div::-webkit-scrollbar-button:single-button {
+    background-color: #f3f4f6 !important; /* Light grey background */
+    display: block !important;
+    border-style: solid !important;
+    height: 12px !important; /* Increased back for better triangle visibility */
+    width: 10px !important; /* Keep width reduced */
+    border-radius: 6px !important; /* Rounded button */
+  }
+
+  .desktop-sidebar > div::-webkit-scrollbar-button:single-button:vertical:decrement {
+    border-width: 0 4px 6px 4px !important; /* Triangle pointing up */
+    border-color: transparent transparent #d1d5db transparent !important; /* Light grey */
+    background-color: #f3f4f6 !important;
+    border-radius: 6px 6px 0 0 !important; /* Rounded top */
+  }
+
+  .desktop-sidebar > div::-webkit-scrollbar-button:single-button:vertical:decrement:hover {
+    border-color: transparent transparent #9ca3af transparent !important; /* Grey on hover */
+    background-color: #e5e7eb !important; /* Slightly darker background on hover */
+  }
+
+  .desktop-sidebar > div::-webkit-scrollbar-button:single-button:vertical:increment {
+    border-width: 6px 4px 0 4px !important; /* Triangle pointing down */
+    border-color: #d1d5db transparent transparent transparent !important; /* Light grey */
+    background-color: #f3f4f6 !important;
+    border-radius: 0 0 6px 6px !important; /* Rounded bottom */
+  }
+
+  .desktop-sidebar > div::-webkit-scrollbar-button:single-button:vertical:increment:hover {
+    border-color: #9ca3af transparent transparent transparent !important; /* Grey on hover */
+    background-color: #e5e7eb !important; /* Slightly darker background on hover */
+  }
+
+  /* Hide mobile elements on desktop */
+  .mobile-thumbnails {
+    display: none !important;
+  }
+
+  /* Desktop content styling */
+  .mobile-content {
+    margin-bottom: 0 !important;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1), -2px 0 4px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* Desktop header styling */
+  .mobile-header {
+    padding: 20px 24px !important;
+    /* Removed hardcoded text-align to allow designer settings */
+  }
+
+  .mobile-header h1 {
+    font-size: 20px !important;
+  }
+
+  /* Desktop page display */
+  .mobile-page-display {
+    padding: 24px !important;
+  }
+
+  /* Show desktop controls */
+  .desktop-controls {
+    display: block !important;
+    height: 56px !important; /* Fixed height for consistency */
+  }
+}
+
+/* Tablet: Full width layout without borders */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .pc-epaper-centered-container {
+    width: 100% !important; /* Full width instead of 85% */
+    padding: 0;
+    max-width: none; /* No max width limit */
+  }
+  
+  /* Tablet-specific button sizing */
+  .pc-epaper-centered-container button,
+  .pc-epaper-centered-container select {
+    min-height: 50px !important;
+    font-size: 17px !important;
+  }
+}
+
+/* Large screens: Full width layout */
+@media (min-width: 1400px) {
+  .pc-epaper-centered-container {
+    max-width: none !important; /* No max width limit */
+    width: 100%; /* Full width */
+  }
+}
+
+/* Ultra-wide screens: Full width layout */
+@media (min-width: 1800px) {
+  .pc-epaper-centered-container {
+    max-width: none !important; /* No max width limit */
+    width: 100% !important; /* Full width */
+  }
+}
+
+/* Smooth transitions for responsive changes */
+.pc-epaper-centered-container {
+  transition: width 0.3s ease-in-out, padding 0.3s ease-in-out;
+}
+
+/* Layout rows and columns - Enhanced spacing for older users */
+.layout-renderer {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  line-height: 1.6 !important; /* Better line spacing for readability */
+}
+
+/* Enhanced text readability */
+.layout-renderer h1,
+.layout-renderer h2,
+.layout-renderer h3,
+.layout-renderer h4,
+.layout-renderer h5,
+.layout-renderer h6 {
+  font-weight: 600 !important; /* Semi-bold headings */
+  line-height: 1.4 !important;
+  margin-bottom: 0.75em !important;
+}
+
+.layout-renderer p,
+.layout-renderer div,
+.layout-renderer span {
+  line-height: 1.6 !important;
+}
+
+/* Enhanced focus indicators for keyboard navigation */
+.layout-renderer button:focus,
+.layout-renderer select:focus,
+.layout-renderer input:focus,
+.layout-renderer a:focus {
+  outline: 3px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Better error and loading states */
+.layout-renderer .loading-spinner {
+  width: 48px !important;
+  height: 48px !important;
+  border-width: 4px !important;
+}
+
+.layout-renderer .error-message {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: #dc2626 !important;
+  padding: 16px !important;
+  border: 2px solid #dc2626 !important;
+  background-color: #fef2f2 !important;
+}
+
+/* Enhanced contrast for better visibility */
+.layout-renderer .text-muted {
+  color: #4b5563 !important; /* Darker muted text */
+}
+
+.layout-renderer .text-secondary {
+  color: #374151 !important; /* Darker secondary text */
+}
+
+/* Layout rows and columns - Enhanced spacing for older users */
+.layout-renderer {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  line-height: 1.6 !important; /* Better line spacing for readability */
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.layout-row {
+  width: 100%;
+  display: block;
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  padding: 0 !important;
+  background: transparent;
+  border-radius: 0;
+  gap: 0 !important;
+}
+
+/* White strip for rows with widgets - SHARP CORNERS DBD STYLE */
+.layout-row.has-widgets {
+  background: white !important;
+  border: 1px solid #e5e7eb;
+  border-radius: 0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin: 0 !important;
+  margin-bottom: 0 !important;
+  padding: 0 !important;
+}
+
+/* Remove last-child margin rule since all rows now have 0 margin */
+
+/* Flex container for columns - ZERO GAPS DBD STYLE */
+.layout-row > .flex {
+  display: flex !important;
+  flex-wrap: nowrap; /* Force widgets to stay in same row */
+  align-items: flex-start;
+  justify-content: flex-start; /* Left align by default */
+  gap: 0 !important;
+  width: 100%;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Column styling - ZERO GAPS DBD STYLE */
+.layout-column {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: 1px;
+  gap: 0 !important;
+  align-self: flex-start;
+}
+
+/* Responsive column padding - REMOVE ALL PADDING TO ELIMINATE GAPS */
+@media (max-width: 1200px) {
+  .layout-column {
+    padding: 0; /* Remove padding to eliminate gaps */
+  }
+}
+
+@media (max-width: 992px) {
+  .layout-column {
+    padding: 0; /* Remove padding to eliminate gaps */
+  }
+}
+
+@media (max-width: 768px) {
+  .layout-column {
+    padding: 0; /* Remove padding to eliminate gaps */
+  }
+}
+
+/* Special handling for small control widgets - keep them in same row */
+.layout-column.control-widgets {
+  flex-wrap: nowrap; /* Force small widgets to stay in same row */
+}
+
+/* Special handling for epaper display widgets - ensure proper containment */
+.layout-column .widget [class*="epaper-page-display"],
+.layout-column .widget [class*="epaper-display"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Ensure epaper widget containers don't exceed column width but respect designer dimensions */
+.widget .epaper-page-display-widget,
+.widget .epaper-display-widget {
+  max-width: 100% !important; /* Prevent overflow */
+  min-width: 0 !important;
+  overflow: hidden;
+  box-sizing: border-box;
+  text-align: left !important; /* Force left alignment */
+}
+
+/* Override any fixed widths in epaper widgets only if they cause overflow */
+.widget .epaper-page-display-widget > *,
+.widget .epaper-display-widget > * {
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Force epaper container to respect column boundaries */
+.widget .epaper-container,
+.widget [class*="epaper-container"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* Override any transform scaling that causes overflow */
+.widget .epaper-page-display-widget,
+.widget .epaper-display-widget {
+  transform: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Ensure all child elements respect container width */
+.widget .epaper-page-display-widget *,
+.widget .epaper-display-widget * {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Force LazyPageViewer and images to stay within bounds - ONLY for epaper widgets */
+.widget .epaper-page-display-widget img,
+.widget .epaper-display-widget img,
+.epaper-page-display-widget img,
+.epaper-display-widget img {
+  max-width: 100% !important;
+  width: 100% !important;
+  height: auto !important;
+  object-fit: contain !important;
+  transform: none !important;
+  display: block !important;
+}
+
+/* Ensure all divs inside epaper widgets respect boundaries */
+.widget .epaper-page-display-widget div,
+.widget .epaper-display-widget div {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* Widget containers - ZERO SPACING DBD STYLE */
+.widget {
+  flex: 0 0 auto; /* Don't grow/shrink, use natural width */
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0 !important; /* ZERO MARGIN */
+  padding: 0 !important; /* ZERO PADDING */
+  text-align: left;
+  align-self: flex-start;
+  justify-self: flex-start;
+  float: none;
+  position: static;
+  gap: 0 !important;
+}
+
+/* Allow designer inline styles to take precedence */
+.widget[style*="margin"] {
+  margin: revert !important;
+}
+
+.widget[style*="padding"] {
+  padding: revert !important;
+}
+
+.widget[style*="text-align: center"] {
+  text-align: center !important;
+}
+
+.widget[style*="text-align: right"] {
+  text-align: right !important;
+}
+
+/* Override widget-specific CSS that interferes with spacing */
+.widget .epaper-pagination-widget,
+.widget .epaper-zoom-widget,
+.widget .epaper-clip-widget,
+.widget .epaper-calendar-widget,
+.widget .epaper-thumbnail-widget,
+.widget .epaper-page-display-widget,
+.widget [class*="epaper"] {
+  margin: 0 !important;
+  text-align: left;
+  /* Prevent any auto-centering */
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  float: none;
+  position: static;
+}
+
+/* Override framework centering classes */
+.widget .mx-auto,
+.widget .justify-center,
+.widget .items-center {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  text-align: left !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+}
+
+/* Allow user-defined alignment classes */
+.widget.center,
+.widget.text-center {
+  text-align: center !important;
+}
+
+.widget.right,
+.widget.text-right {
+  text-align: right !important;
+}
+
+/* Specific rule for header widgets with text-center class */
+.widget.text-center.site-logo,
+.widget[class*="text-center"] {
+  text-align: center !important;
+  display: block !important;
+  margin: 0 auto !important;
+}
+
+/* Remove gaps from header widget - AGGRESSIVE */
+.widget.site-logo,
+.widget.header-center,
+.widget[class*="site-logo"],
+.layout-row .widget.site-logo,
+.layout-column .widget.site-logo {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Remove padding from header content (images, text, etc.) - AGGRESSIVE */
+.widget.site-logo *,
+.widget.header-center *,
+.widget[class*="site-logo"] *,
+.widget.site-logo > *,
+.widget.header-center > *,
+.widget[class*="site-logo"] > * {
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Ensure header images take full width - ALLOW INLINE OVERRIDE */
+.widget.site-logo img,
+.widget.header-center img,
+.widget[class*="site-logo"] img {
+  width: 100% !important;
+  height: auto;  /* Remove !important to allow inline override */
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+  max-height: 120px; /* Remove !important to allow inline override */
+  object-fit: contain;  /* Remove !important to allow inline override */
+}
+
+/* Remove any container padding that might affect header */
+.layout-row:has(.widget.site-logo),
+.layout-column:has(.widget.site-logo) {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Mobile: Stack widgets vertically within columns */
+@media (max-width: 768px) {
+  .layout-row > .flex {
+    flex-direction: column;
+  }
+  
+  .layout-column {
+    width: 100% !important;
+    min-width: 100% !important;
+    padding: 0;
+    margin-bottom: 0;
+    flex-direction: column; /* Stack widgets vertically on mobile */
+  }
+  
+  /* Remove last-child margin rule since all columns now have 0 margin */
+  
+  .widget {
+    width: 100% !important;
+    margin-right: 0;
+    margin-bottom: 1rem;
+  }
+}
+
+/* Special utility classes for widget alignment */
+.horizontal-widgets {
+  flex-direction: row !important;
+  gap: 0 !important;
+}
+
+.horizontal-widgets .widget {
+  margin: 0 !important;
+  flex: 0 0 auto;
+}
+
+.horizontal-widgets-with-gap {
+  flex-direction: row !important;
+  gap: 1rem !important;
+}
+
+.horizontal-widgets-with-gap .widget {
+  margin: 0 !important;
+  flex: 0 0 auto;
+}
+
+.vertical-widgets {
+  flex-direction: column !important;
+}
+
+.vertical-widgets .widget {
+  width: 100% !important;
+  margin-bottom: 0 !important;
+  margin-right: 0 !important;
+}
+
+.no-gap-widgets {
+  gap: 0 !important;
+}
+
+.no-gap-widgets .widget {
+  margin: 0 !important;
+}
+
+/* Newspaper Page Styling - Full Display */
+.newspaper-page-container {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  background: white;
+  border-radius: 4px;
+  overflow: visible !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.newspaper-page-container img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  /* Maintain newspaper aspect ratio but allow full display */
+  aspect-ratio: 1 / 1.4;
+  max-height: none; /* Remove height restrictions for full display */
+}
+
+/* Ensure consistent sizing across all newspaper displays */
+.epaper-page-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start; /* Changed from center to flex-start */
+  background: #f8fafc;
+  padding: 0; /* Removed padding for edge-to-edge layout */
+  border-radius: 4px;
+}
+
+.epaper-page-display .newspaper-page-container {
+  max-width: 600px; /* Increased from 500px */
+  width: 100%;
+}
+
+/* Mobile newspaper page adjustments - Full Display */
+@media (max-width: 768px) {
+  .newspaper-page-container {
+    max-width: 380px; /* Increased from 360px */
+    margin: 0 auto;
+  }
+  
+  .epaper-page-display {
+    padding: 0; /* Removed padding for edge-to-edge layout */
+  }
+  
+  .epaper-page-display .newspaper-page-container {
+    max-width: 100%;
+  }
+  
+  /* Allow newspaper to take more vertical space on mobile */
+  .newspaper-page-container img {
+    max-height: 75vh; /* Allow up to 75% of viewport height */
+  }
+}
+
+/* Calendar modal improvements */
+.calendar-modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.calendar-day.available {
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+}
+
+.calendar-day.available:hover {
+  background: #2563eb;
+  transform: scale(1.05);
+}
+
+.calendar-day.unavailable {
+  background: #f9fafb;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+}
+
+.calendar-day.today {
+  ring: 2px;
+  ring-color: #3b82f6;
+  ring-opacity: 0.5;
+}
+
+/* Clip action buttons — same size on all screens */
+.clip-action-btn {
+  min-height: unset !important;
+  height: 36px !important;
+  font-size: 14px !important;
+  padding: 0 12px !important;
+  line-height: 36px !important;
+}
+
+/* Share modal Open/Download buttons — override global min-height only */
+.share-modal-action-btn {
+  min-height: unset !important;
+  height: auto !important;
+}

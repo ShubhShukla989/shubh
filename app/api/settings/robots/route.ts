@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { settings } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
 
 // GET /api/settings/robots - Get robots.txt content
 export async function GET() {
@@ -17,7 +18,6 @@ export async function GET() {
       data: { content: data?.value || '' },
     });
   } catch (error) {
-    console.error('Get robots.txt error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch robots.txt' },
       { status: 500 }
@@ -54,9 +54,9 @@ export async function POST(request: NextRequest) {
         });
     }
 
+    revalidatePath('/robots.txt', 'page');
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Save robots.txt error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to save robots.txt' },
       { status: 500 }

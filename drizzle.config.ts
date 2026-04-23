@@ -3,8 +3,8 @@ import type { Config } from 'drizzle-kit';
 export default {
   schema: './lib/schema/*',
   out: './database/migrations',
-  dialect: 'sqlite',
+  dialect: 'postgresql',
   dbCredentials: {
-    url: './database/epapercms.db',
+    url: process.env.DATABASE_URL!,
   },
 } satisfies Config;

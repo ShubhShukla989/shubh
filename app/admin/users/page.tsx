@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import ActionIcons from '@/components/ActionIcons';
+import { Plus } from 'lucide-react';
 
 interface User {
   id: number;
@@ -46,11 +47,9 @@ export default function UsersManagerPage() {
       
       if (data.success) {
         setUsers(data.data || []);
-      } else {
-        console.error('Failed to fetch users:', data.error);
       }
     } catch (error) {
-      console.error('Error fetching users:', error);
+      // Silent fail - error handled by UI state
     } finally {
       setLoading(false);
     }
@@ -99,8 +98,7 @@ export default function UsersManagerPage() {
         alert(`Failed to delete user: ${data.error}`);
       }
     } catch (error) {
-      console.error('Error deleting user:', error);
-      alert('Error deleting user');
+      alert('❌ Error deleting user');
     }
   };
 
@@ -133,8 +131,7 @@ export default function UsersManagerPage() {
         alert(`Failed to create user: ${data.error}`);
       }
     } catch (error) {
-      console.error('Error creating user:', error);
-      alert('Error creating user');
+      alert('❌ Error creating user');
     }
   };
 
@@ -169,8 +166,7 @@ export default function UsersManagerPage() {
         alert(`Failed to update user: ${data.error}`);
       }
     } catch (error) {
-      console.error('Error updating user:', error);
-      alert('Error updating user');
+      alert('❌ Error updating user');
     }
   };
 
@@ -197,7 +193,7 @@ export default function UsersManagerPage() {
           onClick={() => setShowModal(true)}
           className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
         >
-          <ActionIcons.Add className="!p-0 !bg-transparent !text-gray-700" />
+          <Plus className="w-5 h-5" />
           New User
         </button>
         <a

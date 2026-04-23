@@ -143,6 +143,11 @@ function EditLayoutPageContent() {
 
       console.log('Save successful:', data);
       await fetchLayout();
+
+      // Signal all LayoutRenderer instances to refetch (clears their sessionStorage)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('layout_updated', JSON.stringify({ name: layout.name, ts: Date.now() }));
+      }
       
       const message = status === 'published' 
         ? '✅ Layout published! Changes are now live on the website.' 

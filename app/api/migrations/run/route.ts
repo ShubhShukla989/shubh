@@ -1,38 +1,41 @@
 import { NextResponse } from 'next/server';
-import Database from 'better-sqlite3';
+import { db } from '@/lib/db';
+import { sql } from 'drizzle-orm';
 
 export async function POST() {
   try {
-    // Use raw SQLite for migrations
-    const sqlite = new Database(process.env.DATABASE_URL!.replace('file:', ''));
-    
-    // Run migration to add columns using raw SQL
-    sqlite.exec(`
+    // These columns already exist in the PostgreSQL schema.
+    // Using IF NOT EXISTS so this is safe to call multiple times.
+    await db.execute(sql`
       ALTER TABLE edition_pages ADD COLUMN IF NOT EXISTS title TEXT;
+    `);
+    await db.execute(sql`
       ALTER TABLE edition_pages ADD COLUMN IF NOT EXISTS alias TEXT;
+    `);
+    await db.execute(sql`
       ALTER TABLE edition_pages ADD COLUMN IF NOT EXISTS description TEXT;
+    `);
+    await db.execute(sql`
       ALTER TABLE edition_pages ADD COLUMN IF NOT EXISTS category TEXT;
     `);
 
-    sqlite.exec(`
-      UPDATE edition_pages 
-      SET 
-        title = COALESCE(title, 'Page ' || page_number),
-        alias = COALESCE(alias, 'page-' || page_number),
+    await db.execute(sql`
+      UPDATE edition_pages
+      SET
+        title       = COALESCE(title, 'Page ' || page_number::text),
+        alias       = COALESCE(alias, 'page-' || page_number::text),
         description = COALESCE(description, ''),
-        category = COALESCE(category, '')
+        category    = COALESCE(category, '')
       WHERE title IS NULL OR alias IS NULL OR description IS NULL OR category IS NULL;
     `);
 
-    sqlite.exec(`
+    await db.execute(sql`
       CREATE INDEX IF NOT EXISTS idx_edition_pages_alias ON edition_pages(alias);
     `);
-    
-    sqlite.close();
 
     return NextResponse.json({
       success: true,
-      message: 'Migration completed successfully! Columns added to edition_pages table.',
+      message: 'Migration completed successfully.',
     });
   } catch (error) {
     console.error('Migration error:', error);

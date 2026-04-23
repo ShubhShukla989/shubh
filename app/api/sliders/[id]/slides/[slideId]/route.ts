@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { slides } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
+import { invalidateCacheKeysAsync } from '@/lib/cache/universal';
 
 /**
  * PUT /api/sliders/[id]/slides/[slideId]
@@ -41,6 +42,7 @@ export async function PUT(
       );
     }
 
+    invalidateCacheKeysAsync([`slider:${params.id}`, `layout:slider:${params.id}`]);
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error in PUT /api/sliders/[id]/slides/[slideId]:', error);
@@ -69,6 +71,7 @@ export async function DELETE(
         )
       );
 
+    invalidateCacheKeysAsync([`slider:${params.id}`, `layout:slider:${params.id}`]);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error in DELETE /api/sliders/[id]/slides/[slideId]:', error);

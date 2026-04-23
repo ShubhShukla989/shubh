@@ -52,6 +52,11 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: 'jwt',
+    maxAge: 24 * 60 * 60, // 24 hours
+    updateAge: 60 * 60, // Update every hour
+  },
+  jwt: {
+    maxAge: 24 * 60 * 60, // 24 hours
   },
   pages: {
     signIn: '/login',
@@ -59,15 +64,21 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        // Store user data in JWT to avoid DB lookups
         token.id = user.id;
         token.role = (user as any).role;
+        token.email = user.email;
+        token.name = user.name;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
+        // Pass user data from JWT to session
         (session.user as any).id = token.id as string;
         (session.user as any).role = token.role as string;
+        (session.user as any).email = token.email as string;
+        (session.user as any).name = token.name as string;
       }
       return session;
     },

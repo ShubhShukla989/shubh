@@ -35,7 +35,7 @@ export default function PublicHeader() {
         if (logo) setLogoUrl(logo.url);
       }
     } catch (error) {
-      console.error('Failed to fetch media URLs:', error);
+      // Silent fail - media URLs not critical
     }
   };
 
@@ -49,7 +49,7 @@ export default function PublicHeader() {
         setMenuItems(data.items || []);
       }
     } catch (error) {
-      console.error('Failed to fetch menu items:', error);
+      // Silent fail - menu items not critical
     }
   };
 

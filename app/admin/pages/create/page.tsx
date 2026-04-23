@@ -2,13 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, Image as ImageIcon, Layout } from 'lucide-react';
+import { ArrowLeft, Save, Image as ImageIcon } from 'lucide-react';
 import { pageService, PageFormData } from '@/lib/services/pageService';
 import { sanitizeHtml } from '@/lib/utils/styleParser';
 import SEOSection from '@/components/page-manager/SEOSection';
 import MediaBrowser from '@/components/page-manager/MediaBrowser';
-import { LayoutBuilder } from '@/components/layout-builder/LayoutBuilder';
-import { LayoutStructure } from '@/components/layout-builder/types';
 import dynamic from 'next/dynamic';
 
 // Dynamically import TinyMCE to avoid SSR issues with better error handling
@@ -23,17 +21,6 @@ const Editor = dynamic(() => import('@tinymce/tinymce-react').then((mod) => mod.
     </div>
   ),
 });
-
-type Layout = {
-  id: number;
-  name: string;
-  structure: any;
-  status: string;
-  created_at: Date;
-  updated_at: Date;
-  custom_css: string;
-  custom_js: string;
-};
 
 export default function CreatePage() {
   const router = useRouter();
@@ -51,23 +38,12 @@ export default function CreatePage() {
     },
   });
 
-  const [contentMode, setContentMode] = useState<'editor' | 'designer'>('editor');
-  const [layouts, setLayouts] = useState<Layout[]>([]);
-  const [selectedLayoutName, setSelectedLayoutName] = useState<string>('');
-  const [layoutStructure, setLayoutStructure] = useState<LayoutStructure>({ rows: [] });
-  const [customCss, setCustomCss] = useState('');
-  const [customJs, setCustomJs] = useState('');
   const [wordCount, setWordCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [showMediaBrowser, setShowMediaBrowser] = useState(false);
   const [mediaTargetField, setMediaTargetField] = useState<string>('');
   const [savedPageData, setSavedPageData] = useState<{ title: string; alias: string } | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
-
-  // Load available layouts
-  useEffect(() => {
-    fetchLayouts();
-  }, []);
 
   // Auto-generate alias from title
   useEffect(() => {
@@ -98,77 +74,6 @@ export default function CreatePage() {
       generateUniqueAlias();
     }
   }, [formData.title]);
-
-  const fetchLayouts = async () => {
-    try {
-      const response = await fetch('/api/layouts');
-      const result = await response.json();
-      
-      if (result.success) {
-        setLayouts(result.data || []);
-      }
-    } catch (error) {
-      // Handle error silently in production
-    }
-  };
-
-  const handleLayoutSelect = async (layoutName: string) => {
-    if (!layoutName) {
-      setSelectedLayoutName('');
-      setLayoutStructure({ rows: [] });
-      setCustomCss('');
-      setCustomJs('');
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/layouts/${encodeURIComponent(layoutName)}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch layout: ${response.status} ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-
-      if (result.success && result.data) {
-        const data = result.data;
-        setSelectedLayoutName(layoutName);
-        
-        // Parse structure safely
-        let parsedStructure = { rows: [] };
-        if (data.structure) {
-          try {
-            parsedStructure = typeof data.structure === 'string' 
-              ? JSON.parse(data.structure) 
-              : data.structure;
-              
-            // Validate structure
-            if (!parsedStructure || !Array.isArray(parsedStructure.rows)) {
-              parsedStructure = { rows: [] };
-            }
-          } catch (parseError) {
-            parsedStructure = { rows: [] };
-            alert('Warning: Layout structure is corrupted. Starting with empty layout.');
-          }
-        }
-        
-        setLayoutStructure(parsedStructure);
-        setCustomCss(data.custom_css || '');
-        setCustomJs(data.custom_js || '');
-      } else {
-        throw new Error(result.message || 'Layout not found');
-      }
-    } catch (error) {
-      console.error('Error loading layout:', error);
-      alert(`Failed to load layout: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      
-      // Reset to empty state on error
-      setSelectedLayoutName('');
-      setLayoutStructure({ rows: [] });
-      setCustomCss('');
-      setCustomJs('');
-    }
-  };
 
   const updateField = (field: keyof PageFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -233,23 +138,6 @@ export default function CreatePage() {
       // Prepare page data
       const pageData = { ...formData };
       
-      // If using designer mode, validate layout data
-      if (contentMode === 'designer') {
-        if (!layoutStructure.rows || layoutStructure.rows.length === 0) {
-          alert('Please add at least one row to your layout');
-          setSaving(false);
-          return;
-        }
-        
-        pageData.content = JSON.stringify({
-          mode: 'designer',
-          layoutName: selectedLayoutName,
-          structure: layoutStructure,
-          customCss,
-          customJs,
-        });
-      }
-      
       const page = await pageService.createPage(pageData);
       setSuccessMessage(`Page "${formData.title}" saved successfully.`);
       setSavedPageData({ title: formData.title, alias: formData.alias });
@@ -259,7 +147,6 @@ export default function CreatePage() {
         router.push('/admin/pages');
       }, 1000);
     } catch (error) {
-      console.error('Save failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to save page';
       alert(errorMessage);
     } finally {
@@ -361,113 +248,47 @@ export default function CreatePage() {
             </p>
           </div>
 
-          {/* Content Mode Toggle */}
+          {/* Rich Text Editor Section */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <label className="block text-sm font-medium text-gray-500 mb-3">
-              Content Mode
-            </label>
-            <div className="flex gap-2">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-500">
+                Content
+              </label>
               <button
                 type="button"
-                onClick={() => setContentMode('editor')}
-                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  contentMode === 'editor'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                }`}
+                onClick={() => openMediaBrowser('content')}
+                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
               >
-                <ImageIcon className="w-4 h-4 inline mr-2" />
-                Rich Text Editor
-              </button>
-              <button
-                type="button"
-                onClick={() => setContentMode('designer')}
-                className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  contentMode === 'designer'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                }`}
-              >
-                <Layout className="w-4 h-4 inline mr-2" />
-                Page Designer
+                <ImageIcon className="w-4 h-4" />
+                Media Browser
               </button>
             </div>
+            <Editor
+              {...{
+                apiKey: "zvxgyo8w1bgxfurgelu31pu12atqyzvem2o9m21ubt6sz2zq",
+                onInit: (_evt: any, editor: any) => (editorRef.current = editor),
+                value: formData.content,
+                onEditorChange: handleEditorChange,
+                init: {
+                  height: 500,
+                  menubar: true,
+                  plugins: [
+                    'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+                    'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+                    'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
+                  ],
+                  toolbar: 'undo redo | blocks | ' +
+                    'bold italic forecolor | alignleft aligncenter ' +
+                    'alignright alignjustify | bullist numlist outdent indent | ' +
+                    'removeformat | help',
+                  content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
+                }
+              } as any}
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Word count: {wordCount}
+            </p>
           </div>
-
-          {/* Content Editor or Designer */}
-          {contentMode === 'editor' ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-500">
-                  Content
-                </label>
-                <button
-                  type="button"
-                  onClick={() => openMediaBrowser('content')}
-                  className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                >
-                  <ImageIcon className="w-4 h-4" />
-                  Media Browser
-                </button>
-              </div>
-              <Editor
-                {...{
-                  apiKey: "zvxgyo8w1bgxfurgelu31pu12atqyzvem2o9m21ubt6sz2zq",
-                  onInit: (_evt: any, editor: any) => (editorRef.current = editor),
-                  value: formData.content,
-                  onEditorChange: handleEditorChange,
-                  init: {
-                    height: 500,
-                    menubar: true,
-                    plugins: [
-                      'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
-                      'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-                      'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
-                    ],
-                    toolbar: 'undo redo | blocks | ' +
-                      'bold italic forecolor | alignleft aligncenter ' +
-                      'alignright alignjustify | bullist numlist outdent indent | ' +
-                      'removeformat | help',
-                    content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
-                  }
-                } as any}
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                Word count: {wordCount}
-              </p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-500 mb-2">
-                  Select Layout Template
-                </label>
-                <select
-                  value={selectedLayoutName}
-                  onChange={(e) => handleLayoutSelect(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Create New Layout</option>
-                  {layouts.map((layout) => (
-                    <option key={layout.id} value={layout.name}>
-                      {layout.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Choose an existing layout or create a new one from scratch
-                </p>
-              </div>
-              <LayoutBuilder
-                structure={layoutStructure}
-                onChange={setLayoutStructure}
-                customCss={customCss}
-                customJs={customJs}
-                onCustomCssChange={setCustomCss}
-                onCustomJsChange={setCustomJs}
-              />
-            </div>
-          )}
 
           {/* SEO Section */}
           <SEOSection

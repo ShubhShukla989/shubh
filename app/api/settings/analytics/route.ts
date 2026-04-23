@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { settings } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { invalidateCacheKeysAsync } from '@/lib/cache/universal';
 
 // GET /api/settings/analytics - Get Google Analytics measurement ID
 export async function GET() {
@@ -17,7 +19,6 @@ export async function GET() {
       data: { measurement_id: data?.value || '' },
     });
   } catch (error) {
-    console.error('Get analytics error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch analytics settings' },
       { status: 500 }
@@ -54,9 +55,10 @@ export async function POST(request: NextRequest) {
         });
     }
 
+    invalidateCacheKeysAsync(['layout:*']);
+    revalidatePath('/', 'page');
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Save analytics error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to save analytics settings' },
       { status: 500 }

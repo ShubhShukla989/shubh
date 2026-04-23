@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { categories } from '@/lib/schema';
 import { desc } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { invalidateWidgetCachesAsync } from '@/lib/cache/universal';
 
 // GET /api/categories - Get all categories
 export async function GET() {
@@ -13,7 +15,6 @@ export async function GET() {
       data: allCategories
     });
   } catch (error) {
-    console.error('Error fetching categories:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch categories' },
       { status: 500 }
@@ -43,12 +44,27 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString()
     }).returning();
     
+    // 🔥 UNIVERSAL CACHE INVALIDATION (Production Safe - Async)
+    invalidateWidgetCachesAsync();
+    
+    // Revalidate Next.js routes
+    try {
+      revalidatePath('/', 'page'); // Homepage
+      revalidatePath('/epaper', 'page'); // EPaper section
+      revalidatePath('/epaper/display', 'page'); // Display page
+      revalidatePath('/epaper/archive', 'page'); // Archive page
+      
+      console.log('✅ Universal cache revalidated for category create');
+    } catch (cacheError) {
+      console.error('❌ Failed to revalidate cache:', cacheError);
+      // Don't fail the request if cache clear fails
+    }
+    
     return NextResponse.json({
       success: true,
       data: newCategory
     });
   } catch (error) {
-    console.error('Error creating category:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to create category' },
       { status: 500 }

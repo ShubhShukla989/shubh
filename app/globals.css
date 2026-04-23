@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* E-paper 70% Width Layout */
+@import '../styles/epaper-layout.css';
+
+/* Accessibility Improvements for Older Users */
+@import '../styles/accessibility-improvements.css';
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -34,6 +40,13 @@
   /* System font stack for better performance and offline support */
   html {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
+    margin: 0;
+    padding: 0;
   }
   .dark {
     --background: 0 0% 3.9%;
@@ -64,7 +77,10 @@
 }
 
 body {
-  @apply bg-gray-50 text-gray-900;
+  @apply text-gray-900;
+  background-color: #e5e7eb !important; /* Grey background like DBD epaper */
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* Custom scrollbar - Dark and 2x size */
@@ -78,41 +94,393 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-700 rounded; /* Much darker thumb */
+  @apply bg-gray-700; /* Much darker thumb */
 }
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-gray-900; /* Even darker on hover */
 }
 
+/* GLOBAL SQUARE CORNERS FOR BUTTONS */
+.layout-row button,
+.layout-column button,
+.widget button,
+.epaper-pagination-widget button,
+.epaper-zoom-widget button,
+.epaper-clip-widget button,
+.epaper-calendar-widget button,
+.epaper-thumbnail-widget button,
+.epaper-page-display-widget button,
+.epaper-archive-widget button,
+.epaper-featured-widget button {
+  border-radius: 0 !important; /* Square corners for all buttons */
+}
 
+/* Keep sharp corners only for newspaper pages and containers */
+.layout-row .newspaper-page-container,
+.layout-column .newspaper-page-container,
+.widget .newspaper-page-container,
+.epaper-page-display-widget .newspaper-page-container,
+.epaper-page-display-widget img {
+  border-radius: 0 !important; /* Keep newspaper pages sharp */
+}
 
-@layer base {
-  * {
-    @apply border-border;
+/* EPAPER SPECIFIC SQUARE BUTTONS */
+.epaper-layout button,
+.epaper-layout select,
+.epaper-layout input {
+  border-radius: 0 !important; /* Square corners */
+}
+
+/* Keep sharp corners only for newspaper content */
+.epaper-layout .newspaper-page-container,
+.epaper-layout .newspaper-page-container img,
+.epaper-layout .epaper-page-display img {
+  border-radius: 0 !important; /* Keep newspaper pages sharp */
+}
+
+/* IMPROVED BUTTON STYLING FOR OLDER USERS - Square corners */
+.epaper-layout button,
+.epaper-layout .btn,
+.epaper-layout [class*="btn-"],
+.epaper-layout a[class*="bg-blue"],
+.epaper-layout a[class*="bg-red"],
+.epaper-layout a[class*="bg-green"],
+.epaper-layout a[class*="bg-orange"],
+.epaper-layout a[class*="bg-gray"],
+.epaper-layout select,
+.epaper-layout input[type="text"],
+.epaper-layout input[type="email"],
+.epaper-layout input[type="password"],
+.epaper-layout .form-control {
+  border-radius: 0 !important; /* Square corners */
+  border: 1px solid rgba(0, 0, 0, 0.3) !important; /* Stronger border for better visibility */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  gap: 0.5rem !important;
+  box-sizing: border-box !important;
+  height: 48px !important; /* Increased from 40px for better accessibility */
+  font-size: 16px !important; /* Increased from 14px for better readability */
+  font-weight: 600 !important; /* Semi-bold for better visibility */
+  line-height: 1.5 !important; /* Better line spacing */
+  padding: 0 20px !important; /* Increased horizontal padding */
+  min-width: 44px !important; /* Minimum touch target */
+  transition: all 0.2s ease !important; /* Smooth transitions */
+}
+
+/* Enhanced button states for older users */
+.epaper-layout button:hover,
+.epaper-layout .btn:hover,
+.epaper-layout [class*="btn-"]:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(0, 0, 0, 0.4) !important;
+}
+
+.epaper-layout button:active,
+.epaper-layout .btn:active,
+.epaper-layout [class*="btn-"]:active {
+  transform: translateY(1px) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+.epaper-layout button:disabled,
+.epaper-layout .btn:disabled,
+.epaper-layout [class*="btn-"]:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.epaper-layout button:focus,
+.epaper-layout .btn:focus,
+.epaper-layout [class*="btn-"]:focus,
+.epaper-layout select:focus,
+.epaper-layout input:focus {
+  outline: 3px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+  .epaper-layout button,
+  .epaper-layout .btn,
+  .epaper-layout [class*="btn-"],
+  .epaper-layout select {
+    height: 56px !important; /* Larger touch targets on mobile */
+    font-size: 18px !important; /* Larger text on mobile */
+    min-width: 56px !important;
+    padding: 0 24px !important;
   }
-  body {
-    @apply bg-background text-foreground;
+  
+  /* Ensure proper spacing between mobile buttons */
+  .epaper-layout button + button,
+  .epaper-layout .btn + .btn {
+    margin-left: 8px !important;
   }
 }
 
-/* Auto-adjust layout for responsive widgets */
+/* Zoom level adaptability - Critical for older users */
+@media (min-width: 769px) {
+  /* At 110% browser zoom */
+  @media (min-resolution: 110dpi) {
+    .epaper-layout button,
+    .epaper-layout select {
+      height: 52px !important;
+      font-size: 17px !important;
+      padding: 0 22px !important;
+    }
+  }
+  
+  /* At 125% browser zoom */
+  @media (min-resolution: 125dpi) {
+    .epaper-layout button,
+    .epaper-layout select {
+      height: 56px !important;
+      font-size: 18px !important;
+      padding: 0 24px !important;
+    }
+  }
+  
+  /* At 150% browser zoom */
+  @media (min-resolution: 150dpi) {
+    .epaper-layout button,
+    .epaper-layout select {
+      height: 60px !important;
+      font-size: 20px !important;
+      padding: 0 28px !important;
+    }
+  }
+}
+
+/* Enhanced scrollbar for older users */
+::-webkit-scrollbar {
+  width: 20px !important; /* Even larger scrollbar */
+  height: 20px !important;
+}
+
+::-webkit-scrollbar-track {
+  background: #e5e7eb !important; /* Lighter track for better contrast */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #374151 !important; /* Darker thumb for better visibility */
+  border: 2px solid #e5e7eb !important; /* Border for better definition */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #1f2937 !important; /* Even darker on hover */
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .epaper-layout button,
+  .epaper-layout select {
+    border-width: 3px !important;
+    font-weight: 700 !important;
+  }
+  
+  .epaper-layout button:focus,
+  .epaper-layout select:focus {
+    outline-width: 4px !important;
+  }
+}
+
+/* ADMIN PANEL SQUARE CORNERS */
+.admin-layout button,
+.admin-layout .btn,
+.admin-layout [class*="btn-"],
+.admin-layout a[class*="bg-"],
+.admin-layout select,
+.admin-layout input,
+.admin-layout .form-control,
+.admin-layout .bg-white,
+.admin-layout .border,
+.admin-layout [class*="rounded"] {
+  border-radius: 0 !important;
+}
+
+/* Admin specific square elements */
+body:has([class*="admin"]) button,
+body:has([class*="admin"]) .btn,
+body:has([class*="admin"]) [class*="btn-"],
+body:has([class*="admin"]) a[class*="bg-"],
+body:has([class*="admin"]) select,
+body:has([class*="admin"]) input,
+body:has([class*="admin"]) textarea,
+body:has([class*="admin"]) .bg-white,
+body:has([class*="admin"]) .border,
+body:has([class*="admin"]) .shadow,
+body:has([class*="admin"]) .card,
+body:has([class*="admin"]) .modal,
+body:has([class*="admin"]) .dropdown {
+  border-radius: 0 !important;
+}
+
+/* More specific admin selectors */
+[class*="admin"] button,
+[class*="admin"] .btn,
+[class*="admin"] [class*="btn-"],
+[class*="admin"] a[class*="bg-"],
+[class*="admin"] select,
+[class*="admin"] input,
+[class*="admin"] textarea,
+[class*="admin"] .bg-white,
+[class*="admin"] .border,
+[class*="admin"] .shadow-lg,
+[class*="admin"] .rounded,
+[class*="admin"] .card {
+  border-radius: 0 !important;
+}
+
+/* Admin page specific */
+.admin-layout *:not(.layout-row):not(.layout-column):not(.widget):not(.epaper-*) {
+  border-radius: 0 !important;
+}
+
+/* Button text and icon alignment */
+button span,
+button svg,
+.btn span,
+.btn svg {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Calendar Widget Square Buttons */
+.calendar-widget button,
+[class*="calendar"] button,
+.date-picker button {
+  border-radius: 0 !important; /* Square corners for buttons */
+}
+
+/* Keep calendar containers sharp if needed */
+.calendar-widget .calendar-container,
+[class*="calendar"] .calendar-grid,
+.date-picker .date-container {
+  border-radius: 0 !important;
+}
+
+/* Download Widget Square Buttons */
+.download-widget button,
+[class*="download"] button,
+a[href*="download"] {
+  border-radius: 0 !important; /* Square corners for buttons */
+}
+
+/* Archive Widget Square Buttons */
+.archive-widget button,
+[class*="archive"] button {
+  border-radius: 0 !important; /* Square corners for buttons */
+}
+
+/* Exception: Keep loading spinners circular */
+.animate-spin {
+  border-radius: 50% !important;
+}
+
+
+
+@layer base {
+  /* Complete gap elimination - All elements */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box;
+  }
+  
+  /* Universal gap reset */
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  * {
+    @apply border-border;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  body {
+    @apply bg-background text-foreground;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+/* EDGE-TO-EDGE LAYOUT SYSTEM - NO SPACING */
 .layout-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: block; /* CHANGED FROM FLEX TO BLOCK */
   width: 100%;
+  margin: 0 !important; /* ZERO MARGIN */
+  padding: 0 !important; /* ZERO PADDING */
 }
 
 .layout-column {
   display: flex;
-  flex-direction: column;
-  min-height: 1px; /* Prevent collapse */
+  flex-direction: row; /* HORIZONTAL LAYOUT */
+  min-height: 1px;
+  gap: 0; /* NO GAPS */
+  margin: 0;
+  padding: 0;
 }
 
-/* Ensure widgets fill available space */
+/* Ensure widgets have no spacing */
 .responsive-widget {
   width: 100%;
   flex: 1;
+}
+
+/* ZERO SPACING FOR ALL WIDGETS */
+.widget {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.layout-column .widget {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* REMOVE EPAPER WIDGET MARGINS - LET DESIGNER CONTROL */
+.widget [class*="epaper-page-display"],
+.widget [class*="epaper-display"] {
+  margin: 0 !important; /* ZERO MARGIN */
+}
+
+@media (max-width: 768px) {
+  .widget [class*="epaper-page-display"],
+  .widget [class*="epaper-display"] {
+    margin: 0 !important; /* ZERO MARGIN ON MOBILE */
+  }
+}
+
+/* EDGE-TO-EDGE LAYOUT RENDERER */
+.layout-renderer {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0; /* ZERO PADDING */
+  box-sizing: border-box;
+}
+
+.layout-renderer .layout-row > div {
+  justify-content: flex-start; /* LEFT ALIGN INSTEAD OF CENTER */
+}
+
+.layout-renderer .layout-column {
+  align-items: flex-start; /* TOP ALIGN INSTEAD OF CENTER */
+  padding: 0;
+}
+
+/* NO CENTERING FOR EPAPER WIDGETS */
+.layout-renderer .widget [class*="epaper-display"],
+.layout-renderer .widget [class*="epaper-page-display"] {
+  margin: 0 !important; /* NO AUTO CENTERING */
 }
 
 /* Auto-adjust for empty columns */
@@ -144,20 +512,23 @@ body {
   padding-left: 25px !important;
 }
 
-/* Mobile Optimizations */
+/* Mobile Optimizations - NO GAPS */
 @media (max-width: 768px) {
   html, body {
     overflow-x: hidden;
     width: 100%;
     max-width: 100vw;
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   
   body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0;
   }
   
   * {
@@ -181,20 +552,28 @@ body {
   .site-footer {
     width: 100%;
     overflow-x: hidden;
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    outline: none !important;
   }
   
   .site-header {
     flex-shrink: 0;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   
   .site-content {
     flex: 1 0 auto;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   
   .site-footer {
     flex-shrink: 0;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }
 
@@ -299,4 +678,323 @@ nav > ul > li, .navigation > ul > li, .menu > ul > li {
   display: inline-block !important;
   margin: 0 !important;
   padding: 0 !important;
+}
+
+/* Footer Bar Colors */
+.bg-footer-bg {
+  background-color: #f8f9fa;
+}
+
+.bg-btn-orange {
+  background-color: #ff6b35;
+}
+
+.bg-btn-red {
+  background-color: #dc3545;
+}
+
+.bg-btn-blue {
+  background-color: #007bff;
+}
+
+/* Mobile Footer Bar Spacing */
+@media (max-width: 768px) {
+  /* Add bottom padding to body when footer bar is present */
+  body.has-footer-bar {
+    padding-bottom: 60px;
+  }
+  
+  /* Ensure epaper content doesn't get hidden behind footer - MOBILE ONLY */
+  .epaper-container {
+    margin-bottom: 60px;
+  }
+  
+  /* Footer bar styling - Mobile Responsive */
+  .mobile-footer-bar {
+    height: 60px;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Mobile Footer Bar Responsive Layout */
+  .mobile-footer-bar .flex {
+    gap: 0.25rem !important; /* Tighter spacing on mobile */
+  }
+  
+  .mobile-footer-bar button {
+    min-width: 44px !important; /* Touch-friendly minimum */
+    min-height: 44px !important;
+  }
+  
+  .mobile-footer-bar select {
+    min-width: 80px !important;
+    font-size: 13px !important;
+  }
+
+  /* Ensure proper triangle positioning on mobile */
+  .mobile-nav-triangles {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    position: relative;
+  }
+  
+  .mobile-nav-left {
+    order: 1; /* Left triangle stays left */
+  }
+  
+  .mobile-nav-right {
+    order: 3; /* Right triangle stays right */
+  }
+  
+  .mobile-nav-center {
+    order: 2; /* Page selector in center */
+    flex: 1;
+    display: flex;
+    justify-content: center;
+  }
+}
+
+/* ===== ADMIN PANEL SQUARE CORNERS OVERRIDE ===== */
+/* This section ensures square corners for admin panel */
+
+/* Admin Layout Container */
+.admin-layout {
+  --admin-radius: 0;
+}
+
+/* Admin Panel Buttons */
+.admin-layout button,
+.admin-layout .btn,
+.admin-layout [class*="btn-"],
+.admin-layout a[class*="bg-blue"],
+.admin-layout a[class*="bg-red"], 
+.admin-layout a[class*="bg-green"],
+.admin-layout a[class*="bg-yellow"],
+.admin-layout a[class*="bg-gray"],
+.admin-layout a[class*="bg-black"] {
+  border-radius: 0 !important;
+}
+
+/* Admin Panel Form Elements */
+.admin-layout input,
+.admin-layout select,
+.admin-layout textarea {
+  border-radius: 0 !important;
+}
+
+/* Admin Panel Cards and Containers */
+.admin-layout .bg-white,
+.admin-layout .border,
+.admin-layout .shadow,
+.admin-layout .shadow-lg,
+.admin-layout .shadow-sm,
+.admin-layout [class*="rounded"] {
+  border-radius: 0 !important;
+}
+
+/* Admin Panel Status Badges */
+.admin-layout .bg-green-100,
+.admin-layout .bg-gray-100,
+.admin-layout .bg-blue-100,
+.admin-layout .bg-red-100,
+.admin-layout .bg-yellow-100 {
+  border-radius: 0 !important;
+}
+
+/* Admin Panel Images */
+.admin-layout img {
+  border-radius: 0 !important;
+}
+
+/* Admin Panel Modals and Dropdowns */
+.admin-layout .modal,
+.admin-layout .dropdown,
+.admin-layout .popover {
+  border-radius: 0 !important;
+}
+
+/* Ensure epaper elements within admin stay sharp when needed */
+.admin-layout .epaper-layout *,
+.admin-layout .widget *,
+.admin-layout .layout-row *,
+.admin-layout .layout-column * {
+  border-radius: 0 !important;
+}
+
+/* ===== CLIP BOX PROTECTION - CRITICAL FIX ===== */
+/* Protect clipping elements from admin CSS overrides */
+.clipping-rectangle,
+.clipping-rectangle *,
+.resize-handle,
+.resize-handle *,
+[class*="clip"] {
+  border-radius: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Force clip box visibility - Spotlight effect */
+.clipping-rectangle {
+  background-color: transparent !important;
+  border: 1px solid #3b82f6 !important;
+  position: absolute !important;
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4) !important; /* Grey overlay outside selection */
+}
+
+/* Resize handles protection - Smaller and cleaner */
+.resize-handle {
+  background-color: #3b82f6 !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 1px !important;
+  position: absolute !important;
+  z-index: 10000 !important;
+  pointer-events: auto !important;
+  width: 8px !important;
+  height: 8px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+}
+
+/* Mobile SE (bottom-right) handle — blue, half size */
+.resize-handle-se-mobile {
+  background-color: #3b82f6 !important;
+  border: none !important;
+  border-radius: 1px !important;
+  position: absolute !important;
+  z-index: 10001 !important;
+  pointer-events: auto !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4) !important;
+  touch-action: none !important;
+}
+
+/* Additional protection for LazyPageViewer clip elements */
+.newspaper-page-container .clipping-rectangle,
+.newspaper-page-container .resize-handle {
+  border-radius: 0 !important;
+}
+
+/* Debug info protection */
+.newspaper-page-container div[style*="CLIPPING MODE ACTIVE"] {
+  border-radius: 4px !important;
+}
+
+/* Share Modal Animation */
+@keyframes scale-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+/* Share Modal Animation */
+@keyframes scale-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+/* ===== THUMBNAIL NAVIGATION IMPROVEMENTS ===== */
+
+/* Custom border width for active thumbnails */
+.border-3 {
+  border-width: 3px !important;
+}
+
+/* Enhanced thumbnail hover and active states */
+.epaper-thumb-navigation button {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.epaper-thumb-navigation button:hover {
+  transform: scale(1.05) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.epaper-thumb-navigation button.active {
+  transform: scale(1.05) !important;
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.25) !important;
+  border-color: #dc2626 !important;
+  ring: 4px solid rgba(239, 68, 68, 0.3) !important;
+}
+
+/* Smooth scrolling for thumbnail container */
+.epaper-thumb-navigation .scroll-container {
+  scroll-behavior: smooth !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e1 #f1f5f9 !important;
+}
+
+/* Custom scrollbar for thumbnail navigation */
+.epaper-thumb-navigation .scroll-container::-webkit-scrollbar {
+  width: 8px !important;
+}
+
+.epaper-thumb-navigation .scroll-container::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+  border-radius: 4px !important;
+}
+
+.epaper-thumb-navigation .scroll-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+  border-radius: 4px !important;
+}
+
+.epaper-thumb-navigation .scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
+}
+
+/* ===== DOTTED CIRCLE LOADER ===== */
+@keyframes dcl-fade {
+  0%, 100% { opacity: 0.15; transform: scale(0.85); }
+  50%       { opacity: 1;    transform: scale(1.1);  }
+}
+
+.dcl-dot {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--dcl-color, #ffffff);
+  animation: dcl-fade var(--dcl-speed, 1.2s) ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dcl-dot { animation: none; opacity: 0.6; }
+}
+
+/* Thin scrollbar for modal image viewers */
+.modal-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.modal-scroll::-webkit-scrollbar-track {
+  background: #d1d5db;
+  border-radius: 999px;
+}
+.modal-scroll::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 999px;
+}
+.modal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #111827;
+}
+/* Firefox */
+.modal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #374151 #d1d5db;
 }

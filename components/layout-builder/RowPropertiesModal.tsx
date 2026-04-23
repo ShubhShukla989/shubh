@@ -20,12 +20,20 @@ export function RowPropertiesModal({ row, onSave, onClose }: RowPropertiesModalP
       customStyle,
       containerWidth,
       contentStretch,
+      // Also save in properties structure for renderer compatibility
+      properties: {
+        cssClass,
+        customStyle,
+        customCss: customStyle, // Renderer also looks for customCss
+        containerWidth,
+        contentStretch,
+      }
     });
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[150]">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">

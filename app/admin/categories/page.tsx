@@ -39,7 +39,7 @@ export default function CategoriesPage() {
         setCategories(hierarchicalCategories);
       }
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      // Failed to fetch categories
     } finally {
       setLoading(false);
     }
@@ -88,7 +88,6 @@ export default function CategoriesPage() {
         alert('Error: ' + result.error);
       }
     } catch (error) {
-      console.error('Delete error:', error);
       alert('Failed to delete category');
     }
   };

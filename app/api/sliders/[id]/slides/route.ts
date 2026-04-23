@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { slides } from '@/lib/schema';
 import { eq, asc } from 'drizzle-orm';
+import { invalidateCacheKeysAsync } from '@/lib/cache/universal';
 
 /**
  * GET /api/sliders/[id]/slides
@@ -62,6 +63,7 @@ export async function POST(
       })
       .returning();
 
+    invalidateCacheKeysAsync([`slider:${params.id}`, `layout:slider:${params.id}`]);
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/sliders/[id]/slides:', error);

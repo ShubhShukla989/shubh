@@ -21,26 +21,11 @@ interface EpaperAreaMapDisplayWidgetProps {
 }
 
 export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propEditionId, pageNumber: propPageNumber }: EpaperAreaMapDisplayWidgetProps) {
-  console.log('🎯 EpaperAreaMapDisplayWidget rendered with props:', {
-    areaMapId,
-    propEditionId,
-    propPageNumber,
-    config,
-    timestamp: new Date().toISOString()
-  });
-  
   // Try to get context, but don't fail if not available
   const epaperContext = useEpaperSafe();
   const contextEditionId = epaperContext?.editionId;
   
   const editionId = propEditionId || contextEditionId;
-  
-  console.log('🔧 Final props for widget:', {
-    areaMapId,
-    editionId,
-    pageNumber: propPageNumber,
-    hasConfig: !!config
-  });
   
   const [areaMapData, setAreaMapData] = useState<any>(null);
   const [pageData, setPageData] = useState<any>(null);
@@ -60,14 +45,16 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
 
   // Add state for edition data
   const [editionData, setEditionData] = useState<any>(null);
+  
+  // NEW: State for checking if area maps exist
+  const [hasAreaMaps, setHasAreaMaps] = useState<boolean | null>(null);
+  const [fullPageImage, setFullPageImage] = useState<string | null>(null);
 
   // Create combined image with logo, info text, and area map
   const createCombinedAreaImage = async () => {
     if (!croppedImage || !canvasRef.current) return;
 
     try {
-      console.log('🎨 Creating combined area map image...');
-      
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -85,11 +72,11 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
       // Calculate dimensions
       const areaWidth = areaImg.width;
       const areaHeight = areaImg.height;
-      const headerHeight = Math.max(120, areaHeight * 0.25); // 25% of area height, minimum 120px
+      const headerHeight = Math.max(180, areaHeight * 0.35); // Increased for bigger logo
       
       // Set canvas size
       canvas.width = areaWidth;
-      canvas.height = areaHeight + headerHeight;
+      canvas.height = areaHeight + headerHeight + 50;
 
       // Draw header background
       ctx.fillStyle = watermarkSettings?.background_color || '#f9fafb';
@@ -122,60 +109,75 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
             logo.onload = () => {
               clearTimeout(timeout);
               
-              // Logo size - 60% of header height
-              const logoHeight = headerHeight * 0.6;
+              // Logo size - 80% of header height (fits within header)
+              const logoHeight = headerHeight * 0.8;
               const logoWidth = (logo.width / logo.height) * logoHeight;
               const logoX = (areaWidth - logoWidth) / 2;
               const logoY = 15;
               
               ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
-              console.log('✅ Logo drawn in combined area map');
               resolve();
             };
             
             logo.onerror = () => {
               clearTimeout(timeout);
-              console.error('❌ Logo failed to load in combined area map');
               resolve();
             };
             
             logo.src = categoryLogoUrl;
           });
         } catch (error) {
-          console.error('❌ Error loading logo for combined area map:', error);
+          // Error loading logo for combined area map
         }
       }
 
-      // Draw info text
-      if (watermarkSettings?.info_text) {
-        const processedText = watermarkSettings.info_text
-          .replace(/\{newline\}/g, '\n')
-          .replace(/\{edition_title\}/g, editionData?.title || '')
-          .replace(/\{date\}/g, editionData?.date ? new Date(editionData.date).toLocaleDateString('en-IN', {
-            day: '2-digit',
-            month: 'short', 
-            year: 'numeric'
-          }) : '')
-          .replace(/\{url\}/g, `${window.location.origin}/epaper/view/${editionId}`);
+      // Draw info text - ALWAYS SHOW SOME TEXT FOR DEBUGGING
+      const debugInfoText = watermarkSettings?.info_text || 'Default Info Text{newline}{date}{newline}{edition_title}';
+      
+      const processedText = debugInfoText
+        .replace(/\{newline\}/g, '\n')
+        .replace(/\{edition_title\}/g, editionData?.title || 'Test Edition')
+        .replace(/\{date\}/g, editionData?.date ? new Date(editionData.date).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short', 
+          year: 'numeric'
+        }) : new Date().toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short', 
+          year: 'numeric'
+        }))
+        .replace(/\{url\}/g, (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/^https?:\/\//, ''));
 
-        if (processedText.trim()) {
-          ctx.fillStyle = watermarkSettings.foreground_color || '#1f2937';
-          ctx.textAlign = 'center';
-          ctx.font = '16px Arial';
-          
-          const lines = processedText.split('\n');
-          const lineHeight = 20;
-          const logoHeight = headerHeight * 0.6;
-          const textStartY = 15 + logoHeight + 25; // Below logo
-          
-          lines.forEach((line: string, index: number) => {
-            if (line.trim()) {
-              ctx.fillText(line.trim(), areaWidth / 2, textStartY + (index * lineHeight));
-            }
-          });
-          
-          console.log('✅ Info text drawn in combined area map');
-        }
+      if (processedText.trim()) {
+        // Use high contrast colors for visibility
+        ctx.fillStyle = '#000000'; // Always black text
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 20px Arial'; // Even bigger and bolder
+        
+        const lines = processedText.split('\n');
+        const lineHeight = 28; // More line height
+        const logoHeight = headerHeight * 0.8;
+        const textStartY = 15 + logoHeight + 35; // More space below logo
+        
+        lines.forEach((line: string, index: number) => {
+          if (line.trim()) {
+            const yPos = textStartY + (index * lineHeight);
+            
+            // Add text shadow for better visibility
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 2;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+            
+            ctx.fillText(line.trim(), areaWidth / 2, yPos);
+            
+            // Reset shadow
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+          }
+        });
       }
 
       // Draw area map image
@@ -184,10 +186,8 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
       // Convert to data URL
       const dataUrl = canvas.toDataURL('image/png', 0.95);
       setCombinedImage(dataUrl);
-      
-      console.log('✅ Combined area map image created successfully');
     } catch (error) {
-      console.error('❌ Error creating combined area map image:', error);
+      // Error creating combined area map image
     }
   };
 
@@ -200,14 +200,18 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
 
   // Fetch area map data and create cropped image
   useEffect(() => {
+    // NEW: Check if we need to show full page (no areaMapId but have editionId and pageNumber)
+    if (!areaMapId && editionId && propPageNumber) {
+      checkAreaMapsAndLoadPage();
+      return;
+    }
+    
     if (!areaMapId) {
-      console.warn('EpaperAreaMapDisplayWidget: No areaMapId provided');
       setLoading(false);
       return;
     }
     
     if (!editionId) {
-      console.warn('EpaperAreaMapDisplayWidget: No editionId provided');
       setLoading(false);
       return;
     }
@@ -221,7 +225,6 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
         const areaResult = await areaResponse.json();
         
         if (!areaResult.success) {
-          console.error('Failed to fetch area map:', areaResult.error);
           setLoading(false);
           return;
         }
@@ -234,7 +237,6 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
         const pageResult = await pageResponse.json();
         
         if (!pageResult.success) {
-          console.error('Failed to fetch page:', pageResult.error);
           setLoading(false);
           return;
         }
@@ -255,16 +257,10 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
             const cacheKey = `category_${categoryId}`;
             
             // PERMANENT SOLUTION: Fetch watermark settings with multiple fallbacks
-            console.log('🌐 Fetching watermark settings for category:', categoryId);
-            console.log('🔗 API URL will be:', `/api/settings/category-watermark?category_id=${categoryId}`);
-            
             try {
               // Try category-specific settings first
               const categoryResponse = await fetch(`/api/settings/category-watermark?category_id=${categoryId}`);
               const categoryResult = await categoryResponse.json();
-              
-              console.log('🔍 Category API Response Status:', categoryResponse.status);
-              console.log('🔍 Category API Response:', categoryResult);
               
               let finalSettings = null;
               let logoUrl = null;
@@ -272,32 +268,18 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
               // Check if category has custom settings with logo
               if (categoryResult.success && categoryResult.data) {
                 const data = categoryResult.data;
-                console.log('🔍 Category data received:', data);
-                console.log('🔍 Enable watermarking:', data.enable_watermarking);
-                console.log('🔍 Logo URL:', data.logo_url);
-                console.log('🔍 Info text:', data.info_text);
                 
                 // Use category settings if watermarking is enabled and logo exists
                 if (data.enable_watermarking && (data.logo_url || data.center_watermark_url)) {
                   finalSettings = data;
                   logoUrl = data.logo_url || data.center_watermark_url;
-                  console.log('✅ Using category-specific watermark settings');
-                } else {
-                  console.log('⚠️ Category settings exist but no logo or watermarking disabled');
-                  console.log('⚠️ Enable watermarking:', data.enable_watermarking);
-                  console.log('⚠️ Logo URL:', data.logo_url);
                 }
-              } else {
-                console.log('⚠️ Category API failed or returned no data');
               }
               
               // Fallback to global area map watermark settings
               if (!finalSettings || !logoUrl) {
-                console.log('🔄 Falling back to global area map watermark settings');
                 const globalResponse = await fetch('/api/settings/area-map-watermark');
                 const globalResult = await globalResponse.json();
-                
-                console.log('🔍 Global API Response:', globalResult);
                 
                 if (globalResult.success && globalResult.data) {
                   const globalData = globalResult.data;
@@ -305,14 +287,12 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
                   if (globalData.enable_watermarking && (globalData.logo_url || globalData.center_watermark_url)) {
                     finalSettings = globalData;
                     logoUrl = globalData.logo_url || globalData.center_watermark_url;
-                    console.log('✅ Using global watermark settings');
                   }
                 }
               }
               
               // ULTIMATE FALLBACK: Use test logo if nothing else works
               if (!finalSettings || !logoUrl) {
-                console.log('🔄 Using ultimate fallback - test logo and settings');
                 finalSettings = {
                   enable_watermarking: true,
                   logo_url: '/sample-watermark.svg', // Use sample logo from public folder
@@ -322,31 +302,24 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
                   enable_border: true,
                   border_width: 2,
                   border_color: '#e5e7eb',
-                  info_text: 'Test Newspaper{newline}{date}{newline}{edition_title}',
-                  info_text_font: 'English'
+                  info_text: 'Test Edition{newline}{date}{newline}Sample Info Text',
+                  info_text_font: 'English',
+                  mode: 'in_outerside'
                 };
                 logoUrl = '/sample-watermark.svg';
-                console.log('✅ Using fallback test settings');
               }
               
               // Set final settings and logo
               if (finalSettings && logoUrl) {
-                console.log('✅ Final watermark settings:', finalSettings);
-                console.log('✅ Final logo URL:', logoUrl);
-                
                 setWatermarkSettings(finalSettings);
                 setCategoryLogoUrl(logoUrl);
               } else {
-                console.error('❌ All fallbacks failed - no watermark settings available');
                 setWatermarkSettings(null);
                 setCategoryLogoUrl(null);
               }
               
             } catch (error) {
-              console.error('❌ Error fetching watermark settings:', error);
-              
               // NO FALLBACK - If settings can't be loaded, don't show any watermark
-              console.log('⚠️ No watermark settings available - no watermark will be shown');
               setWatermarkSettings(null);
               setCategoryLogoUrl(null);
             }
@@ -358,13 +331,64 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
         
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching area map:', error);
         setLoading(false);
       }
     };
     
     fetchAndCropImage();
   }, [areaMapId, editionId]); // Only depend on areaMapId and editionId
+  
+  // NEW: Function to check if area maps exist and load full page if not
+  const checkAreaMapsAndLoadPage = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch all area maps for this edition
+      const areaMapsResponse = await fetch(`/api/editions/${editionId}/all-area-maps`);
+      const areaMapsResult = await areaMapsResponse.json();
+      
+      if (areaMapsResult.success) {
+        const areaMaps = areaMapsResult.data || [];
+        
+        if (areaMaps.length === 0) {
+          // No area maps exist - show full page
+          setHasAreaMaps(false);
+          await loadFullPage();
+        } else {
+          // Area maps exist - show normal area map view
+          setHasAreaMaps(true);
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    } catch (error) {
+      setLoading(false);
+    }
+  };
+  
+  // NEW: Function to load full page image
+  const loadFullPage = async () => {
+    try {
+      // Fetch pages for this edition
+      const pagesResponse = await fetch(`/api/editions/${editionId}/pages`);
+      const pagesResult = await pagesResponse.json();
+      
+      if (pagesResult.success) {
+        const pages = pagesResult.data || [];
+        const page = pages.find((p: any) => p.page_number === parseInt(propPageNumber || '1'));
+        
+        if (page) {
+          setPageData(page);
+          setFullPageImage(page.image_url);
+        }
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+    }
+  };
   
   const createCroppedImage = async (area: any, page: any) => {
     if (!canvasRef.current) return;
@@ -415,16 +439,12 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
     
     const dataUrl = canvas.toDataURL('image/png', 0.95);
     setCroppedImage(dataUrl);
-    
-    console.log('✅ Simple image created - logo will be shown via HTML overlay');
   };
   
   const createCombinedImage = async (mainArea: any, logoUrl: string | null, settings: any) => {
     if (!canvasRef.current) return;
     
     try {
-      console.log('🔗 Creating simple combined image with linked areas:', mainArea.linked_area_ids);
-      
       // Fetch all linked area maps
       const linkedIds = mainArea.linked_area_ids || [];
       
@@ -443,7 +463,6 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
           }
           return null;
         } catch (error) {
-          console.error('Failed to fetch linked area:', areaId, error);
           return null;
         }
       });
@@ -471,8 +490,6 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
         const pageB = b.page?.page_number || 0;
         return pageA - pageB;
       });
-      
-      console.log('📦 Total areas to combine:', allAreasWithPages.length);
       
       // Create simple combined canvas
       const canvas = canvasRef.current;
@@ -537,10 +554,7 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
       
       const dataUrl = canvas.toDataURL('image/png', 0.95);
       setCroppedImage(dataUrl);
-      
-      console.log('✅ Simple combined image created - logo will be shown via HTML overlay');
     } catch (error) {
-      console.error('❌ Failed to create combined image:', error);
       // Fallback to single area - fetch page if needed
       let fallbackPage = pageData;
       if (!fallbackPage) {
@@ -551,7 +565,7 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
             fallbackPage = pageResult.data;
           }
         } catch (err) {
-          console.error('Failed to fetch page for fallback:', err);
+          // Failed to fetch page for fallback
         }
       }
       if (fallbackPage) {
@@ -676,12 +690,19 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
               </a>
             </div>
             
-            {/* Zoom Hint */}
-            <div className="absolute top-4 left-4 z-10 bg-white/90 rounded-lg px-3 py-2 shadow-lg">
-              <p className="text-xs text-gray-700 font-medium">
-                💡 Double-click to {isZoomed ? 'zoom out' : 'zoom in'}
-              </p>
+            {/* Zoom Instructions */}
+            <div className="absolute top-4 left-4 z-10 bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg text-sm">
+              <div className="flex items-center gap-2">
+                <span>🔍</span>
+                <span>{isZoomed ? 'Double-click to zoom out' : 'Double-click to zoom in'}</span>
+              </div>
+              {isZoomed && (
+                <div className="text-xs mt-1 opacity-80">
+                  Hold & drag to move around
+                </div>
+              )}
             </div>
+
 
             {/* COMBINED IMAGE WITH LOGO, INFO TEXT, AND AREA MAP */}
             <div
@@ -709,9 +730,10 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
                   className="w-full h-auto select-none"
                   draggable={false}
                   style={{
-                    transform: `scale(${isZoomed ? 2 : 1}) translate(${panOffset.x / (isZoomed ? 2 : 1)}px, ${panOffset.y / (isZoomed ? 2 : 1)}px)`,
+                    transform: `scale(${isZoomed ? 2.5 : 1}) translate(${panOffset.x / (isZoomed ? 2.5 : 1)}px, ${panOffset.y / (isZoomed ? 2.5 : 1)}px)`,
                     transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
                     transition: isPanning ? 'none' : 'transform 0.3s ease-out',
+                    maxWidth: 'none', // Allow image to exceed container when zoomed
                   }}
                 />
               ) : croppedImage ? (
@@ -736,6 +758,76 @@ export function EpaperAreaMapDisplayWidget({ config, areaMapId, editionId: propE
         ) : (
           <div className="bg-red-50 border border-red-200 rounded p-4 text-center">
             <p className="text-red-800">Failed to load article image</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+  
+  // NEW: If no area maps exist, show full page with same border design (no logo, no share icons)
+  if (hasAreaMaps === false && fullPageImage) {
+    return (
+      <div className={config.cssClasses || ''} style={parseInlineStyle(config.style)}>
+        {config.title && (
+          <h3 className="text-lg font-semibold mb-3">{config.title}</h3>
+        )}
+        
+        {loading ? (
+          <div className="flex items-center justify-center p-12 bg-gray-100 rounded">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading page...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="relative bg-white rounded shadow-lg overflow-hidden">
+            {/* Zoom Instructions - Same as area map */}
+            <div className="absolute top-4 left-4 z-10 bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg text-sm">
+              <div className="flex items-center gap-2">
+                <span>🔍</span>
+                <span>{isZoomed ? 'Double-click to zoom out' : 'Double-click to zoom in'}</span>
+              </div>
+              {isZoomed && (
+                <div className="text-xs mt-1 opacity-80">
+                  Hold & drag to move around
+                </div>
+              )}
+            </div>
+
+            {/* Full Page Image with Same Border Design */}
+            <div
+              ref={containerRef}
+              className="overflow-hidden relative bg-white"
+              style={{ 
+                cursor: isZoomed ? (isPanning ? 'grabbing' : 'grab') : 'zoom-in',
+                touchAction: 'none',
+                userSelect: 'none',
+                border: '2px solid #e5e7eb', // Same border as area map
+                borderRadius: '0.375rem', // Same rounded corners
+              }}
+              onDoubleClick={handleDoubleClick}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              <img
+                ref={imageRef}
+                src={fullPageImage}
+                alt={`Page ${propPageNumber || '1'}`}
+                className="w-full h-auto select-none"
+                draggable={false}
+                style={{
+                  transform: `scale(${isZoomed ? 2.5 : 1}) translate(${panOffset.x / (isZoomed ? 2.5 : 1)}px, ${panOffset.y / (isZoomed ? 2.5 : 1)}px)`,
+                  transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+                  transition: isPanning ? 'none' : 'transform 0.3s ease-out',
+                  maxWidth: 'none',
+                }}
+              />
+            </div>
           </div>
         )}
       </div>

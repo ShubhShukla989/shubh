@@ -50,7 +50,20 @@ export default function AreaMapEditModal({
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Update local state when props change (important for fresh data)
   useEffect(() => {
@@ -64,14 +77,9 @@ export default function AreaMapEditModal({
     
     if (cleanedLinkedIds.length !== processedLinkedIds.length) {
       const removedIds = processedLinkedIds.filter((id: any) => !cleanedLinkedIds.includes(id));
-      console.warn('🧹 Cleaned up orphaned linked IDs:', removedIds);
-      console.log('📋 Available IDs:', availableIds);
-      console.log('🔗 Original linked IDs:', processedLinkedIds);
-      console.log('✅ Cleaned linked IDs:', cleanedLinkedIds);
       
       // Auto-save the cleaned IDs to database if there were changes
       if (area.id && removedIds.length > 0) {
-        console.log('💾 Auto-saving cleaned linked IDs to database...');
         fetch(`/api/editions/${window.location.pathname.split('/')[3]}/area-maps/${area.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -79,13 +87,9 @@ export default function AreaMapEditModal({
             linked_area_ids: cleanedLinkedIds
           }),
         }).then(response => response.json()).then(result => {
-          if (result.success) {
-            console.log('✅ Auto-cleanup successful');
-          } else {
-            console.error('❌ Auto-cleanup failed:', result.error);
-          }
+          // Auto-cleanup completed
         }).catch(error => {
-          console.error('💥 Auto-cleanup error:', error);
+          // Auto-cleanup error
         });
       }
     }
@@ -106,15 +110,28 @@ export default function AreaMapEditModal({
   useEffect(() => {
     if (modalRef.current) {
       const rect = modalRef.current.getBoundingClientRect();
-      setPosition({
-        x: (window.innerWidth - rect.width) / 2,
-        y: (window.innerHeight - rect.height) / 2,
-      });
+      
+      if (isMobile) {
+        // Mobile: Full width with small margins, centered vertically
+        setPosition({
+          x: 16, // 16px margin from edges
+          y: Math.max(20, (window.innerHeight - rect.height) / 2),
+        });
+      } else {
+        // Desktop: Centered
+        setPosition({
+          x: (window.innerWidth - rect.width) / 2,
+          y: (window.innerHeight - rect.height) / 2,
+        });
+      }
     }
-  }, []);
+  }, [isMobile]);
 
   // Handle mouse down on header (start dragging)
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Only allow dragging on desktop
+    if (isMobile) return;
+    
     setIsDragging(true);
     setDragStart({
       x: e.clientX - position.x,
@@ -152,15 +169,6 @@ export default function AreaMapEditModal({
   const linkableAreas = localAvailableAreas.filter(a => a.id !== area.id);
 
   const handleSave = () => {
-    console.log('💾 Modal: Saving area with data:', {
-      id: editedArea.id,
-      title: editedArea.title,
-      url: editedArea.url,
-      linked_area_ids: editedArea.linked_area_ids,
-      linked_area_ids_type: typeof editedArea.linked_area_ids,
-      linked_area_ids_length: editedArea.linked_area_ids?.length
-    });
-    
     // Validate required fields
     if (!editedArea.title.trim()) {
       alert('Please enter a title for the area map.');
@@ -175,30 +183,36 @@ export default function AreaMapEditModal({
         : []
     };
     
-    console.log('📤 Modal: Sending area data to parent:', areaToSave);
-    
-    // Show bidirectional linking info
-    if (areaToSave.linked_area_ids.length > 0) {
-      console.log('🔗 Bidirectional linking: These areas will also link back to this area:', areaToSave.linked_area_ids);
-    }
-    
     onSave(areaToSave);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div 
         ref={modalRef}
-        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden absolute"
+        className="bg-white rounded-lg shadow-xl w-full max-w-2xl my-8 flex flex-col relative"
         style={{
-          left: `${position.x}px`,
-          top: `${position.y}px`,
+          // Only use custom positioning on desktop
+          ...(!isMobile ? {
+            position: 'absolute',
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+            maxHeight: 'calc(90vh - 64px)',
+          } : {
+            // Mobile: use flexbox centering
+            position: 'relative',
+            margin: 'auto',
+            maxWidth: 'calc(100vw - 32px)', // Account for padding
+            maxHeight: 'calc(90vh - 64px)',
+          })
         }}
       >
-        {/* Header - Draggable */}
+        {/* Header - Draggable on desktop only */}
         <div 
-          className="flex items-center justify-between p-4 sm:p-6 border-b cursor-move select-none"
+          className={`flex items-center justify-between p-4 sm:p-6 border-b select-none ${
+            !isMobile ? 'cursor-move' : 'cursor-default'
+          }`}
           onMouseDown={handleMouseDown}
         >
           <h2 className="text-xl sm:text-2xl font-bold">Edit Area Map</h2>
@@ -211,7 +225,7 @@ export default function AreaMapEditModal({
         </div>
 
         {/* Body */}
-        <div className="p-4 sm:p-6 space-y-4 overflow-auto max-h-[calc(90vh-140px)]">
+        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
           {/* Title */}
           <div>
             <label className="block text-sm font-medium text-gray-500 mb-2">
@@ -267,8 +281,6 @@ export default function AreaMapEditModal({
                   const isBidirectional = Array.isArray(otherAreaLinkedIds) 
                     ? otherAreaLinkedIds.includes(Number(area.id))
                     : false;
-                  
-                  console.log(`🔍 Checkbox for Area ${linkAreaId}: ${isSelected ? 'CHECKED' : 'UNCHECKED'} (linkedIds: [${linkedIds.join(', ')}]) ${isBidirectional ? '↔ BIDIRECTIONAL' : ''}`);
                   
                   return (
                     <label
@@ -341,7 +353,6 @@ export default function AreaMapEditModal({
                               ...editedArea,
                               linked_area_ids: cleanedIds
                             });
-                            console.log('🧹 Manual cleanup: removed', orphanedIds);
                           }}
                           className="text-xs text-yellow-700 underline hover:text-yellow-900"
                         >

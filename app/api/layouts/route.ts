@@ -3,6 +3,9 @@ import { db } from '@/lib/db';
 import { layouts } from '@/lib/schema';
 import { asc } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const data = await db

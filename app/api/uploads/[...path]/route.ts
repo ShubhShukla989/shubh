@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { stat } from 'fs/promises';
+import { readFile, stat } from 'fs/promises';
+import { existsSync } from 'fs';
+import { getPublicDir, getUploadsDir } from '@/lib/paths';
 
 /**
- * Dynamic file serving with fallback logic
- * Handles cases where files might be in different locations
+ * Dynamic file serving with intelligent fallback
+ * Handles missing files by searching multiple locations
+ * NOTE: Uses lib/paths.ts to resolve correct public dir in standalone mode
  */
 export async function GET(
   request: NextRequest,
@@ -13,92 +15,77 @@ export async function GET(
 ) {
   try {
     const filePath = params.path.join('/');
-    const filename = params.path[params.path.length - 1];
+    const publicDir = getPublicDir();
+    const uploadsDir = getUploadsDir();
     
-    // Try original path first
-    const originalPath = join(process.cwd(), 'public', 'uploads', filePath);
+    // List of possible file locations to try
+    const possiblePaths = [
+      join(uploadsDir, filePath), // Original path
+      join(uploadsDir, 'page-assets', filePath), // Page assets
+      join(uploadsDir, 'editions', filePath), // Editions folder
+      join(publicDir, filePath), // Direct public path
+    ];
     
-    if (existsSync(originalPath)) {
-      return serveFile(originalPath);
+    // Try different file extensions if original doesn't exist
+    const filename = filePath.split('/').pop() || '';
+    const baseName = filename.split('.')[0];
+    const extensions = ['jpg', 'jpeg', 'png', 'pdf'];
+    
+    // Add extension variations to possible paths
+    for (const ext of extensions) {
+      const testFilename = `${baseName}.${ext}`;
+      possiblePaths.push(
+        join(publicDir, 'uploads', testFilename),
+        join(publicDir, 'uploads', 'page-assets', testFilename),
+        join(publicDir, 'uploads', 'editions', testFilename)
+      );
     }
     
-    // FALLBACK 1: Try direct uploads folder
-    const directPath = join(process.cwd(), 'public', 'uploads', filename);
-    if (existsSync(directPath)) {
-      return serveFile(directPath);
+    // Find the first existing file
+    let foundPath: string | null = null;
+    for (const path of possiblePaths) {
+      if (existsSync(path)) {
+        foundPath = path;
+        break;
+      }
     }
     
-    // FALLBACK 2: Try page-assets subfolder
-    const pageAssetsPath = join(process.cwd(), 'public', 'uploads', 'page-assets', filename);
-    if (existsSync(pageAssetsPath)) {
-      return serveFile(pageAssetsPath);
+    if (!foundPath) {
+      return NextResponse.json(
+        { error: 'File not found', path: filePath },
+        { status: 404 }
+      );
     }
     
-    // FALLBACK 3: Try editions subfolder
-    const editionsPath = join(process.cwd(), 'public', 'uploads', 'editions', filename);
-    if (existsSync(editionsPath)) {
-      return serveFile(editionsPath);
-    }
-    
-    // File not found anywhere
-    return NextResponse.json(
-      { error: 'File not found', path: filePath },
-      { status: 404 }
-    );
-    
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: 'Server error', details: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-async function serveFile(filePath: string) {
-  try {
-    const stats = await stat(filePath);
-    const fileExtension = filePath.split('.').pop()?.toLowerCase();
+    // Read and serve the file
+    const fileBuffer = await readFile(foundPath);
+    const stats = await stat(foundPath);
     
     // Determine content type
-    let contentType = 'application/octet-stream';
-    switch (fileExtension) {
-      case 'jpg':
-      case 'jpeg':
-        contentType = 'image/jpeg';
-        break;
-      case 'png':
-        contentType = 'image/png';
-        break;
-      case 'gif':
-        contentType = 'image/gif';
-        break;
-      case 'webp':
-        contentType = 'image/webp';
-        break;
-      case 'pdf':
-        contentType = 'application/pdf';
-        break;
-    }
+    const ext = foundPath.split('.').pop()?.toLowerCase();
+    const contentType = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'pdf': 'application/pdf',
+      'gif': 'image/gif',
+      'webp': 'image/webp'
+    }[ext || ''] || 'application/octet-stream';
     
-    // Read file synchronously for API route
-    const fileBuffer = readFileSync(filePath);
-    
-    // Create response with proper headers
-    const response = new NextResponse(fileBuffer, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Content-Length': stats.size.toString(),
-        'Cache-Control': 'public, max-age=604800, s-maxage=2592000, stale-while-revalidate=7776000',
-        'X-Accel-Expires': '2592000', // Nginx cache for 1 month
-      },
+    // Set appropriate headers
+    const headers = new Headers({
+      'Content-Type': contentType,
+      'Content-Length': stats.size.toString(),
+      'Cache-Control': 'public, max-age=3600', // 1 hour cache
+      'Last-Modified': stats.mtime.toUTCString(),
     });
     
-    return response;
+    return new NextResponse(fileBuffer, { headers });
     
-  } catch (error: any) {
+  } catch (error) {
+    console.error('File serving error:', error);
     return NextResponse.json(
-      { error: 'Failed to serve file', details: error.message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

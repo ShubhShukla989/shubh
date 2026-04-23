@@ -671,10 +671,11 @@ function EpaperPaginationForm({ config, onChange }: { config: any; onChange: (co
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Pager Format</label>
         <select
-          value={config.pagerFormat || 'pagination-control'}
+          value={config.pagerFormat || 'smart-pagination'}
           onChange={(e) => onChange({ ...config, pagerFormat: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
+          <option value="smart-pagination">Smart Pagination (Centered)</option>
           <option value="pagination-control">Pagination Control</option>
           <option value="pagination-control-mini">Pagination Control (Mini)</option>
           <option value="dropdown-list-page-numbers">Dropdown List (Page Numbers)</option>
@@ -1014,13 +1015,18 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
   const [categoryTree, setCategoryTree] = useState<TreeNode[]>(config.categoryTree || []);
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
   const [draggedNode, setDraggedNode] = useState<TreeNode | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     fetchCategories();
   }, []);
 
   useEffect(() => {
-    // Update config whenever tree changes
+    // Skip the initial mount - only call onChange when user actually changes the tree
+    if (!initialized) {
+      setInitialized(true);
+      return;
+    }
     onChange({ ...config, categoryTree });
   }, [categoryTree]);
 
@@ -1364,27 +1370,30 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
           <label className="block text-sm font-medium text-gray-700 mb-1">Thumbnail Width</label>
           <input
             type="number"
-            value={config.thumbnailWidth || 300}
-            onChange={(e) => onChange({ ...config, thumbnailWidth: parseInt(e.target.value) })}
+            value={config.thumbnailWidth ?? ''}
+            onChange={(e) => onChange({ ...config, thumbnailWidth: e.target.value === '' ? undefined : parseInt(e.target.value) })}
             className="w-full px-3 py-2 border border-gray-300 rounded"
+            placeholder="e.g. 300"
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Thumbnail Height</label>
           <input
             type="number"
-            value={config.thumbnailHeight || 450}
-            onChange={(e) => onChange({ ...config, thumbnailHeight: parseInt(e.target.value) })}
+            value={config.thumbnailHeight ?? ''}
+            onChange={(e) => onChange({ ...config, thumbnailHeight: e.target.value === '' ? undefined : parseInt(e.target.value) })}
             className="w-full px-3 py-2 border border-gray-300 rounded"
+            placeholder="e.g. 450"
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Per Row Count</label>
           <input
             type="number"
-            value={config.perRowCount || 3}
-            onChange={(e) => onChange({ ...config, perRowCount: parseInt(e.target.value) })}
+            value={config.perRowCount ?? ''}
+            onChange={(e) => onChange({ ...config, perRowCount: e.target.value === '' ? undefined : parseInt(e.target.value) })}
             className="w-full px-3 py-2 border border-gray-300 rounded"
+            placeholder="e.g. 3"
           />
         </div>
       </div>
@@ -1430,41 +1439,16 @@ function EpaperFeaturedCategoriesForm({ config, onChange }: { config: any; onCha
         </div>
       </div>
 
-      {/* Row 3: Back Button Text, Share Icon Position, Share Icon Size */}
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Back Button Text</label>
-          <input
-            type="text"
-            value={config.backButtonText || 'Back'}
-            onChange={(e) => onChange({ ...config, backButtonText: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded"
-            placeholder="Back"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Share Icon Position</label>
-          <select
-            value={config.shareIconPosition || 'none'}
-            onChange={(e) => onChange({ ...config, shareIconPosition: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded"
-          >
-            <option value="none">None</option>
-            <option value="top-left">Top Left</option>
-            <option value="top-right">Top Right</option>
-            <option value="bottom-left">Bottom Left</option>
-            <option value="bottom-right">Bottom Right</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Share Icon Size</label>
-          <input
-            type="number"
-            value={config.shareIconSize || 20}
-            onChange={(e) => onChange({ ...config, shareIconSize: parseInt(e.target.value) })}
-            className="w-full px-3 py-2 border border-gray-300 rounded"
-          />
-        </div>
+      {/* Row 3: Back Button Text */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Back Button Text</label>
+        <input
+          type="text"
+          value={config.backButtonText || 'Back'}
+          onChange={(e) => onChange({ ...config, backButtonText: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded"
+          placeholder="Back"
+        />
       </div>
 
       {/* Link To */}
@@ -1888,7 +1872,7 @@ export function WidgetModal({ widget, onSelect, onSave, onClose }: WidgetModalPr
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[150]">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4 pb-3 border-b">

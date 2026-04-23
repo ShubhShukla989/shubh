@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -17,6 +16,7 @@ import {
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import PrefetchLink from './PrefetchLink';
 
 interface MenuItem {
   label: string;
@@ -171,10 +171,11 @@ export default function Sidebar({ onClose }: SidebarProps) {
     }
 
     return (
-      <Link
+      <PrefetchLink
         key={item.label}
         href={item.href!}
         onClick={onClose} // Close sidebar on mobile when link is clicked
+        prefetchDelay={150} // Elite: 150ms hover delay
         className={cn(
           'flex items-center gap-3 px-4 py-2.5 text-gray-800 hover:bg-blue-50 hover:text-blue-500 transition-colors rounded-lg',
           isActive && 'bg-blue-50 text-blue-600 hover:bg-blue-100',
@@ -183,7 +184,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
       >
         <div className="flex-shrink-0">{item.icon}</div>
         <span className={cn('font-medium', level === 0 && 'text-sm')}>{item.label}</span>
-      </Link>
+      </PrefetchLink>
     );
   };
 

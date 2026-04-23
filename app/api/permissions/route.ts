@@ -13,7 +13,6 @@ export async function GET() {
 
     return NextResponse.json({ success: true, data: data || [] });
   } catch (error) {
-    console.error('Get permissions error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch permissions' },
       { status: 500 }

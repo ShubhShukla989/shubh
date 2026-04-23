@@ -49,7 +49,7 @@ export default function AddToMenuModal({
         setSelectedMenu(locations[0].id);
       }
     } catch (err) {
-      console.error('Failed to load menu locations:', err);
+      // Silent fail - menu locations not critical
     }
   };
 
@@ -58,7 +58,7 @@ export default function AddToMenuModal({
       const menu = await menuService.getMenu(menuId);
       setMenuItems(menu.items);
     } catch (err) {
-      console.error('Failed to load menu items:', err);
+      // Silent fail - menu items not critical
     }
   };
 

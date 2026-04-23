@@ -42,6 +42,11 @@ export async function GET(
           enable_center_watermark: false,
           center_watermark_url: '',
           center_watermark_opacity: 100,
+          // Clip-specific defaults
+          clip_logo_url: '',
+          clip_brand_text: 'दो बजे दोपहर',
+          clip_brand_name: 'DBD',
+          enable_clip_branding: true,
         },
       });
     }
@@ -95,6 +100,11 @@ export async function POST(
           enable_center_watermark: body.enable_center_watermark,
           center_watermark_url: body.center_watermark_url,
           center_watermark_opacity: body.center_watermark_opacity,
+          // Clip-specific fields
+          clip_logo_url: body.clip_logo_url,
+          clip_brand_text: body.clip_brand_text,
+          clip_brand_name: body.clip_brand_name,
+          enable_clip_branding: body.enable_clip_branding,
           updated_at: new Date().toISOString(),
         })
         .where(eq(category_watermark_settings.category_id, categoryId))

@@ -39,7 +39,7 @@ export function PageDownloadWidget({ config }: PageDownloadWidgetProps) {
         setEdition(data.data);
       }
     } catch (error) {
-      console.error('Failed to fetch edition:', error);
+      // Silent fail - edition data not critical for download
     } finally {
       setLoading(false);
     }
@@ -53,7 +53,7 @@ export function PageDownloadWidget({ config }: PageDownloadWidgetProps) {
   };
 
   if (loading) {
-    return <div className="text-center py-2">Loading...</div>;
+    return null; // No loading text - content appears directly
   }
 
   if (!edition?.pdf_url) {

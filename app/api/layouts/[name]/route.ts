@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { layouts } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 
-// Force dynamic rendering - no caching
+// Force dynamic — no Next.js data cache
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
@@ -107,11 +107,21 @@ export async function GET(
           status: 'published',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }
+        },
+        cached: false
       });
     }
 
-    return NextResponse.json({ success: true, data });
+    // No Redis cache — always fetch fresh from DB so layout changes reflect instantly
+    return NextResponse.json({ 
+      success: true, 
+      data,
+      cached: false 
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      }
+    });
   } catch (error) {
     console.error('[GET /api/layouts/:name] Error:', error);
     return NextResponse.json(

@@ -26,6 +26,17 @@ export interface Column {
 export interface Row {
   id: string;
   columns: Column[];
+  cssClass?: string;
+  customStyle?: string;
+  containerWidth?: string;
+  contentStretch?: string;
+  properties?: {
+    cssClass?: string;
+    customStyle?: string;
+    customCss?: string;
+    containerWidth?: string;
+    contentStretch?: string;
+  };
 }
 
 export interface LayoutStructure {

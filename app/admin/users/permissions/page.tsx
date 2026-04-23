@@ -46,8 +46,7 @@ export default function PermissionsPage() {
         setAdminPermissions(permKeys);
       }
     } catch (error) {
-      console.error('Failed to load permissions:', error);
-      alert('Failed to load permissions');
+      alert('❌ Failed to load permissions');
     } finally {
       setLoading(false);
     }
@@ -100,7 +99,6 @@ export default function PermissionsPage() {
         alert('❌ Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Save error:', error);
       alert('❌ Failed to save permissions');
     } finally {
       setSaving(false);

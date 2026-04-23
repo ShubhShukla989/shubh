@@ -25,7 +25,7 @@ export function LayoutBuilder({
   onCustomJsChange,
 }: LayoutBuilderProps) {
   const [showCustomCode, setShowCustomCode] = useState(false);
-  const [screenSize, setScreenSize] = useState<'xl' | 'lg' | 'md' | 'sm' | 'xs'>('xl');
+  const [screenSize, setScreenSize] = useState<'xl'>('xl');
   const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [rowToDelete, setRowToDelete] = useState<{ id: string; widgetCount: number } | null>(null);
@@ -91,15 +91,6 @@ export function LayoutBuilder({
     newRows.splice(rowIndex + 1, 0, newRow);
     onChange({ ...structure, rows: newRows });
   };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      setDraggedRowId(null);
-      setDropTargetIndex(null);
-      setRowToDelete(null);
-    };
-  }, []);
 
   const updateRow = (rowId: string, updatedRow: any) => {
     // Comprehensive validation of the updated row structure
@@ -180,55 +171,35 @@ export function LayoutBuilder({
 
   const screenSizes = {
     xl: { label: 'Extra Large', width: '100%' },
-    lg: { label: 'Large', width: '1200px' },
-    md: { label: 'Medium', width: '992px' },
-    sm: { label: 'Small', width: '768px' },
-    xs: { label: 'Mobile', width: '375px' },
   };
 
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 rounded flex items-center justify-between shadow-lg">
+      <div className="bg-blue-600 p-3 rounded flex items-center justify-between shadow-lg">
         <div className="flex gap-2">
           <button
             onClick={addRow}
-            className="px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600 flex items-center gap-2 font-medium shadow-md transition-all hover:shadow-lg"
+            className="px-3 py-2 bg-teal-500 text-white text-xs hover:bg-teal-600 flex items-center justify-center font-medium shadow-sm transition-all"
+            title="Add Row"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
             Add Row
           </button>
           <button
             onClick={() => setShowCustomCode(true)}
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center gap-2 font-medium shadow-md transition-all hover:shadow-lg"
+            className="px-3 py-2 bg-green-500 text-white text-xs hover:bg-green-600 flex items-center justify-center font-medium shadow-sm transition-all"
+            title="Custom CSS/JS"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-            </svg>
             Custom CSS/JS
           </button>
         </div>
         
-        <button
-          onClick={() => {
-            const sizes: ('xl' | 'lg' | 'md' | 'sm' | 'xs')[] = ['xl', 'lg', 'md', 'sm', 'xs'];
-            const currentIndex = sizes.indexOf(screenSize);
-            const nextIndex = (currentIndex + 1) % sizes.length;
-            setScreenSize(sizes[nextIndex]);
-          }}
-          className={`px-4 py-2 rounded font-medium shadow-md transition-all hover:shadow-lg flex items-center gap-2 ${
-            screenSize === 'xl'
-              ? 'bg-yellow-400 text-black hover:bg-yellow-500'
-              : 'bg-gray-700 text-white hover:bg-gray-600'
-          }`}
-        >
+        <div className="w-8 h-8 font-medium shadow-sm transition-all flex items-center justify-center bg-yellow-400 text-black hover:bg-yellow-500 text-xs"
+             title="Extra Large">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
           </svg>
-          {screenSizes[screenSize].label}
-        </button>
+        </div>
       </div>
 
       {/* Canvas - Scrollable Container */}
@@ -242,7 +213,7 @@ export function LayoutBuilder({
         }}
       >
         <div
-          className="relative border-4 border-blue-500 rounded-lg p-4"
+          className="relative border border-blue-500 rounded-lg p-4"
           style={{
             width: screenSizes[screenSize].width,
             minHeight: structure.rows.length === 0 ? '600px' : 'auto',
@@ -257,7 +228,7 @@ export function LayoutBuilder({
             <p className="text-sm">Click "Add Row" to start building your layout</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="">
             {structure.rows.map((row, index) => (
               <div
                 key={row.id}

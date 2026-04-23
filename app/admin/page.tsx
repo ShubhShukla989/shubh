@@ -2,11 +2,14 @@
 
 import { BarChart3 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import AdminNotesBox from '@/components/admin/AdminNotesBox';
 
 // Real-time Interactive Chart Component
 function RealTimeChart({ data, loading, period }: { data: any[], loading: boolean, period: string }) {
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const activeMetric = 'visitors';
 
   // Use only real data, no fallbacks
   const chartData = data && data.length > 0 ? data : [];
@@ -36,7 +39,8 @@ function RealTimeChart({ data, loading, period }: { data: any[], loading: boolea
   }
 
   // Calculate max value for scaling
-  const maxViews = Math.max(...chartData.map(d => d.views), 100);
+  const metricKey = activeMetric;
+  const maxViews = Math.max(...chartData.map(d => d[metricKey] || 0), 100);
   const yAxisMax = Math.ceil(maxViews / 100) * 100;
   const yAxisSteps = [yAxisMax, yAxisMax * 0.75, yAxisMax * 0.5, yAxisMax * 0.25, 0];
 
@@ -47,7 +51,7 @@ function RealTimeChart({ data, loading, period }: { data: any[], loading: boolea
   
   const points = chartData.map((item, index) => {
     const x = (index / (chartData.length - 1)) * (chartWidth - padding * 2) + padding;
-    const y = chartHeight - padding - ((item.views / yAxisMax) * (chartHeight - padding * 2));
+    const y = chartHeight - padding - (((item[metricKey] || 0) / yAxisMax) * (chartHeight - padding * 2));
     return { x, y, data: item, index };
   });
 
@@ -59,7 +63,6 @@ function RealTimeChart({ data, loading, period }: { data: any[], loading: boolea
 
   return (
     <div className="h-80 relative">
-      <div className="absolute top-0 left-0 text-xs text-gray-500">Pageviews</div>
       <div className="h-full w-full bg-gradient-to-t from-blue-50 to-transparent rounded-lg relative overflow-hidden">
         
         {/* Y-axis labels */}
@@ -181,8 +184,7 @@ function RealTimeChart({ data, loading, period }: { data: any[], loading: boolea
           }}
         >
           <div className="font-semibold">{hoveredPoint.data.label}</div>
-          <div className="text-blue-300">Views: {hoveredPoint.data.views.toLocaleString()}</div>
-          <div className="text-green-300">Visitors: {hoveredPoint.data.visitors.toLocaleString()}</div>
+          <div className="text-blue-300">{(hoveredPoint.data.visitors || 0).toLocaleString()}</div>
         </div>
       )}
     </div>
@@ -193,6 +195,28 @@ export default function AdminDashboard() {
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [selectedPeriod, setSelectedPeriod] = useState('7');
   const [loading, setLoading] = useState(true);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const { data: session } = useSession();
+
+  // Check if user is superadmin
+  useEffect(() => {
+    const checkSuperAdmin = async () => {
+      if (!session?.user?.email) return;
+      
+      try {
+        const response = await fetch('/api/users/by-email?email=' + encodeURIComponent(session.user.email));
+        const data = await response.json();
+        
+        if (data.success && data.user?.role_name === 'Super Admin') {
+          setIsSuperAdmin(true);
+        }
+      } catch (error) {
+        console.error('Failed to check user role:', error);
+      }
+    };
+
+    checkSuperAdmin();
+  }, [session]);
 
   // Fetch analytics data
   useEffect(() => {
@@ -291,18 +315,12 @@ export default function AdminDashboard() {
           />
           
           {/* Real-time stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-200">
+          <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-200">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">
-                {loading ? '...' : (analyticsData?.realtime?.todayViews || 0)}
+                {loading ? '...' : (analyticsData?.realtime?.todayViews || 0).toLocaleString()}
               </div>
-              <div className="text-xs text-gray-500">Today's Views</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {loading ? '...' : (analyticsData?.realtime?.activeNow || 0)}
-              </div>
-              <div className="text-xs text-gray-500">Active Now</div>
+              <div className="text-xs text-gray-500">Today</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
@@ -318,6 +336,11 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Admin Notes Section */}
+      <div className="mb-8">
+        <AdminNotesBox isSuperAdmin={isSuperAdmin} />
       </div>
 
 

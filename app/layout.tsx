@@ -5,18 +5,31 @@ import { ClientLayout } from '@/components/ClientLayout';
 import { ToastContainer } from '@/components/ui/ToastContainer';
 import AnalyticsTracker from '@/components/AnalyticsTracker';
 
+const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Epaper';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+const defaultOg = process.env.NEXT_PUBLIC_DEFAULT_OG_IMAGE;
+
 export const metadata: Metadata = {
-  title: 'Epaper CMS',
-  description: 'Comprehensive ePaper Content Management System',
+  title: {
+    default: siteName,
+    template: `%s | ${siteName}`,
+  },
+  description: process.env.NEXT_PUBLIC_SITE_DESCRIPTION || 'Comprehensive ePaper Content Management System',
+  // metadataBase is critical — without this, relative OG image URLs silently break in production
+  metadataBase: new URL(siteUrl),
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Epaper CMS',
+    title: siteName,
   },
-  applicationName: 'Epaper CMS',
-  formatDetection: {
-    telephone: false,
+  applicationName: siteName,
+  formatDetection: { telephone: false },
+  openGraph: {
+    siteName,
+    images: defaultOg ? [defaultOg] : [],
   },
+  twitter: { card: 'summary_large_image' },
+  robots: { index: true, follow: true },
 };
 
 export const viewport: Viewport = {
@@ -45,7 +58,7 @@ export default function RootLayout({
         />
         
         {/* Basic meta tags */}
-        <meta name="application-name" content="Epaper CMS" />
+        <meta name="application-name" content="DBD NEWSPAPER" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Epaper CMS" />
@@ -55,15 +68,20 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         
         {/* Apple touch icons */}
-        <link rel="apple-touch-icon" href="/icons/icon.svg" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon.svg" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon.svg" />
+        <link rel="apple-touch-icon" href="/icons/icon.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon.png" />
         
         {/* Favicon */}
-        <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
-        <link rel="shortcut icon" href="/icons/icon.svg" />
+        <link rel="icon" type="image/png" href="/icons/icon.png" />
+        <link rel="shortcut icon" href="/icons/icon.png" />
       </head>
-      <body className="font-sans">
+      <body 
+        className="font-sans"
+        suppressHydrationWarning={true}
+        data-new-gr-c-s-check-loaded=""
+        data-gr-ext-installed=""
+      >
         <GoogleAnalytics />
         <AnalyticsTracker />
         <ClientLayout>

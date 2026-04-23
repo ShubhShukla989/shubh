@@ -25,44 +25,32 @@ export default function EpaperDisplay() {
 
   const loadFeaturedEditions = async () => {
     try {
-      const response = await fetch('/api/editions');
+      // Use the cached featured endpoint instead of fetching all editions
+      const response = await fetch('/api/editions/featured');
       const data = await response.json();
-      
-      if (data.success && data.data) {
-        // Filter for featured editions only
-        let featuredEditions = data.data
-          .filter((e: any) => e.status?.toLowerCase() === 'published' && e.is_featured === true);
 
-        // If no featured editions, show latest edition
-        if (featuredEditions.length === 0) {
-          featuredEditions = data.data
-            .filter((e: any) => e.status?.toLowerCase() === 'published')
-            .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-            .slice(0, 1);
-        }
+      if (data.success && data.data) {
+        const featuredEditions = data.data;
 
         const loadedEditions: Edition[] = featuredEditions.map((e: any) => {
           const date = new Date(e.date);
+          const firstPage = e.pages?.[0];
+          const thumbnail = firstPage?.thumb_url || firstPage?.image_url || '/images/epaper-placeholder.svg';
           return {
             id: e.id.toString(),
-            date: date.toLocaleDateString('en-IN', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric'
-            }),
+            date: date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
             title: e.title,
-            totalPages: 12,
-            thumbnail: `/media/epaper/${e.id}/page-1.jpg`,
-            is_featured: e.is_featured || false
+            totalPages: e.pages?.length || 0,
+            thumbnail,
+            is_featured: e.is_featured || false,
           };
         });
-        
+
         setEditions(loadedEditions);
       }
     } catch (error) {
       console.error('Failed to load featured editions:', error);
     }
-    
     setLoading(false);
   };
 
@@ -80,9 +68,7 @@ export default function EpaperDisplay() {
               <h1 className="text-4xl font-bold">Featured E-Paper</h1>
             </div>
           </div>
-          <p className="text-blue-100 text-lg">
-            Today's featured editions - handpicked for you
-          </p>
+          <p className="text-blue-100 text-lg">Today's featured editions - handpicked for you</p>
         </div>
       </div>
 
@@ -118,11 +104,18 @@ export default function EpaperDisplay() {
                     <span className="font-bold text-sm">FEATURED</span>
                   </div>
                 )}
+                {/* Thumbnail image */}
                 <div className="relative h-96 bg-gray-100 overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10"></div>
-                  <div className="w-full h-full flex items-center justify-center text-gray-400">
-                    <BookOpen className="w-20 h-20" />
-                  </div>
+                  <img
+                    src={edition.thumbnail}
+                    alt={edition.title}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/images/epaper-placeholder.svg';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
                   <div className="absolute bottom-6 left-6 right-6 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-blue-700 shadow-lg">
                       Read Now
@@ -134,12 +127,8 @@ export default function EpaperDisplay() {
                     <Calendar className="w-4 h-4" />
                     {edition.date}
                   </div>
-                  <h3 className="font-bold text-xl text-gray-900 mb-3 line-clamp-2">
-                    {edition.title}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    {edition.totalPages} Pages
-                  </p>
+                  <h3 className="font-bold text-xl text-gray-900 mb-3 line-clamp-2">{edition.title}</h3>
+                  <p className="text-sm text-gray-600">{edition.totalPages} Pages</p>
                 </div>
               </div>
             ))}

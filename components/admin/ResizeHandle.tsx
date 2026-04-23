@@ -29,8 +29,8 @@ const getCursorStyle = (position: HandlePosition): string => {
 const getPositionStyle = (position: HandlePosition): React.CSSProperties => {
   const baseStyle: React.CSSProperties = {
     position: 'absolute',
-    width: '12px',
-    height: '12px',
+    width: '6px',
+    height: '6px',
     backgroundColor: 'white',
     border: '2px solid #ef4444',
     borderRadius: '1px',
@@ -38,24 +38,31 @@ const getPositionStyle = (position: HandlePosition): React.CSSProperties => {
     boxShadow: '0 2px 4px rgba(0,0,0,0.4)',
   };
 
-  // Position the handle
+  const largeStyle: React.CSSProperties = {
+    ...baseStyle,
+    width: '18px',
+    height: '18px',
+  };
+
+  // All handles placed inside the bounding box (2px inset from edges)
   switch (position) {
     case 'top-left':
-      return { ...baseStyle, top: '-6px', left: '-6px' };
+      return { ...baseStyle, top: '2px', left: '2px' };
     case 'top':
-      return { ...baseStyle, top: '-6px', left: '50%', transform: 'translateX(-50%)' };
+      return { ...baseStyle, top: '2px', left: '50%', transform: 'translateX(-50%)' };
     case 'top-right':
-      return { ...baseStyle, top: '-6px', right: '-6px' };
+      return { ...baseStyle, top: '2px', right: '2px' };
     case 'left':
-      return { ...baseStyle, top: '50%', left: '-6px', transform: 'translateY(-50%)' };
+      return { ...baseStyle, top: '50%', left: '2px', transform: 'translateY(-50%)' };
     case 'right':
-      return { ...baseStyle, top: '50%', right: '-6px', transform: 'translateY(-50%)' };
+      return { ...baseStyle, top: '50%', right: '2px', transform: 'translateY(-50%)' };
     case 'bottom-left':
-      return { ...baseStyle, bottom: '-6px', left: '-6px' };
+      return { ...baseStyle, bottom: '2px', left: '2px' };
     case 'bottom':
-      return { ...baseStyle, bottom: '-6px', left: '50%', transform: 'translateX(-50%)' };
+      return { ...baseStyle, bottom: '2px', left: '50%', transform: 'translateX(-50%)' };
     case 'bottom-right':
-      return { ...baseStyle, bottom: '-6px', right: '-6px' };
+      // Primary resize handle — 3× larger, inset from corner
+      return { ...largeStyle, bottom: '2px', right: '2px' };
   }
 };
 
@@ -75,12 +82,7 @@ export default function ResizeHandle({ position, onResizeStart }: ResizeHandlePr
       style={{
         ...positionStyle,
         cursor,
-        // Balanced hit area - visible handle with extended touch area
-        padding: '6px',
-        margin: '-6px',
-        minWidth: '24px',
-        minHeight: '24px',
-        touchAction: 'none', // Prevent default touch behaviors
+        touchAction: 'none',
       }}
       onMouseDown={handleStart}
       onTouchStart={handleStart}

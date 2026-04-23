@@ -64,7 +64,6 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[POST /api/upload/pdf] Error:', error);
     const message = error instanceof Error ? error.message : 'Failed to upload PDF';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }

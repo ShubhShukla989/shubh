@@ -1,28 +1,36 @@
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { path } = await request.json();
+    const body = await request.json();
+    const { path, tag } = body;
     
-    if (!path) {
+    if (!path && !tag) {
       return NextResponse.json(
-        { success: false, error: 'Path is required' },
+        { success: false, error: 'Path or tag is required' },
         { status: 400 }
       );
     }
 
-    // Revalidate the specified path
-    revalidatePath(path);
+    // Revalidate by path or tag
+    if (path) {
+      revalidatePath(path);
+    }
+    
+    if (tag) {
+      revalidateTag(tag);
+    }
     
     return NextResponse.json({
       success: true,
-      message: `Path ${path} revalidated successfully`
+      message: path 
+        ? `Path ${path} revalidated successfully` 
+        : `Tag ${tag} revalidated successfully`
     });
   } catch (error: any) {
-    console.error('Revalidation error:', error);
     return NextResponse.json(
-      { success: false, error: error.message },
+      { success: false, error: error.message || 'Revalidation failed' },
       { status: 500 }
     );
   }

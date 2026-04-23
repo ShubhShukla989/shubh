@@ -86,7 +86,6 @@ export default function EditPage() {
         setWordCount(words.length);
       }
     } catch (error) {
-      console.error('Failed to load page:', error);
       alert('Failed to load page');
       router.push('/admin/pages');
     } finally {
@@ -159,7 +158,7 @@ export default function EditPage() {
         try {
           await menuService.updateMenuItemsAlias(originalAlias, formData.alias);
         } catch (error) {
-          console.error('Failed to update menu items:', error);
+          // Failed to update menu items
         }
       }
     }
@@ -175,7 +174,6 @@ export default function EditPage() {
         router.push('/admin/pages');
       }, 1500);
     } catch (error) {
-      console.error('Save failed:', error);
       alert(error instanceof Error ? error.message : 'Failed to save page');
     } finally {
       setSaving(false);
@@ -318,8 +316,14 @@ export default function EditPage() {
             <Editor
               {...{
                 apiKey: "zvxgyo8w1bgxfurgelu31pu12atqyzvem2o9m21ubt6sz2zq",
-                onInit: (_evt: any, editor: any) => (editorRef.current = editor),
-                value: formData.content,
+                onInit: (_evt: any, editor: any) => {
+                  editorRef.current = editor;
+                  // Set initial content after editor is ready
+                  if (formData.content) {
+                    editor.setContent(formData.content);
+                  }
+                },
+                initialValue: formData.content,
                 onEditorChange: handleEditorChange,
                 init: {
                   height: 500,

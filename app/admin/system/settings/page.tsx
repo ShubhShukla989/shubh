@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Save } from 'lucide-react';
 import MediaBrowser from '@/components/page-manager/MediaBrowser';
 
@@ -53,38 +53,48 @@ export default function SettingsPage() {
   // Media browser state
   const [showMediaBrowser, setShowMediaBrowser] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
+  // Memoize origin for robots.txt default
+  const siteOrigin = useMemo(() => 
+    typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com',
+    []
+  );
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
-      const siteRes = await fetch('/api/settings/site');
-      const siteData = await siteRes.json();
+      const [siteRes, adsRes, robotsRes, analyticsRes, epaperRes, watermarkRes] = await Promise.all([
+        fetch('/api/settings/site'),
+        fetch('/api/settings/ads'),
+        fetch('/api/settings/robots'),
+        fetch('/api/settings/analytics'),
+        fetch('/api/settings/epaper'),
+        fetch('/api/settings/area-map-watermark')
+      ]);
+
+      const [siteData, adsData, robotsData, analyticsData, epaperData, watermarkData] = await Promise.all([
+        siteRes.json(),
+        adsRes.json(),
+        robotsRes.json(),
+        analyticsRes.json(),
+        epaperRes.json(),
+        watermarkRes.json()
+      ]);
+
       if (siteData.success) {
         setHomePage(siteData.data?.setting_value || 'website-homepage');
       }
 
-      const adsRes = await fetch('/api/settings/ads');
-      const adsData = await adsRes.json();
       if (adsData.success) {
         setAdsContent(adsData.data?.content || '');
       }
 
-      const robotsRes = await fetch('/api/settings/robots');
-      const robotsData = await robotsRes.json();
       if (robotsData.success) {
         setRobotsContent(robotsData.data?.content || '');
       }
 
-      const analyticsRes = await fetch('/api/settings/analytics');
-      const analyticsData = await analyticsRes.json();
       if (analyticsData.success) {
         setAnalyticsId(analyticsData.data?.measurement_id || '');
       }
 
-      const epaperRes = await fetch('/api/settings/epaper');
-      const epaperData = await epaperRes.json();
       if (epaperData.success) {
         const data = epaperData.data;
         setEntriesPerPage(data.entries_per_page || 12);
@@ -96,8 +106,6 @@ export default function SettingsPage() {
         setUseRandomPrefix(data.use_random_prefix || false);
       }
 
-      const watermarkRes = await fetch('/api/settings/area-map-watermark');
-      const watermarkData = await watermarkRes.json();
       if (watermarkData.success) {
         const data = watermarkData.data;
         setEnableWatermarking(data.enable_watermarking || false);
@@ -115,11 +123,15 @@ export default function SettingsPage() {
         setInfoTextFont(data.info_text_font || 'English');
       }
     } catch (error) {
-      // Silently handle error - user will see default values
+      // Silent fail - user will see default values
     }
-  };
+  }, []);
 
-  const handleSaveBasic = async () => {
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  const handleSaveBasic = useCallback(async () => {
     try {
       setSaving(true);
       const response = await fetch('/api/settings/site', {
@@ -130,7 +142,6 @@ export default function SettingsPage() {
 
       const data = await response.json();
       if (data.success) {
-        // Trigger revalidation of homepage
         await fetch('/api/revalidate?path=/', { method: 'POST' });
         alert('✅ Site settings saved successfully! Homepage will update on next visit.');
       } else {
@@ -141,9 +152,9 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [homePage]);
 
-  const handleSaveAds = async () => {
+  const handleSaveAds = useCallback(async () => {
     try {
       setSaving(true);
       const response = await fetch('/api/settings/ads', {
@@ -163,9 +174,9 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [adsContent]);
 
-  const handleSaveRobots = async () => {
+  const handleSaveRobots = useCallback(async () => {
     try {
       setSaving(true);
       const response = await fetch('/api/settings/robots', {
@@ -185,9 +196,9 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [robotsContent]);
 
-  const handleSaveAnalytics = async () => {
+  const handleSaveAnalytics = useCallback(async () => {
     try {
       setSaving(true);
       const response = await fetch('/api/settings/analytics', {
@@ -207,9 +218,9 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [analyticsId]);
 
-  const handleSaveEpaper = async () => {
+  const handleSaveEpaper = useCallback(async () => {
     try {
       setSaving(true);
       const response = await fetch('/api/settings/epaper', {
@@ -237,9 +248,9 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [entriesPerPage, includeHeaderFooterMap, includeHeaderFooterClip, defaultPublishingStatus, disableRightClick, keepArchiveDays, useRandomPrefix]);
 
-  const handleSaveWatermark = async () => {
+  const handleSaveWatermark = useCallback(async () => {
     try {
       setSaving(true);
       const response = await fetch('/api/settings/area-map-watermark', {
@@ -273,9 +284,9 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [enableWatermarking, logoUrl, opacity, mode, position, minWidthPx, backgroundColor, foregroundColor, enableBorder, borderWidth, borderColor, infoText, infoTextFont]);
 
-  const fillDefaultRobots = () => {
+  const fillDefaultRobots = useCallback(() => {
     const defaultContent = `User-agent: *
 Disallow: /*?page=*
 Disallow: /*?forcesingle=*
@@ -283,9 +294,15 @@ Disallow: */open?id=*
 Disallow: /admin/
 Disallow: /login
 
-Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}/sitemap.xml`;
+Sitemap: ${siteOrigin}/sitemap.xml`;
     setRobotsContent(defaultContent);
-  };
+  }, [siteOrigin]);
+
+  const handleMediaSelect = useCallback((url: string) => {
+    setLogoUrl(url);
+    alert('✅ Logo image selected successfully!');
+    setShowMediaBrowser(false);
+  }, []);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -826,7 +843,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
                             placeholder="Garvi Gujarat English Ahemdabad Edition{newline}{date}"
                           />
                           <p className="text-xs text-gray-500 mt-1">
-                            Templates: {'{edition_title}'} {'{page_title}'} {'{date}'} {'{url}'}{' '}
+                            Templates: {'{edition_title}'} {'{page_title}'} {'{date}'} {'{url}'} {'{page_number}'} {'{total_pages}'}{' '}
                             {'{newline}'}
                           </p>
                         </div>
@@ -866,11 +883,7 @@ Sitemap: ${typeof window !== 'undefined' ? window.location.origin : 'https://you
       <MediaBrowser
         isOpen={showMediaBrowser}
         onClose={() => setShowMediaBrowser(false)}
-        onSelect={(url) => {
-          setLogoUrl(url);
-          alert('✅ Logo image selected successfully!');
-          setShowMediaBrowser(false);
-        }}
+        onSelect={handleMediaSelect}
         accept="image/*"
       />
     </div>

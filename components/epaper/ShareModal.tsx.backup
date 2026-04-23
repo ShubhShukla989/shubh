@@ -1,0 +1,768 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { X, Download, ExternalLink } from 'lucide-react';
+
+interface ShareModalProps {
+  clippedImage: string | null;
+  editionId: string;
+  pageNumber: number;
+  onClose: () => void;
+}
+
+interface WatermarkSettings {
+  enable_watermarking: boolean;
+  logo_url: string;
+  logo_width_percentage: number;
+  opacity: number;
+  position: string;
+  background_color: string;
+  foreground_color: string;
+  info_text: string;
+  info_text_font: string;
+}
+
+export default function ShareModal({
+  clippedImage,
+  editionId,
+  pageNumber,
+  onClose
+}: ShareModalProps) {
+  const [watermarkSettings, setWatermarkSettings] = useState<WatermarkSettings | null>(null);
+  const [watermarkedImage, setWatermarkedImage] = useState<string>('');
+  const [edition, setEdition] = useState<any>(null);
+  const [clipUrl, setClipUrl] = useState<string>('');
+  const [clipId, setClipId] = useState<string>('');
+
+  // Fetch edition data and watermark settings
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch edition with pages data - SAME AS AREA MAP
+        const editionResponse = await fetch(`/api/editions/${editionId}/complete`);
+        const editionData = await editionResponse.json();
+        
+        if (editionData.success) {
+          const { edition, pages } = editionData.data;
+          // Store edition with pages data
+          setEdition({ ...edition, pages: pages || [] });
+          console.log('📖 Loaded edition with pages for clip:', {
+            id: edition.id,
+            title: edition.title,
+            pagesCount: pages?.length || 0,
+            currentPageTitle: pages?.[pageNumber - 1]?.title
+          });
+        } else {
+          // Fallback to basic edition data
+          const basicResponse = await fetch(`/api/editions/${editionId}`);
+          const basicData = await basicResponse.json();
+          if (basicData.success) {
+            setEdition(basicData.data);
+          }
+        }
+        
+        // Fetch watermark settings - SAME AS AREA MAP
+        const watermarkResponse = await fetch('/api/settings/area-map-watermark');
+        const watermarkData = await watermarkResponse.json();
+        
+        if (watermarkData.success) {
+          setWatermarkSettings(watermarkData.data);
+          console.log('🎨 Loaded watermark settings for clip:', watermarkData.data);
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    if (editionId) {
+      fetchData();
+    }
+  }, [editionId, pageNumber]); // Add pageNumber dependency
+
+  // Create watermarked image
+  useEffect(() => {
+    if (clippedImage && watermarkSettings) {
+      console.log('🎨 ShareModal watermark settings:', {
+        enable_watermarking: watermarkSettings.enable_watermarking,
+        logo_url: watermarkSettings.logo_url,
+        logo_width_percentage: watermarkSettings.logo_width_percentage
+      });
+      
+      if (watermarkSettings.enable_watermarking && watermarkSettings.logo_url) {
+        console.log('✅ Creating watermarked image...');
+        createWatermarkedImage();
+      } else {
+        console.warn('⚠️ Watermarking disabled or no logo URL - CANNOT save clip without watermark!');
+        // Don't set watermarkedImage - force user to enable watermark
+      }
+    } else if (clippedImage) {
+      console.warn('⚠️ No watermark settings loaded yet - waiting...');
+      // Don't set watermarkedImage - wait for settings
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clippedImage, watermarkSettings]);
+
+  // Save clip and get URL - ONLY save when watermarked image is ready
+  useEffect(() => {
+    const saveClip = async () => {
+      if (!editionId) return;
+      
+      // CRITICAL FIX: Only save when watermarked image is ready!
+      // Don't fallback to clippedImage - wait for watermark
+      if (!watermarkedImage) {
+        console.log('⏳ Waiting for watermarked image before saving...');
+        return;
+      }
+
+      try {
+        console.log('💾 Saving watermarked clip to database...');
+        const response = await fetch('/api/clips/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image_data: watermarkedImage, // ONLY send watermarked image!
+            edition_id: parseInt(editionId),
+            page_number: pageNumber,
+            apply_watermark: true
+          }),
+        });
+
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          console.log('✅ Watermarked clip saved successfully!', result.data.id);
+          setClipUrl(result.data.clip_url);
+          setClipId(result.data.id);
+        }
+      } catch (error) {
+        console.error('❌ Error saving clip:', error);
+        // Fallback to page URL if API fails
+        setClipUrl(window.location.href);
+      }
+    };
+
+    // Start when watermarked image is ready
+    if (watermarkedImage) {
+      saveClip();
+    }
+  }, [watermarkedImage, editionId, pageNumber]);
+
+  const createWatermarkedImage = async () => {
+    if (!clippedImage || !watermarkSettings) return;
+
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const baseWidth = img.width;
+        const baseHeight = img.height;
+
+        // STEP 1: Load logo first to get actual dimensions
+        let actualLogoHeight = 0;
+        let actualLogoWidth = 0;
+        
+        if (watermarkSettings.logo_url) {
+          try {
+            const logoImg = new Image();
+            logoImg.crossOrigin = 'anonymous';
+            
+            await new Promise((resolve, reject) => {
+              logoImg.onload = resolve;
+              logoImg.onerror = reject;
+              logoImg.src = watermarkSettings.logo_url;
+            });
+
+            // Calculate actual logo dimensions
+            const logoWidthPercentage = watermarkSettings.logo_width_percentage || 50;
+            actualLogoWidth = baseWidth * (logoWidthPercentage / 100);
+            actualLogoHeight = (logoImg.height / logoImg.width) * actualLogoWidth;
+            
+            console.log('🎨 ShareModal actual logo dimensions:', { actualLogoWidth, actualLogoHeight });
+          } catch (error) {
+            console.error('Logo load error:', error);
+          }
+        }
+        
+        // STEP 2: Calculate actual text height
+        let actualTextHeight = 0;
+        if (watermarkSettings.info_text && watermarkSettings.info_text.trim()) {
+          const lines = watermarkSettings.info_text.split('\n').filter(line => line.trim());
+          actualTextHeight = lines.length * 16; // 16px per line
+        }
+        
+        // STEP 3: Calculate exact watermark height - NO ESTIMATES
+        const watermarkHeight = actualLogoHeight + actualTextHeight + 30; // 10px + 10px + 10px gaps
+        
+        console.log('🎨 ShareModal exact dimensions:', {
+          actualLogoHeight,
+          actualTextHeight, 
+          watermarkHeight,
+          totalHeight: baseHeight + watermarkHeight
+        });
+
+        const isTopPosition = watermarkSettings.position?.includes('top');
+        
+        canvas.width = baseWidth;
+        canvas.height = baseHeight + watermarkHeight;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, baseWidth, canvas.height);
+
+        if (isTopPosition) {
+          await drawWatermark(ctx, 0, baseWidth, watermarkHeight, actualLogoHeight, actualLogoWidth);
+          ctx.drawImage(img, 0, watermarkHeight, baseWidth, baseHeight);
+        } else {
+          ctx.drawImage(img, 0, 0, baseWidth, baseHeight);
+          await drawWatermark(ctx, baseHeight, baseWidth, watermarkHeight, actualLogoHeight, actualLogoWidth);
+        }
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            setWatermarkedImage(URL.createObjectURL(blob));
+          }
+        }, 'image/png', 0.95);
+      };
+
+      img.src = clippedImage;
+    } catch (error) {
+      console.error('Error creating watermarked image:', error);
+      setWatermarkedImage(clippedImage);
+    }
+  };
+
+  const drawWatermark = async (ctx: CanvasRenderingContext2D, watermarkY: number, baseWidth: number, watermarkHeight: number, actualLogoHeight: number, actualLogoWidth: number) => {
+    if (!watermarkSettings) return;
+
+    // Background - Use admin settings like area map
+    ctx.fillStyle = watermarkSettings.background_color || 'rgba(243, 244, 246, 0.95)';
+    ctx.fillRect(0, watermarkY, baseWidth, watermarkHeight);
+
+    // Process template text - EXACT SAME LOGIC AS AREA MAP
+    let processedText = watermarkSettings.info_text || '{edition_title}\n{date}\n{url}';
+    
+    // Replace edition title
+    if (edition?.title) {
+      processedText = processedText.replace(/{edition_title}/g, edition.title);
+    }
+    
+    // Replace page title - SAME LOGIC AS AREA MAP
+    if (edition?.pages && edition.pages[pageNumber - 1]?.title) {
+      // Use actual page title if available
+      processedText = processedText.replace(/{page_title}/g, edition.pages[pageNumber - 1].title);
+    } else {
+      // Fallback to "Page X" format
+      processedText = processedText.replace(/{page_title}/g, `Page ${pageNumber}`);
+    }
+    
+    // Replace date with edition's actual date (archive date) - EXACT SAME AS AREA MAP
+    if (edition?.date) {
+      const editionDate = new Date(edition.date);
+      const formattedDate = editionDate.toLocaleDateString('en-GB', { 
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+      console.log('📅 Using edition date for clip:', edition.date, '→', formattedDate);
+      processedText = processedText.replace(/{date}/g, formattedDate);
+    } else {
+      // Fallback to current date if edition date not available
+      const currentDate = new Date().toLocaleDateString('en-GB', { 
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+      console.log('📅 Using current date (fallback) for clip:', currentDate);
+      processedText = processedText.replace(/{date}/g, currentDate);
+    }
+    
+    // Replace page number (always available) - SAME AS AREA MAP
+    processedText = processedText.replace(/{page}/g, pageNumber.toString());
+    
+    // Replace URL (always available in browser) - SAME AS AREA MAP
+    if (typeof window !== 'undefined') {
+      processedText = processedText.replace(/{url}/g, window.location.href);
+    } else {
+      processedText = processedText.replace(/{url}/g, ''); // Remove URL placeholder if not available
+    }
+    
+    // Replace newlines - SAME AS AREA MAP
+    processedText = processedText.replace(/{newline}/g, '\n');
+
+    // Draw logo with exact dimensions - NO RECALCULATION
+    if (watermarkSettings.logo_url && actualLogoHeight > 0) {
+      try {
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        
+        await new Promise((resolve, reject) => {
+          logoImg.onload = resolve;
+          logoImg.onerror = reject;
+          logoImg.src = watermarkSettings.logo_url;
+        });
+
+        const logoX = (baseWidth - actualLogoWidth) / 2;
+        ctx.drawImage(logoImg, logoX, watermarkY + 10, actualLogoWidth, actualLogoHeight);
+        console.log('✅ ShareModal logo drawn with exact dimensions:', { actualLogoWidth, actualLogoHeight });
+      } catch (error) {
+        console.error('Logo load error:', error);
+      }
+    }
+
+    // Draw text with exact positioning - 10px gap after logo
+    if (processedText) {
+      const lines = processedText.split('\n').filter(line => line.trim());
+      
+      // Remove duplicate headers - EXACT SAME LOGIC AS AREA MAP
+      const editionTitle = edition?.title;
+      if (editionTitle) {
+        let foundFirst = false;
+        const deduplicatedLines = lines.filter((line: string) => {
+          const trimmedLine = line.trim();
+          if (trimmedLine === editionTitle) {
+            if (!foundFirst) {
+              foundFirst = true;
+              console.log('✅ Keeping first header:', trimmedLine);
+              return true; // Keep first occurrence
+            } else {
+              console.log('🚫 Removing duplicate header:', trimmedLine);
+              return false; // Remove subsequent occurrences
+            }
+          }
+          return true; // Keep non-header lines
+        });
+        
+        // Update lines array with deduplicated version
+        lines.length = 0;
+        lines.push(...deduplicatedLines);
+        
+        console.log('✅ Header deduplication complete. Final lines:', lines);
+      }
+      
+      // SAME RESPONSIVE FONT SIZING as area map
+      const totalTextLength = lines.join('').length;
+      const availableTextHeight = watermarkHeight * 0.5; // 50% of watermark area for text
+      const maxLinesInSpace = Math.floor(availableTextHeight / 14); // Assuming min 14px line height
+      
+      let fontSize = 13; // Default size for short text
+      
+      // Reduce font size based on text length - SAME LOGIC as area map
+      if (totalTextLength > 300) {
+        fontSize = 9; // Very very long text
+      } else if (totalTextLength > 200) {
+        fontSize = 10; // Very long text
+      } else if (totalTextLength > 150) {
+        fontSize = 11; // Long text
+      } else if (totalTextLength > 100) {
+        fontSize = 12; // Medium text
+      } else if (totalTextLength > 50) {
+        fontSize = 13; // Short-medium text
+      }
+      // else keep default 13px for short text (<=50 chars)
+      
+      // Also reduce if too many lines for available space
+      if (lines.length > maxLinesInSpace) {
+        fontSize = Math.max(8, fontSize - (lines.length - maxLinesInSpace));
+      }
+      
+      // Ensure minimum readable size
+      fontSize = Math.max(9, fontSize);
+      
+      console.log('📝 Font sizing calculation for clip:', {
+        watermarkHeight,
+        availableTextHeight,
+        textLines: lines.length,
+        totalChars: totalTextLength,
+        finalFontSize: fontSize
+      });
+      
+      ctx.textAlign = 'center';
+      ctx.fillStyle = watermarkSettings.foreground_color || '#1f2937';
+      ctx.font = `${fontSize}px ${watermarkSettings.info_text_font || 'Arial'}`;
+      
+      const textStartY = watermarkY + 10 + actualLogoHeight + 10; // 10px + logo + 10px gap
+      const lineHeight = Math.max(fontSize * 1.2, 12); // Minimum 12px line height
+      
+      lines.forEach((line, index) => {
+        if (line.trim()) {
+          ctx.fillText(line.trim(), baseWidth / 2, textStartY + (index * lineHeight));
+        }
+      });
+      
+      console.log(`✅ ShareModal text drawn at Y=${textStartY} with exact positioning`);
+      console.log('🔍 Clip processed text:', processedText);
+      console.log('🔍 Original admin text:', watermarkSettings.info_text);
+    }
+  };
+
+  const handleDownload = () => {
+    const imageToDownload = watermarkedImage || clippedImage;
+    if (!imageToDownload) return;
+    
+    const link = document.createElement('a');
+    link.href = imageToDownload;
+    link.download = `clip-${editionId}-page-${pageNumber}.png`;
+    link.click();
+  };
+
+  const handleShare = (platform: string) => {
+    const url = clipUrl || window.location.href; // Use clip URL if available
+    const text = encodeURIComponent('Check out this article');
+    const encodedUrl = encodeURIComponent(url);
+
+    const urls: Record<string, string> = {
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+      twitter: `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${text}`,
+      whatsapp: `https://wa.me/?text=${text}%20${encodedUrl}`,
+      telegram: `https://t.me/share/url?url=${encodedUrl}&text=${text}`,
+      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+    };
+
+    if (urls[platform]) {
+      window.open(urls[platform], '_blank', 'width=600,height=400');
+    }
+  };
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-2 backdrop-blur-sm"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 10001, // Higher than area maps
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backdropFilter: 'blur(2px)'
+      }}
+    >
+      <div 
+        className="bg-white rounded-xl shadow-2xl max-h-[95vh] overflow-y-auto share-modal-scrollbar"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: '600px', // Reduced from 90vw
+          width: '95%',
+          maxHeight: '95vh',
+          zIndex: 10002
+        }}
+      >
+        {/* Custom Scrollbar Styles - Light Grey */}
+        <style jsx>{`
+          .share-modal-scrollbar::-webkit-scrollbar {
+            width: 12px;
+          }
+          
+          .share-modal-scrollbar::-webkit-scrollbar-track {
+            background: #f3f4f6;
+            border-radius: 10px;
+          }
+          
+          .share-modal-scrollbar::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 10px;
+            border: 2px solid #f3f4f6;
+          }
+          
+          .share-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+          }
+          
+          .share-modal-scrollbar::-webkit-scrollbar-thumb:active {
+            background: #6b7280;
+          }
+          
+          /* Firefox */
+          .share-modal-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: #d1d5db #f3f4f6;
+          }
+        `}</style>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-100">
+          <div className="flex items-center gap-2">
+            <svg className="w-6 h-6 text-gray-800" fill="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <path d="M3 15v4c0 1.1.9 2 2 2h14c0-1.1-.9-2-2-2v-4M7 10l5-5 5 5M12 5v10"/>
+              <rect x="4" y="11" width="16" height="2" rx="1"/>
+            </svg>
+            <h3 className="text-lg font-bold text-gray-900">Share</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Image */}
+        <div className="px-4 py-4">
+          {!watermarkedImage && !clippedImage ? (
+            <div className="bg-gray-50 rounded-lg p-8 flex flex-col items-center justify-center min-h-[200px]">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+              <p className="text-gray-600 text-sm">Loading image...</p>
+            </div>
+          ) : !watermarkedImage && clippedImage ? (
+            <div className="bg-gray-50 rounded-lg p-8 flex flex-col items-center justify-center min-h-[200px]">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+              <p className="text-gray-600 text-sm font-medium">Adding watermark...</p>
+              <p className="text-gray-500 text-xs mt-2">Please wait while we add logo and text</p>
+            </div>
+          ) : (
+            <div className="bg-gray-50 rounded-lg p-2">
+              <img
+                src={watermarkedImage || ''}
+                alt="Clipped content with watermark"
+                className="w-full h-auto rounded"
+                style={{ 
+                  maxHeight: '60vh', 
+                  objectFit: 'contain',
+                  display: 'block',
+                  margin: '0 auto'
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* URL - Show Clip URL - ONLY when watermarked image is ready */}
+        {watermarkedImage && clipUrl && (
+        <div className="px-4 py-3">
+          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:border-blue-300 transition-colors">
+            <div className="text-xs text-gray-500 mb-1 font-medium">
+              Click to copy clip link:
+            </div>
+            <input
+              type="text"
+              value={clipUrl || window.location.href}
+              readOnly
+              className="w-full text-sm text-gray-800 bg-transparent border-none outline-none cursor-pointer hover:text-blue-600 transition-colors font-mono"
+              onClick={async () => {
+                const urlToCopy = clipUrl || window.location.href;
+                try {
+                  await navigator.clipboard.writeText(urlToCopy);
+                } catch (err) {
+                  console.error('Failed to copy URL:', err);
+                }
+              }}
+              title="Click to copy URL"
+              style={{ userSelect: 'all' }}
+            />
+          </div>
+        </div>
+        )}
+
+        {/* Social Icons - Only show when watermarked image is ready */}
+        {watermarkedImage && (
+        <div className="px-6 py-4">
+          <div className="flex justify-center gap-1 flex-wrap">
+            {/* Generic Share - Image + Link */}
+            <button
+              onClick={async () => {
+                const imageToShare = watermarkedImage || clippedImage;
+                const url = clipUrl || window.location.href;
+                if (imageToShare && navigator.share) {
+                  try {
+                    const response = await fetch(imageToShare);
+                    const blob = await response.blob();
+                    const file = new File([blob], `clip-${editionId}-page-${pageNumber}.png`, { type: 'image/png' });
+                    
+                    await navigator.share({
+                      files: [file],
+                      title: `Clip from ${edition?.title || 'Epaper'}`,
+                      text: `Check out this article from ${edition?.title || 'Epaper'}\n${url}`
+                    });
+                  } catch (error) {
+                    console.error('Error sharing:', error);
+                    try {
+                      await navigator.share({
+                        title: `Clip from ${edition?.title || 'Epaper'}`,
+                        url: url
+                      });
+                    } catch (err) {
+                      alert('Share feature not supported');
+                    }
+                  }
+                } else {
+                  alert('Share feature not supported');
+                }
+              }}
+              className="w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              title="Share Image & Link"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+              </svg>
+            </button>
+
+            {/* Copy Link */}
+            <button
+              onClick={async () => {
+                const url = clipUrl || window.location.href;
+                try {
+                  await navigator.clipboard.writeText(url);
+                  alert('Link copied!');
+                } catch (err) {
+                  console.error('Failed to copy:', err);
+                }
+              }}
+              className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              title="Copy Link"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+              </svg>
+            </button>
+
+            {/* Facebook */}
+            <button
+              onClick={() => handleShare('facebook')}
+              className="w-12 h-12 bg-[#3b5998] hover:bg-[#2d4373] text-white flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              title="Share on Facebook"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+            </button>
+            
+            {/* Twitter/X */}
+            <button
+              onClick={() => handleShare('twitter')}
+              className="w-12 h-12 bg-black hover:bg-gray-800 text-white flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              title="Share on X"
+            >
+              <span className="text-lg font-bold">𝕏</span>
+            </button>
+            
+            {/* WhatsApp - Image + Link */}
+            <button
+              onClick={async () => {
+                const imageToShare = watermarkedImage || clippedImage;
+                const url = clipUrl || window.location.href;
+                const text = `Check out this article from ${edition?.title || 'Epaper'}`;
+                
+                if (imageToShare && navigator.share && navigator.canShare) {
+                  try {
+                    const response = await fetch(imageToShare);
+                    const blob = await response.blob();
+                    const file = new File([blob], `clip.png`, { type: 'image/png' });
+                    
+                    if (navigator.canShare({ files: [file] })) {
+                      await navigator.share({
+                        files: [file],
+                        text: `${text}\n${url}`
+                      });
+                      return;
+                    }
+                  } catch (error) {
+                    console.error('Error sharing with image:', error);
+                  }
+                }
+                
+                const encodedText = encodeURIComponent(`${text}\n${url}`);
+                window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+              }}
+              className="w-12 h-12 bg-[#25d366] hover:bg-[#1da851] text-white flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              title="Share on WhatsApp"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.89 3.488"/>
+              </svg>
+            </button>
+
+            {/* Telegram - Image + Link */}
+            <button
+              onClick={async () => {
+                const imageToShare = watermarkedImage || clippedImage;
+                const url = clipUrl || window.location.href;
+                const text = `Check out this article from ${edition?.title || 'Epaper'}`;
+                
+                if (imageToShare && navigator.share && navigator.canShare) {
+                  try {
+                    const response = await fetch(imageToShare);
+                    const blob = await response.blob();
+                    const file = new File([blob], `clip.png`, { type: 'image/png' });
+                    
+                    if (navigator.canShare({ files: [file] })) {
+                      await navigator.share({
+                        files: [file],
+                        text: `${text}\n${url}`
+                      });
+                      return;
+                    }
+                  } catch (error) {
+                    console.error('Error sharing with image:', error);
+                  }
+                }
+                
+                handleShare('telegram');
+              }}
+              className="w-12 h-12 bg-[#0088cc] hover:bg-[#006699] text-white flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              title="Share on Telegram"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+              </svg>
+            </button>
+
+            {/* Instagram */}
+            <button
+              onClick={() => alert('Instagram sharing requires the Instagram app. Please use the mobile app to share.')}
+              className="w-12 h-12 text-white flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              style={{
+                background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)'
+              }}
+              title="Share on Instagram"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+              </svg>
+            </button>
+
+            {/* LinkedIn */}
+            <button
+              onClick={() => handleShare('linkedin')}
+              className="w-12 h-12 bg-[#0077b5] hover:bg-[#005582] text-white flex items-center justify-center transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 active:scale-95"
+              title="Share on LinkedIn"
+            >
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="px-6 py-2 border-t border-gray-100">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => {
+                const url = clipUrl || window.location.href;
+                window.open(url, '_blank');
+              }}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open
+            </button>
+            <button
+              onClick={handleDownload}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+            >
+              <Download className="w-4 h-4" />
+              Download
+            </button>
+          </div>
+        </div>
+        )}
+      </div>
+    </div>
+  );
+}

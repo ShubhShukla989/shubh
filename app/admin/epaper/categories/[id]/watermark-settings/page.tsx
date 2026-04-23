@@ -15,7 +15,6 @@ export default function CategoryWatermarkSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [categoryName, setCategoryName] = useState('');
   const [showMediaBrowser, setShowMediaBrowser] = useState(false);
-  const [mediaTargetField, setMediaTargetField] = useState<'logo'>('logo');
   const [settings, setSettings] = useState({
     override_global_settings: false,
     enable_watermarking: false,
@@ -55,7 +54,7 @@ export default function CategoryWatermarkSettingsPage() {
     try {
       const response = await fetch(`/api/settings/category-watermark?category_id=${categoryId}`);
       const result = await response.json();
-      if (result.success) {
+      if (result.success && result.data) {
         setSettings(result.data);
       }
     } catch (error) {
@@ -332,7 +331,6 @@ export default function CategoryWatermarkSettingsPage() {
                 </div>
               )}
 
-
             </div>
 
             {/* Footer */}
@@ -362,7 +360,7 @@ export default function CategoryWatermarkSettingsPage() {
         onClose={() => setShowMediaBrowser(false)}
         onSelect={(url) => {
           setSettings({ ...settings, logo_url: url });
-          alert('✅ Logo image selected successfully!');
+          alert('✅ Watermark logo selected successfully!');
           setShowMediaBrowser(false);
         }}
         accept="image/*"

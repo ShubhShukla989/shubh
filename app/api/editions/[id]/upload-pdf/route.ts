@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { editions } from '@/lib/schema';
+import { editions, epaper_categories } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
+import { revalidatePath } from 'next/cache';
+import { invalidateWidgetCachesAsync } from '@/lib/cache/universal';
 
 export async function POST(
   request: NextRequest,
@@ -39,17 +41,45 @@ export async function POST(
     const pdfUrl = `/uploads/editions/${fileName}`;
 
     // Update edition with PDF URL
-    await db
+    const [updatedEdition] = await db
       .update(editions)
       .set({ pdf_url: pdfUrl })
-      .where(eq(editions.id, editionId));
+      .where(eq(editions.id, editionId))
+      .returning();
+
+    // 🚀 AUTO-CLEAR CACHE after PDF upload
+    invalidateWidgetCachesAsync();
+    
+    // Revalidate pages if edition is published
+    if (updatedEdition?.status === 'published') {
+      try {
+        revalidatePath('/', 'page');
+        revalidatePath('/epaper/display', 'page');
+        
+        if (updatedEdition.category_id) {
+          const [cat] = await db
+            .select({ alias: epaper_categories.alias })
+            .from(epaper_categories)
+            .where(eq(epaper_categories.id, updatedEdition.category_id))
+            .limit(1);
+          
+          if (cat?.alias) {
+            revalidatePath(`/epaper/category/${cat.alias}`, 'page');
+          }
+        }
+        
+        revalidatePath(`/epaper/view/${editionId}`, 'page');
+        console.log('✅ Cache cleared after PDF upload');
+      } catch (e) {
+        console.error('Failed to clear cache:', e);
+      }
+    }
 
     return NextResponse.json({
       success: true,
       data: { pdf_url: pdfUrl, file_name: file.name },
     });
   } catch (error) {
-    console.error('Upload PDF error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to upload PDF' },
       { status: 500 }

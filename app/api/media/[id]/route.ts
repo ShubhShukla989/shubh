@@ -3,8 +3,14 @@ import { db } from '@/lib/db';
 import { media_files } from '@/lib/schema/media';
 import { eq } from 'drizzle-orm';
 import { unlink } from 'fs/promises';
-import { join } from 'path';
+import { join, resolve, basename } from 'path';
 import { existsSync } from 'fs';
+
+function getUploadDir(): string {
+  return process.env.UPLOAD_DIR
+    ? resolve(process.env.UPLOAD_DIR)
+    : join(process.cwd(), 'public', 'uploads');
+}
 
 // DELETE /api/media/[id] - Delete media file
 export async function DELETE(
@@ -34,9 +40,11 @@ export async function DELETE(
     // Delete from database
     await db.delete(media_files).where(eq(media_files.id, fileId));
 
-    // Delete physical file if it exists
+    // Delete physical file using UPLOAD_DIR env var (not process.cwd())
     try {
-      const filePath = join(process.cwd(), 'public', file.file_url);
+      const uploadDir = getUploadDir();
+      const filename = basename(file.file_url); // extract just the filename
+      const filePath = join(uploadDir, filename);
       if (existsSync(filePath)) {
         await unlink(filePath);
       }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { epaper_categories } from '@/lib/schema/categories';
 import { eq, asc, and } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { invalidateCacheKeysAsync } from '@/lib/cache/universal';
 
 // Disable Next.js caching for categories
 export const dynamic = 'force-dynamic';
@@ -40,7 +42,6 @@ async function getCategoriesHandler(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Get categories error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch categories' },
       { status: 500 }
@@ -60,7 +61,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('📝 Category creation request:', body);
 
     // Simple validation - only require title
     if (!body.title || typeof body.title !== 'string' || body.title.trim().length === 0) {
@@ -106,17 +106,14 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    console.log('💾 Creating category with data:', categoryData);
-
     const [data] = await db
       .insert(epaper_categories)
       .values(categoryData)
       .returning();
 
     // Invalidate categories cache
-    // Cache invalidation removed for simplicity
-
-    console.log('✅ Category created successfully:', data);
+    invalidateCacheKeysAsync(['categories:*', 'epaper:editions-by-category:*', 'editions:latest-by-categories:*', 'layout:compiled:*']);
+    revalidatePath('/epaper', 'page');
 
     return NextResponse.json({
       success: true,
@@ -130,8 +127,6 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('❌ Create category error:', error);
-    
     // Handle unique constraint violations
     if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
       if (error.message.includes('alias')) {

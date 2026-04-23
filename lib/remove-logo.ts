@@ -36,8 +36,8 @@ export async function removeDBDLogo(imageBuffer: Buffer): Promise<Buffer> {
 
     return result;
   } catch (error) {
-    console.error('Error removing DBD logo:', error);
-    return imageBuffer; // Return original on error
+    console.error('[remove-logo] removeDBDLogo failed:', error);
+    throw error;
   }
 }
 
@@ -53,7 +53,7 @@ export async function removeDBDLogoFromBase64(base64Image: string): Promise<stri
     
     return `data:image/png;base64,${processedBuffer.toString('base64')}`;
   } catch (error) {
-    console.error('Error removing logo from base64:', error);
-    return base64Image;
+    console.error('[remove-logo] removeDBDLogoFromBase64 failed:', error);
+    throw error;
   }
 }

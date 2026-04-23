@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { editions } from '@/lib/schema';
+import { editions, edition_pages, epaper_categories } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { invalidateWidgetCaches } from '@/lib/cache/universal';
+import { revalidatePath } from 'next/cache';
 
 // Disable Next.js caching for admin panel
 export const dynamic = 'force-dynamic';
@@ -76,8 +78,38 @@ export async function PUT(
       );
     }
 
-    // Invalidate editions cache after update
-    // Cache invalidation removed for simplicity
+    // Await cache invalidation so homepage widget reflects new data immediately
+    await invalidateWidgetCaches();
+
+    // Revalidate affected pages (direct call - no HTTP overhead)
+    if (body.status === 'published' || body.is_featured) {
+      try {
+        // Use "page" type for proper route cache invalidation
+        revalidatePath('/', 'page'); // Homepage
+        revalidatePath('/epaper', 'page'); // EPaper section
+        revalidatePath('/epaper/display', 'page'); // Display page
+        
+        // Revalidate category page using alias (not ID — alias is the actual route param)
+        if (data.category_id) {
+          const [cat] = await db
+            .select({ alias: epaper_categories.alias })
+            .from(epaper_categories)
+            .where(eq(epaper_categories.id, data.category_id))
+            .limit(1);
+
+          if (cat?.alias) {
+            revalidatePath(`/epaper/category/${cat.alias}`, 'page');
+          }
+        }
+        
+        // Revalidate edition view page
+        revalidatePath(`/epaper/view/${params.id}`, 'page');
+        
+        console.log('✅ Cache revalidated for edition update');
+      } catch (e) {
+        console.error('❌ Failed to revalidate cache:', e);
+      }
+    }
 
     return NextResponse.json({ success: true, data });
   } catch (error) {
@@ -93,18 +125,25 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    await db
-      .delete(editions)
-      .where(eq(editions.id, parseInt(params.id)));
+    const editionId = parseInt(params.id);
 
-    // Invalidate editions cache after delete
-    // Cache invalidation removed for simplicity
+    // Delete pages first (no FK cascade in schema), then the edition
+    await db.delete(edition_pages).where(eq(edition_pages.edition_id, editionId));
+    await db.delete(editions).where(eq(editions.id, editionId));
+
+    // Await cache invalidation so the next request never gets stale data
+    await invalidateWidgetCaches();
+
+    revalidatePath('/', 'page');
+    revalidatePath('/epaper', 'page');
+    revalidatePath('/epaper/display', 'page');
 
     return NextResponse.json({
       success: true,
       message: 'Edition deleted successfully',
     });
   } catch (error) {
+    console.error('❌ Failed to delete edition:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete edition' },
       { status: 500 }

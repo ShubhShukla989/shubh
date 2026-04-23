@@ -45,7 +45,7 @@ export default function MediaBrowser({ isOpen, onClose, onSelect, accept = 'imag
         setFiles(result.data || []);
       }
     } catch (error) {
-      console.error('Failed to load files:', error);
+      // Silent fail - files will remain empty
     } finally {
       setLoading(false);
     }
@@ -85,7 +85,6 @@ export default function MediaBrowser({ isOpen, onClose, onSelect, accept = 'imag
         alert(`✅ File "${fileName}" uploaded and selected successfully!`);
       }
     } catch (error) {
-      console.error('Upload error:', error);
       alert('Failed to upload files');
     } finally {
       setUploading(false);
@@ -117,7 +116,6 @@ export default function MediaBrowser({ isOpen, onClose, onSelect, accept = 'imag
         setSelectedFile(null);
       }
     } catch (error) {
-      console.error('Delete error:', error);
       alert('Failed to delete file');
     } finally {
       setDeleting(null);

@@ -244,10 +244,14 @@ export default function EpaperHeader({
                 <div className="relative">
                   <button
                     onClick={() => setShowCalendar(!showCalendar)}
-                    className="px-2 md:px-4 py-1 md:py-1.5 bg-red-600 text-white hover:bg-red-700 transition-colors text-xs md:text-sm font-medium rounded"
+                    className="px-2 md:px-4 py-1 md:py-1.5 bg-red-600 text-white hover:bg-red-700 transition-colors text-xs md:text-sm font-medium rounded inline-flex items-center gap-1"
                     title="Archive"
                   >
-                    Archive
+                    {/* Better Archive SVG Icon */}
+                    <svg className="w-3 h-3 md:w-4 md:h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M20,6H16V4A2,2 0 0,0 14,2H10A2,2 0 0,0 8,4V6H4A1,1 0 0,0 3,7V8A1,1 0 0,0 4,9H5V19A3,3 0 0,0 8,22H16A3,3 0 0,0 19,19V9H20A1,1 0 0,0 21,8V7A1,1 0 0,0 20,6M10,4H14V6H10V4M17,19A1,1 0 0,1 16,20H8A1,1 0 0,1 7,19V9H17V19M9,11V17H11V11H9M13,11V17H15V11H13Z"/>
+                    </svg>
+                    <span>Archive</span>
                   </button>
                   
                   {/* Calendar Modal */}

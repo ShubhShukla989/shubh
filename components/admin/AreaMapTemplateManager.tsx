@@ -51,7 +51,7 @@ export default function AreaMapTemplateManager({
         setTemplates(JSON.parse(saved));
       }
     } catch (error) {
-      console.error('Failed to load templates:', error);
+      // Failed to load templates - silent fail
     }
   };
 
@@ -60,7 +60,6 @@ export default function AreaMapTemplateManager({
       localStorage.setItem('areaMapTemplates', JSON.stringify(newTemplates));
       setTemplates(newTemplates);
     } catch (error) {
-      console.error('Failed to save templates:', error);
       alert('Failed to save template!');
     }
   };

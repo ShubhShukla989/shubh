@@ -147,8 +147,8 @@ export const useCreateEdition = () => {
       // Add the new edition to the cache
       queryClient.setQueryData(queryKeys.edition(data.data.id), { data: data.data });
     },
-    onError: (error) => {
-      console.error('Failed to create edition:', error);
+    onError: () => {
+      // Silent fail - error handled by UI
     },
   });
 };
@@ -165,8 +165,8 @@ export const useUpdateEdition = () => {
       // Invalidate editions list to refresh
       queryClient.invalidateQueries({ queryKey: queryKeys.editions });
     },
-    onError: (error) => {
-      console.error('Failed to update edition:', error);
+    onError: () => {
+      // Silent fail - error handled by UI
     },
   });
 };
@@ -184,8 +184,8 @@ export const useDeleteEdition = () => {
       // Invalidate editions list
       queryClient.invalidateQueries({ queryKey: queryKeys.editions });
     },
-    onError: (error) => {
-      console.error('Failed to delete edition:', error);
+    onError: () => {
+      // Silent fail - error handled by UI
     },
   });
 };

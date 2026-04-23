@@ -28,10 +28,15 @@ export function FeaturedEditionsWidget({ config }: FeaturedEditionsWidgetProps) 
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/editions/featured', {
+      
+      // Add cache-busting timestamp to force fresh data
+      const timestamp = Date.now();
+      const response = await fetch(`/api/editions/featured?_t=${timestamp}`, {
         cache: 'no-store',
         headers: {
-          'Cache-Control': 'no-cache',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         },
       });
       const result = await response.json();
@@ -43,7 +48,6 @@ export function FeaturedEditionsWidget({ config }: FeaturedEditionsWidgetProps) 
         setError(result.error || 'Failed to fetch featured editions');
       }
     } catch (error) {
-      console.error('Failed to fetch featured editions:', error);
       setError('Failed to fetch featured editions');
     } finally {
       setLoading(false);
@@ -55,13 +59,18 @@ export function FeaturedEditionsWidget({ config }: FeaturedEditionsWidgetProps) 
   }, [fetchFeaturedEditions]);
 
   const getThumbnailUrl = useCallback((edition: any) => {
-    // Try to get the first page thumbnail
+    // First priority: Category image (if exists)
+    if (edition.category_image_url) {
+      return edition.category_image_url;
+    }
+    
+    // Second priority: First page thumbnail
     if (edition.pages && edition.pages.length > 0) {
       return edition.pages[0].thumb_url || edition.pages[0].image_url;
     }
     
-    // Fallback to a default thumbnail path
-    return `/media/epaper/${edition.id}/page-1-thumb.jpg`;
+    // Fallback to placeholder
+    return '/images/epaper-placeholder.svg';
   }, []);
 
   if (loading) {
@@ -103,9 +112,9 @@ export function FeaturedEditionsWidget({ config }: FeaturedEditionsWidgetProps) 
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {editions.map((edition: any) => (
-          <div key={edition.id} className="featured-edition-card bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+          <div key={edition.id} className="featured-edition-card bg-white shadow-sm relative">
             <Link href={`/epaper/view/${edition.id}`} className="block">
-              <div className="relative overflow-hidden rounded-t-lg">
+              <div className="relative overflow-hidden">
                 <Image
                   src={getThumbnailUrl(edition)}
                   alt={edition.title}
@@ -120,12 +129,12 @@ export function FeaturedEditionsWidget({ config }: FeaturedEditionsWidgetProps) 
                 />
                 
                 {/* Featured Badge */}
-                <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded text-xs font-semibold">
+                <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 text-xs font-semibold">
                   ⭐ Featured
                 </div>
               </div>
               
-              <div className="p-4">
+              <div className="px-4 pt-4 pb-5">
                 <h3 className="font-bold text-lg mb-2 text-gray-800 line-clamp-2">{edition.title}</h3>
                 
                 {config.showDate && (
@@ -141,21 +150,19 @@ export function FeaturedEditionsWidget({ config }: FeaturedEditionsWidgetProps) 
                 {config.showDescription && edition.description && (
                   <p className="text-sm text-gray-600 line-clamp-3">{edition.description}</p>
                 )}
-                
-                <div className="mt-3 text-blue-600 text-sm font-medium hover:text-blue-800">
-                  Read Edition →
-                </div>
               </div>
             </Link>
+            {/* Orange horizontal line at bottom */}
+            <div className="w-full h-1 bg-orange-500 absolute bottom-0 left-0"></div>
           </div>
         ))}
       </div>
       
       {editions.length > 0 && (
-        <div className="text-center mt-8">
+        <div className="mt-8">
           <Link 
             href="/epaper/archive" 
-            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-block px-6 py-3 bg-blue-600 text-white"
           >
             View All Editions
           </Link>

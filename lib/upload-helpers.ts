@@ -24,7 +24,6 @@ export async function uploadPDFToLocal(
 
     return { success: true, url: result.data.pdf_url };
   } catch (error) {
-    console.error('Upload error:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Upload failed' 

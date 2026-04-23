@@ -45,8 +45,8 @@ export async function hasPermission(
 
     return !!rolePermission;
   } catch (error) {
-    console.error('Permission check error:', error);
-    return false;
+    console.error('[permissions] hasPermission failed:', error);
+    throw error;
   }
 }
 
@@ -86,8 +86,8 @@ export async function getUserPermissions(
 
     return rolePermissions.map(p => p.permission_key);
   } catch (error) {
-    console.error('Get user permissions error:', error);
-    return [];
+    console.error('[permissions] getUserPermissions failed:', error);
+    throw error;
   }
 }
 
@@ -107,6 +107,7 @@ export async function isSuperAdmin(userId: number): Promise<boolean> {
 
     return user?.role_name === 'Super Admin';
   } catch (error) {
-    return false;
+    console.error('[permissions] isSuperAdmin failed:', error);
+    throw error;
   }
 }

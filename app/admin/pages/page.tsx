@@ -22,11 +22,20 @@ export default function PageManager() {
 
   const loadPages = async () => {
     try {
+      console.time('⏱️ Pages: Total Load Time');
       setLoading(true);
+      
+      console.time('⏱️ Pages: API Request');
       const response = await pageService.getPages();
+      console.timeEnd('⏱️ Pages: API Request');
+      
+      console.time('⏱️ Pages: State Update');
       setPages(response.pages || []);
+      console.timeEnd('⏱️ Pages: State Update');
+      
+      console.timeEnd('⏱️ Pages: Total Load Time');
     } catch (error) {
-      console.error('Failed to load pages:', error);
+      console.error('❌ Pages: Load Error', error);
       setPages([]); // Ensure pages is always an array
     } finally {
       setLoading(false);
@@ -42,7 +51,6 @@ export default function PageManager() {
       });
       setPages(response.pages || []);
     } catch (error) {
-      console.error('Search failed:', error);
       setPages([]); // Ensure pages is always an array
     } finally {
       setLoading(false);
@@ -61,7 +69,6 @@ export default function PageManager() {
       setPages((pages || []).filter((p) => p.id !== id));
       setDeleteConfirm(null);
     } catch (error) {
-      console.error('Delete failed:', error);
       alert('Failed to delete page');
     }
   };

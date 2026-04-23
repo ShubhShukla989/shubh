@@ -7,11 +7,16 @@ import Link from 'next/link';
 import PDFThumbnail from '@/components/PDFThumbnail';
 import SimplePDFViewer from '@/components/SimplePDFViewer';
 import ProgressModal from '@/components/admin/ProgressModal';
+import { ClientPDFExtractor } from '@/components/admin/ClientPDFExtractor';
 
 interface Page {
   id: number;
   page_number: number;
   image_url: string;
+  thumb_url?: string;
+  thumb_url_with_cache_bust?: string;
+  image_url_with_cache_bust?: string;
+  image_url_error?: string;
   file_size: string;
   category: string;
   title?: string;
@@ -49,16 +54,14 @@ export default function EditionPagesPage() {
   // Extract modal state
   const [showExtractModal, setShowExtractModal] = useState(false);
   const [extractSettings, setExtractSettings] = useState({
-    resolution: 150,
-    format: 'png',
-    jpgQuality: 90,
+    resolution: 300,
+    format: 'jpg',
+    jpgQuality: 85,
     currentPage: 1,
-    useAlternateEngine: false,
-    startPage: 1,
-    endPage: 1,
-    extractAll: false,
-    optimizationPreset: 'balanced'
   });
+
+  // Client-side extraction fallback state
+  const [showClientExtractor, setShowClientExtractor] = useState(false);
 
   // Progress modal state
   const [showProgressModal, setShowProgressModal] = useState(false);
@@ -173,15 +176,12 @@ export default function EditionPagesPage() {
     }
   };
 
-  // Extract pages from PDF using GraphicsMagick
+  // Extract pages from PDF using Ghostscript/pdftoppm (server-side), falls back to browser extraction
   const handleExtractPages = async () => {
-    if (!pdfUrl) {
-      return;
-    }
+    if (!pdfUrl) return;
 
-    // Show progress modal
     setProgressData({
-      title: 'Extracting & Optimizing Pages',
+      title: 'Extracting Pages',
       fileName: uploadedPDF?.name || 'PDF File',
       fileSize: uploadedPDF ? `${(uploadedPDF.size / (1024 * 1024)).toFixed(2)} MB` : '',
       progress: 0,
@@ -191,7 +191,7 @@ export default function EditionPagesPage() {
     setShowExtractModal(false);
 
     try {
-      setProgressData(prev => ({ ...prev, progress: 10, status: 'Processing PDF...' }));
+      setProgressData(prev => ({ ...prev, progress: 20, status: 'Extracting pages via Ghostscript...' }));
 
       const response = await fetch(`/api/editions/${editionId}/extract-pages`, {
         method: 'POST',
@@ -203,105 +203,43 @@ export default function EditionPagesPage() {
         }),
       });
 
-      setProgressData(prev => ({ ...prev, progress: 40, status: 'Extracting pages...' }));
+      setProgressData(prev => ({ ...prev, progress: 80, status: 'Saving pages...' }));
 
       const result = await response.json();
-      
-          if (result.success) {
-            setProgressData(prev => ({ ...prev, progress: 60, status: 'Optimizing images for smaller file size...' }));
-            
-            // Auto-optimize extracted pages
-            try {
-              const optimizeResponse = await fetch(`/api/editions/${editionId}/optimize-pages`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ preset: extractSettings.optimizationPreset }),
-              });
 
-              setProgressData(prev => ({ ...prev, progress: 90, status: 'Finalizing optimization...' }));
-
-              const optimizeResult = await optimizeResponse.json();
-              
-              if (optimizeResult.success) {
-                setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction & optimization complete!' }));
-                
-                setTimeout(() => {
-                  setShowProgressModal(false);
-                  // Force refresh pages and clear image cache
-                  fetchPages();
-                }, 500);
-              } else {
-                // Extraction succeeded but optimization failed
-                setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction complete, optimization skipped' }));
-                setTimeout(() => {
-                  setShowProgressModal(false);
-                  fetchPages();
-                }, 500);
-              }
-            } catch (optimizeError) {
-              // Extraction succeeded but optimization failed
-              setProgressData(prev => ({ ...prev, progress: 100, status: 'Extraction complete, optimization skipped' }));
-              setTimeout(() => {
-                setShowProgressModal(false);
-                fetchPages();
-                window.location.hash = `refresh-${Date.now()}`;
-              }, 500);
-            }
-          } else {
-            setShowProgressModal(false);
-            alert('Error: ' + (result.error || 'Failed to extract pages'));
-          }
-    } catch (error) {
-      setShowProgressModal(false);
-    }
-  };
-
-  // Optimize pages to reduce file size while maintaining quality
-  const handleOptimizePages = async () => {
-    if (pages.length === 0) {
-      return;
-    }
-
-    const validPresets = ['highQuality', 'balanced', 'compressed', 'thumbnail'];
-    const preset = 'balanced'; // Default to balanced preset
-
-    // Show progress modal
-    setProgressData({
-      title: 'Optimizing Pages',
-      fileName: `${pages.length} pages`,
-      fileSize: 'Reducing file sizes...',
-      progress: 0,
-      status: 'Starting optimization...',
-    });
-    setShowProgressModal(true);
-
-    try {
-      setProgressData(prev => ({ ...prev, progress: 20, status: 'Analyzing images...' }));
-
-      const response = await fetch(`/api/editions/${editionId}/optimize-pages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ preset }),
-      });
-
-      setProgressData(prev => ({ ...prev, progress: 60, status: 'Optimizing images...' }));
-
-      const result = await response.json();
-      
-      setProgressData(prev => ({ ...prev, progress: 90, status: 'Finalizing...' }));
-      
       if (result.success) {
-        setProgressData(prev => ({ ...prev, progress: 100, status: 'Optimization complete!' }));
-        
+        // Check if server says client-side extraction is needed (e.g. Hostinger fallback)
+        if (result.requiresClientSide) {
+          setShowProgressModal(false);
+          if (!uploadedPDF) {
+            alert('Server-side extraction not available. Please re-upload the PDF to use browser-based extraction.');
+            return;
+          }
+          setShowClientExtractor(true);
+          return;
+        }
+        setProgressData(prev => ({ ...prev, progress: 100, status: `Done! ${result.data.pageCount} pages extracted.` }));
         setTimeout(() => {
           setShowProgressModal(false);
-          fetchPages(); // Refresh the page list
-        }, 500);
+          fetchPages();
+        }, 800);
       } else {
+        // Server-side failed — activate browser fallback if PDF file is available
         setShowProgressModal(false);
+        if (uploadedPDF) {
+          setShowClientExtractor(true);
+        } else {
+          alert('Extraction failed: ' + (result.error || 'Unknown error') + '\n\nRe-upload the PDF to use browser-based extraction.');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       setShowProgressModal(false);
+      // Network/server error — try browser fallback
+      if (uploadedPDF) {
+        setShowClientExtractor(true);
+      } else {
+        alert('Extraction failed: ' + error.message + '\n\nRe-upload the PDF to use browser-based extraction.');
+      }
     }
   };
 
@@ -698,12 +636,9 @@ export default function EditionPagesPage() {
                         />
                       ) : (
                         <img
-                          src={`${page.image_url}${page.image_url.includes('?') ? '&' : '?'}v=${imageCacheKey}`}
+                          src={`${page.thumb_url || page.image_url}?v=${imageCacheKey}`}
                           alt={`Page ${page.page_number}`}
                           className="w-16 h-20 object-cover border border-gray-200 rounded"
-                          onError={(e) => {
-                            e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="64" height="80"><rect width="64" height="80" fill="%23f3f4f6"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="10">No Image</text></svg>';
-                          }}
                           key={`${page.id}-${imageCacheKey}`}
                         />
                       )}
@@ -801,7 +736,7 @@ export default function EditionPagesPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-gray-500 mb-2">
-                        Resolution
+                        Resolution (DPI)
                       </label>
                       <select
                         value={extractSettings.resolution}
@@ -816,86 +751,36 @@ export default function EditionPagesPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-500 mb-2">
-                        Optimization Preset
+                        Format
                       </label>
                       <select
-                        value={extractSettings.optimizationPreset || 'balanced'}
-                        onChange={(e) => setExtractSettings({ ...extractSettings, optimizationPreset: e.target.value })}
+                        value={extractSettings.format}
+                        onChange={(e) => setExtractSettings({ ...extractSettings, format: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                       >
-                        <option value="highQuality">Ultra High Quality (400-600KB) 🏆</option>
-                        <option value="balanced">High Quality Balanced (300-400KB) ⭐</option>
-                        <option value="compressed">Good Quality Compressed (200-300KB)</option>
-                        <option value="thumbnail">Standard Quality (100-200KB)</option>
+                        <option value="jpg">JPG (smaller size) ⭐</option>
+                        <option value="png">PNG (lossless)</option>
                       </select>
                     </div>
                   </div>
-
-                  {/* Preview Button - Updates the page view on the right */}
-                  <button
-                    onClick={() => {
-                      if (!pdfUrl) {
-                        return;
-                      }
-                      // The preview is already showing on the right side
-                      // This button just confirms the settings are applied
-                    }}
-                    className="w-full px-4 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
-                    disabled={!pdfUrl}
-                  >
-                    Preview Settings
-                  </button>
-
-                  {/* Alternate Engine Checkbox */}
-                  <label className="flex items-center gap-2">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-500 mb-2">
+                      JPG Quality: {extractSettings.jpgQuality}%
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={extractSettings.useAlternateEngine}
-                      onChange={(e) => setExtractSettings({ ...extractSettings, useAlternateEngine: e.target.checked })}
-                      className="rounded border-gray-300"
-                      disabled
+                      type="range"
+                      min="20"
+                      max="100"
+                      value={extractSettings.jpgQuality}
+                      onChange={(e) => setExtractSettings({ ...extractSettings, jpgQuality: Number(e.target.value) })}
+                      className="w-full"
+                      disabled={extractSettings.format === 'png'}
                     />
-                    <span className="text-sm text-gray-500">Use Alternate Engine for PDF to JPG Conversion (Coming Soon)</span>
-                  </label>
-
-                  {/* Start & End Page */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-500 mb-2">
-                        Start Page
-                      </label>
-                      <input
-                        type="number"
-                        value={extractSettings.startPage}
-                        onChange={(e) => setExtractSettings({ ...extractSettings, startPage: Number(e.target.value) })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                        min="1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-500 mb-2">
-                        End Page
-                      </label>
-                      <input
-                        type="number"
-                        value={extractSettings.endPage}
-                        onChange={(e) => setExtractSettings({ ...extractSettings, endPage: Number(e.target.value) })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                        min="1"
-                      />
+                    <div className="flex justify-between text-xs text-gray-400 mt-1">
+                      <span>20% (smaller)</span>
+                      <span>100% (best quality)</span>
                     </div>
                   </div>
-
-                  {/* Extract All Pages Checkbox */}
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={extractSettings.extractAll}
-                      onChange={(e) => setExtractSettings({ ...extractSettings, extractAll: e.target.checked })}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-sm font-semibold text-gray-500">Extract All Pages (Maximum 30 Pages)</span>
-                  </label>
 
                   {/* Extract & Optimize Button */}
                   <button
@@ -1096,15 +981,11 @@ export default function EditionPagesPage() {
                   Page Preview
                 </label>
                 <div className="border border-gray-200 rounded p-4 bg-gray-50">
-                  {editingPage.image_url ? (
+                  {editingPage.thumb_url_with_cache_bust || editingPage.thumb_url || editingPage.image_url ? (
                     <img
-                      src={`${editingPage.image_url}${editingPage.image_url.includes('?') ? '&' : '?'}v=${imageCacheKey}`}
+                      src={editingPage.thumb_url_with_cache_bust || editingPage.thumb_url || editingPage.image_url}
                       alt={`Page ${editingPage.page_number}`}
                       className="w-32 h-40 object-cover border border-gray-300 rounded mx-auto"
-                      onError={(e) => {
-                        e.currentTarget.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="128" height="160"><rect width="128" height="160" fill="%23f3f4f6"/><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%239ca3af" font-size="12">No Image</text></svg>';
-                      }}
-                      key={`edit-${editingPage.id}-${imageCacheKey}`}
                     />
                   ) : (
                     <div className="w-32 h-40 bg-gray-200 flex items-center justify-center mx-auto rounded">
@@ -1211,6 +1092,40 @@ export default function EditionPagesPage() {
         onCancel={() => setShowProgressModal(false)}
         showCancel={progressData.progress < 100}
       />
+
+      {/* Browser-based fallback extraction */}
+      {showClientExtractor && uploadedPDF && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md shadow-lg">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-700">Browser-Based Extraction</h3>
+              <button
+                onClick={() => setShowClientExtractor(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-500 mb-4">
+                Server-side extraction unavailable. Extracting pages directly in your browser.
+              </p>
+              <ClientPDFExtractor
+                editionId={parseInt(editionId)}
+                pdfFile={uploadedPDF}
+                onComplete={(extractedPages) => {
+                  setShowClientExtractor(false);
+                  fetchPages();
+                }}
+                onError={(error) => {
+                  setShowClientExtractor(false);
+                  alert('Browser extraction failed: ' + error);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

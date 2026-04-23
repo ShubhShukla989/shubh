@@ -1,0 +1,135 @@
+{
+  "exportedAt": "2026-03-22T16:59:18.475Z",
+  "database": "./database/epapercms.db",
+  "tables": [
+    {
+      "table": "active_sessions",
+      "rows": 72
+    },
+    {
+      "table": "admin_notes",
+      "rows": 1
+    },
+    {
+      "table": "area_map_watermark_settings",
+      "rows": 1
+    },
+    {
+      "table": "area_maps",
+      "rows": 36
+    },
+    {
+      "table": "audit_logs",
+      "rows": 0
+    },
+    {
+      "table": "categories",
+      "rows": 0
+    },
+    {
+      "table": "category_watermark_settings",
+      "rows": 1
+    },
+    {
+      "table": "daily_stats",
+      "rows": 11
+    },
+    {
+      "table": "edition_pages",
+      "rows": 40
+    },
+    {
+      "table": "editions",
+      "rows": 5
+    },
+    {
+      "table": "epaper_categories",
+      "rows": 2
+    },
+    {
+      "table": "epaper_clips",
+      "rows": 220
+    },
+    {
+      "table": "epaper_settings",
+      "rows": 1
+    },
+    {
+      "table": "layout_backups",
+      "rows": 197
+    },
+    {
+      "table": "layouts",
+      "rows": 7
+    },
+    {
+      "table": "media_file_tags",
+      "rows": 0
+    },
+    {
+      "table": "media_files",
+      "rows": 7
+    },
+    {
+      "table": "media_tags",
+      "rows": 0
+    },
+    {
+      "table": "menu_items",
+      "rows": 2
+    },
+    {
+      "table": "menus",
+      "rows": 1
+    },
+    {
+      "table": "otp_attempts",
+      "rows": 1
+    },
+    {
+      "table": "page_views",
+      "rows": 563
+    },
+    {
+      "table": "pages",
+      "rows": 1
+    },
+    {
+      "table": "password_reset_otps",
+      "rows": 1
+    },
+    {
+      "table": "permissions",
+      "rows": 21
+    },
+    {
+      "table": "role_permissions",
+      "rows": 21
+    },
+    {
+      "table": "roles",
+      "rows": 4
+    },
+    {
+      "table": "settings",
+      "rows": 6
+    },
+    {
+      "table": "site_settings",
+      "rows": 4
+    },
+    {
+      "table": "sliders",
+      "rows": 0
+    },
+    {
+      "table": "slides",
+      "rows": 0
+    },
+    {
+      "table": "users",
+      "rows": 2
+    }
+  ],
+  "totalRows": 1228
+}

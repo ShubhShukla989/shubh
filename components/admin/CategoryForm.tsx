@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
+import MediaBrowser from '@/components/page-manager/MediaBrowser';
 
 interface CategoryFormData {
   title: string;
@@ -37,6 +38,7 @@ export default function CategoryForm({
   const [activeTab, setActiveTab] = useState('basic');
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showMediaBrowser, setShowMediaBrowser] = useState(false);
 
   const [formData, setFormData] = useState<CategoryFormData>({
     title: '',
@@ -103,11 +105,19 @@ export default function CategoryForm({
         alert('Failed to upload image');
       }
     } catch (error) {
-      console.error('Upload error:', error);
       alert('Failed to upload image');
     } finally {
       setUploading(false);
     }
+  };
+
+  const openMediaBrowser = () => {
+    setShowMediaBrowser(true);
+  };
+
+  const handleMediaSelect = (url: string) => {
+    setFormData(prev => ({ ...prev, image_url: url }));
+    setShowMediaBrowser(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -116,8 +126,6 @@ export default function CategoryForm({
 
     try {
       await onSubmit(formData);
-    } catch (error) {
-      console.error('Submit error:', error);
     } finally {
       setSubmitting(false);
     }
@@ -236,16 +244,31 @@ export default function CategoryForm({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Category Image
                   </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    disabled={uploading}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                  />
-                  {uploading && <p className="text-sm text-blue-600 mt-1">Uploading...</p>}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={openMediaBrowser}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Browse Media
+                    </button>
+                    <label className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 cursor-pointer transition-colors flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                      {uploading ? 'Uploading...' : 'Upload New'}
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Browse existing media or upload a new image
+                  </p>
                   {formData.image_url && (
-                    <div className="mt-2">
+                    <div className="mt-3">
                       <img
                         src={formData.image_url}
                         alt="Category"
@@ -417,6 +440,14 @@ export default function CategoryForm({
           </Link>
         </div>
       </form>
+
+      {/* Media Browser Modal */}
+      <MediaBrowser
+        isOpen={showMediaBrowser}
+        onClose={() => setShowMediaBrowser(false)}
+        onSelect={handleMediaSelect}
+        accept="image/*"
+      />
     </div>
   );
 }

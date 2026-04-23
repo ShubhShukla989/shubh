@@ -1,7 +1,7 @@
-import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
+import { pgTable, serial, integer, text, boolean } from 'drizzle-orm/pg-core';
 
-export const categories = sqliteTable('categories', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const categories = pgTable('categories', {
+  id: serial('id').primaryKey(),
   name: text('name').notNull(),
   alias: text('alias'),
   status: text('status').default('active'),
@@ -10,8 +10,8 @@ export const categories = sqliteTable('categories', {
   created_at: text('created_at').default('CURRENT_TIMESTAMP'),
 });
 
-export const epaper_categories = sqliteTable('epaper_categories', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const epaper_categories = pgTable('epaper_categories', {
+  id: serial('id').primaryKey(),
   title: text('title').notNull(),
   alias: text('alias').notNull().unique(),
   description: text('description'),
@@ -21,8 +21,8 @@ export const epaper_categories = sqliteTable('epaper_categories', {
   meta_description: text('meta_description'),
   meta_keywords: text('meta_keywords'),
   robots: text('robots').default('index, follow'),
-  is_active: integer('is_active', { mode: 'boolean' }).default(true),
-  is_featured: integer('is_featured', { mode: 'boolean' }).default(false),
+  is_active: boolean('is_active').default(true),
+  is_featured: boolean('is_featured').default(false),
   display_order: integer('display_order').default(0),
   created_at: text('created_at').default('CURRENT_TIMESTAMP'),
   updated_at: text('updated_at').default('CURRENT_TIMESTAMP'),

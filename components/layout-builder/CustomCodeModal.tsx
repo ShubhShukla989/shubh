@@ -21,7 +21,7 @@ export function CustomCodeModal({ css, js, onCssChange, onJsChange, onClose }: C
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[150] p-4">
       <div className="bg-white rounded shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-white px-4 py-3 border-b flex justify-between items-center">

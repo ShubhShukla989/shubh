@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Force dynamic — disable Next.js data cache for this route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // GET /api/media - Get all media files
 export async function GET() {
   try {
-    // During build time, return empty data to prevent build failures
-    if (process.env.SKIP_BUILD_STATIC_GENERATION === 'true') {
-      return NextResponse.json({
-        success: true,
-        data: []
-      });
-    }
-
     const { db } = await import('@/lib/db');
     const { media_files } = await import('@/lib/schema/media');
     const { desc } = await import('drizzle-orm');

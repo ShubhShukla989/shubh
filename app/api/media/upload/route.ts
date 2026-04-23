@@ -2,8 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { media_files } from '@/lib/schema/media';
 import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { existsSync } from 'fs';
+
+// Resolve upload directory — use absolute UPLOAD_DIR env var in production
+// to avoid process.cwd() pointing to .next/standalone/ instead of project root
+function getUploadDir(): string {
+  if (process.env.UPLOAD_DIR) {
+    return resolve(process.env.UPLOAD_DIR);
+  }
+  // Fallback: walk up from __dirname to find the project root's public/uploads
+  // In standalone mode __dirname is .next/standalone/app/api/media/upload/
+  // We need to go up enough levels to reach the actual public/ folder
+  return join(process.cwd(), 'public', 'uploads');
+}
 
 // POST /api/media/upload - Upload media files
 export async function POST(request: NextRequest) {
@@ -26,10 +38,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Ensure upload directory exists
-    const uploadDir = join(process.cwd(), 'public', 'uploads');
+    const uploadDir = getUploadDir();
     if (!existsSync(uploadDir)) {
       await mkdir(uploadDir, { recursive: true });
     }
+    console.log(`📂 Upload directory: ${uploadDir}`);
 
     const uploadedFiles = [];
 

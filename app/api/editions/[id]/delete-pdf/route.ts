@@ -76,12 +76,10 @@ export async function DELETE(
         try {
           await unlink(filePath);
           fileDeleted = true;
-          console.log(`PDF deleted successfully from: ${filePath}`);
           break; // Stop after successful deletion
         } catch (unlinkError: any) {
           // If unlink fails, log but don't throw
           if (unlinkError.code !== 'ENOENT') {
-            console.warn(`Failed to delete file at ${filePath}:`, unlinkError.message);
             lastError = unlinkError;
           }
           continue; // Try next path
@@ -89,19 +87,13 @@ export async function DELETE(
       } catch (error: any) {
         // Catch any other unexpected errors
         if (error.code !== 'ENOENT') {
-          console.warn(`Unexpected error at ${filePath}:`, error.message);
           lastError = error;
         }
         continue; // Try next path
       }
     }
 
-    // If file not found in any location, just log warning (don't throw error)
-    if (!fileDeleted) {
-      console.log(`PDF file not found in any expected location. Database reference will still be cleared.`);
-      // Don't throw error - just continue to clear database reference
-    }
-
+    // If file not found in any location, continue to clear database reference
     // Update edition to remove PDF URL
     await db
       .update(editions)
@@ -113,9 +105,6 @@ export async function DELETE(
       message: fileDeleted ? 'PDF deleted successfully' : 'PDF reference removed (file was not found)',
     });
   } catch (error: any) {
-    // Only log unexpected errors, but still clear database reference
-    console.error('Unexpected error in delete PDF:', error);
-    
     // Try to clear database reference even if file deletion failed
     try {
       await db
@@ -123,7 +112,7 @@ export async function DELETE(
         .set({ pdf_url: null })
         .where(eq(editions.id, parseInt(params.id)));
     } catch (dbError) {
-      console.error('Failed to clear database reference:', dbError);
+      // Silent fail - database error
     }
     
     // Return success anyway - database reference cleared

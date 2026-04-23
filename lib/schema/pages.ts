@@ -1,7 +1,7 @@
-import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
+import { pgTable, serial, integer, text } from 'drizzle-orm/pg-core';
 
-export const pages = sqliteTable('pages', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const pages = pgTable('pages', {
+  id: serial('id').primaryKey(),
   title: text('title').notNull(),
   alias: text('alias').notNull().unique(),
   description: text('description'),
@@ -20,19 +20,19 @@ export const pages = sqliteTable('pages', {
   updated_at: text('updated_at').default('CURRENT_TIMESTAMP'),
 });
 
-export const menus = sqliteTable('menus', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const menus = pgTable('menus', {
+  id: serial('id').primaryKey(),
   name: text('name').notNull(),
   location: text('location'),
-  items: text('items').default('[]'), // jsonb stored as text
+  items: text('items').default('[]'),
   status: text('status').default('Active'),
   created_at: text('created_at').default('CURRENT_TIMESTAMP'),
   updated_at: text('updated_at').default('CURRENT_TIMESTAMP'),
   alias: text('alias').unique(),
 });
 
-export const menu_items = sqliteTable('menu_items', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const menu_items = pgTable('menu_items', {
+  id: serial('id').primaryKey(),
   menu_id: integer('menu_id').notNull(),
   title: text('title').notNull(),
   type: text('type').notNull(),

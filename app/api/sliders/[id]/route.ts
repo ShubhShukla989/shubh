@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sliders, slides } from '@/lib/schema';
 import { eq, asc } from 'drizzle-orm';
+import { invalidateWidgetCachesAsync } from '@/lib/cache/universal';
 
 /**
  * GET /api/sliders/[id]
@@ -74,6 +75,9 @@ export async function PUT(
       );
     }
 
+    // 🚀 UNIVERSAL CACHE INVALIDATION (Production Safe - Async)
+    invalidateWidgetCachesAsync();
+
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error in PUT /api/sliders/[id]:', error);
@@ -102,6 +106,9 @@ export async function DELETE(
     await db
       .delete(sliders)
       .where(eq(sliders.id, parseInt(params.id)));
+
+    // 🚀 UNIVERSAL CACHE INVALIDATION (Production Safe - Async)
+    invalidateWidgetCachesAsync();
 
     return NextResponse.json({ success: true });
   } catch (error) {

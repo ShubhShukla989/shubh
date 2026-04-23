@@ -18,7 +18,6 @@ export async function GET(
 
     return NextResponse.json({ success: true, data: data || [] });
   } catch (error) {
-    console.error('Get role permissions error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch role permissions' },
       { status: 500 }
@@ -54,7 +53,6 @@ export async function POST(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Update role permissions error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update role permissions' },
       { status: 500 }

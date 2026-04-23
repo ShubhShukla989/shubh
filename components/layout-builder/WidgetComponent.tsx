@@ -53,43 +53,8 @@ export function WidgetComponent({ widget, onEdit, onDelete, onDuplicate, onDragS
   };
 
   const getWidgetColor = () => {
-    switch (widget.type) {
-      case 'ticker': return 'bg-cyan-500';
-      case 'social': return 'bg-blue-500';
-      case 'image': return 'bg-teal-500';
-      case 'text': return 'bg-purple-500';
-      case 'button': return 'bg-green-500';
-      case 'menu': return 'bg-orange-500';
-      case 'embed': return 'bg-pink-500';
-      case 'html': return 'bg-indigo-500';
-      case 'navigation': return 'bg-blue-600';
-      case 'slideshow': return 'bg-purple-600';
-      case 'tinymce': return 'bg-yellow-500';
-      case 'page-content': return 'bg-gray-600';
-      case 'infobox': return 'bg-cyan-600';
-      case 'cards': return 'bg-pink-600';
-      case 'heading': return 'bg-red-500';
-      case 'video': return 'bg-red-600';
-      case 'audio': return 'bg-green-600';
-      case 'datetime': return 'bg-blue-700';
-      case 'reusable': return 'bg-purple-700';
-      case 'epaper-category': return 'bg-orange-600';
-      case 'epaper-gallery': return 'bg-teal-600';
-      case 'epaper-featured': return 'bg-cyan-700';
-      case 'featured-editions': return 'bg-green-700';
-      case 'epaper-archive': return 'bg-purple-800';
-      case 'epaper-calendar': return 'bg-green-700';
-      case 'epaper-pagination': return 'bg-blue-800';
-      case 'epaper-pdf-download': return 'bg-red-800';
-      case 'epaper-thumb-navigation': return 'bg-yellow-700';
-      case 'epaper-clip-share': return 'bg-pink-700';
-      case 'epaper-display': return 'bg-slate-800';
-      case 'epaper-area-map': return 'bg-amber-700';
-      case 'page-download': return 'bg-red-600';
-      case 'youtube': return 'bg-red-700';
-      case 'rss': return 'bg-orange-700';
-      default: return 'bg-gray-500';
-    }
+    // Professional color scheme: Only Blue for all widgets
+    return 'bg-blue-600';
   };
 
   return (
@@ -116,7 +81,7 @@ export function WidgetComponent({ widget, onEdit, onDelete, onDuplicate, onDragS
             e.stopPropagation();
             onDuplicate();
           }}
-          className="p-1 bg-gray-500 text-white rounded hover:bg-gray-600 shadow-sm transition-all"
+          className="w-6 h-6 bg-gray-500 text-white hover:bg-gray-600 shadow-sm transition-all flex items-center justify-center"
           title="Duplicate"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,7 +93,7 @@ export function WidgetComponent({ widget, onEdit, onDelete, onDuplicate, onDragS
             e.stopPropagation();
             onEdit();
           }}
-          className="p-1 bg-green-500 text-white rounded hover:bg-green-600 shadow-sm transition-all"
+          className="w-6 h-6 bg-green-500 text-white hover:bg-green-600 shadow-sm transition-all flex items-center justify-center"
           title="Edit"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -140,7 +105,7 @@ export function WidgetComponent({ widget, onEdit, onDelete, onDuplicate, onDragS
             e.stopPropagation();
             onDelete();
           }}
-          className="p-1 bg-red-500 text-white rounded hover:bg-red-600 shadow-sm transition-all"
+          className="w-6 h-6 bg-red-500 text-white hover:bg-red-600 shadow-sm transition-all flex items-center justify-center"
           title="Delete"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

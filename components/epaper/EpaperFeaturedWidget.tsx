@@ -21,8 +21,6 @@ interface EpaperFeaturedWidgetProps {
     categoryNamePosition?: string;
     datePosition?: string;
     backButtonText?: string;
-    shareIconPosition?: string;
-    shareIconSize?: number;
     linkTo?: string;
     cssClasses?: string;
     style?: string;
@@ -50,9 +48,11 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const categoryTreeKey = JSON.stringify(config.categoryTree);
+
   useEffect(() => {
     fetchCategoriesData();
-  }, [config.categoryTree]);
+  }, [categoryTreeKey]);
 
   const fetchCategoriesData = async () => {
     if (!config.categoryTree || config.categoryTree.length === 0) {
@@ -61,37 +61,25 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     }
 
     try {
-      // Get all category IDs from tree (including nested)
       const categoryIds = getAllCategoryIds(config.categoryTree);
 
-      // Fetch category details
-      const categoriesResponse = await fetch('/api/epaper/categories');
-      const categoriesResult = await categoriesResponse.json();
-      
+      // Fetch category details and latest editions in parallel
+      const [categoriesResult, editionsResult] = await Promise.all([
+        fetch('/api/epaper/categories').then(r => r.json()),
+        fetch(`/api/editions/latest-by-categories?ids=${categoryIds.join(',')}`).then(r => r.json()),
+      ]);
+
       if (categoriesResult.success) {
         const allCategories = categoriesResult.data || [];
-        const filteredCategories = allCategories.filter((cat: any) => 
-          categoryIds.includes(cat.id)
-        );
-        setCategories(filteredCategories);
+        setCategories(allCategories.filter((cat: any) => categoryIds.includes(cat.id)));
+      }
 
-        // Fetch latest edition for each category
-        const editionsMap: { [key: number]: any } = {};
-        for (const catId of categoryIds) {
-          try {
-            const editionResponse = await fetch(`/api/editions?category_id=${catId}&limit=1&status=published`);
-            const editionResult = await editionResponse.json();
-            if (editionResult.success && editionResult.data && editionResult.data.length > 0) {
-              editionsMap[catId] = editionResult.data[0];
-            }
-          } catch (error) {
-            console.error(`Failed to fetch edition for category ${catId}:`, error);
-          }
-        }
-        setLatestEditions(editionsMap);
+      if (editionsResult.success) {
+        // API returns { categoryId: edition } map
+        setLatestEditions(editionsResult.data || {});
       }
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      // Failed to fetch
     } finally {
       setLoading(false);
     }
@@ -112,20 +100,11 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     return categories.find(cat => cat.id === categoryId);
   };
 
-  const getCategoryThumbnail = (categoryId: number) => {
-    const category = getCategoryData(categoryId);
-    
-    // First priority: Category image
-    if (category && category.image_url) {
-      return category.image_url;
-    }
-    
-    // Fallback: Edition thumbnail
+  const getCategoryThumbnail = (categoryId: number): string | null => {
     const edition = latestEditions[categoryId];
-    if (edition && edition.pages && edition.pages.length > 0) {
-      return edition.pages[0].thumbnail_url || edition.pages[0].image_url;
+    if (edition?.pages?.[0]?.thumb_url) {
+      return edition.pages[0].thumb_url;
     }
-    
     return null;
   };
 
@@ -185,16 +164,9 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     const cropThumbnails = config.cropThumbnails !== 'no';
     const categoryNamePosition = config.categoryNamePosition || 'bottom';
     const datePosition = config.datePosition || 'none';
-    const shareIconPosition = config.shareIconPosition || 'none';
-    const shareIconSize = config.shareIconSize || 20;
 
     if (!category) return null;
 
-    // Calculate border styles for seamless connection
-    const isRightEdge = (index + 1) % perRow === 0;
-    const isBottomEdge = index >= totalCount - perRow;
-
-    // Always show full category title - no name extraction
     const displayTitle = category.title;
 
     const handleClick = (e: React.MouseEvent) => {
@@ -208,15 +180,15 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     return (
       <div 
         key={node.id} 
-        className="featured-category-item bg-white border-4 border-gray-800 shadow-xl hover:shadow-2xl hover:border-blue-600 transition-all cursor-pointer transform hover:scale-105"
+        className="featured-category-item bg-white shadow-xl cursor-pointer relative"
         style={{ 
           marginLeft: level > 0 ? '20px' : '0',
           width: isMobile ? '100%' : `${thumbnailWidth}px`,
-          height: `${thumbnailHeight}px`, // Fixed height for both mobile and desktop
-          borderRadius: '12px',
+          height: `${thumbnailHeight}px`,
+          borderRadius: '0px',
           overflow: 'hidden',
           maxWidth: isMobile ? '350px' : 'none',
-          margin: isMobile ? '0 auto' : '0', // Center on mobile
+          margin: '0',
         }}
         onClick={handleClick}
       >
@@ -254,58 +226,11 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
                 {new Date(edition.date).toLocaleDateString()}
               </div>
             )}
-
-            {/* Share Icon */}
-            {shareIconPosition !== 'none' && (
-              <button
-                className={`absolute bg-white/90 hover:bg-white rounded-full p-2 shadow-md transition-all ${
-                  shareIconPosition === 'top-left' ? 'top-2 left-2' :
-                  shareIconPosition === 'top-right' ? 'top-2 right-2' :
-                  shareIconPosition === 'bottom-left' ? 'bottom-2 left-2' :
-                  'bottom-2 right-2'
-                }`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (navigator.share) {
-                    navigator.share({
-                      title: category.title,
-                      url: window.location.origin + getLinkUrl(node.id),
-                    });
-                  }
-                }}
-              >
-                <svg 
-                  width={shareIconSize} 
-                  height={shareIconSize} 
-                  fill="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
-                </svg>
-              </button>
-            )}
           </div>
 
           {/* Category Name Top */}
           {categoryNamePosition === 'top' && (
-            <h3 className="font-bold text-lg mb-2 text-gray-800">{category.title}</h3>
-          )}
-
-          {/* Category Name Bottom */}
-          {categoryNamePosition === 'bottom' && (
-            <div className="absolute bottom-0 left-0 right-0 bg-white p-3 border-t-4 border-gray-800">
-              <h3 className="font-bold text-sm text-gray-800 text-center leading-tight">{displayTitle}</h3>
-              {datePosition === 'bottom' && edition && (
-                <p className="text-xs text-gray-500 text-center mt-1">
-                  {new Date(edition.date).toLocaleDateString()}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Category Name Top */}
-          {categoryNamePosition === 'top' && (
-            <div className="absolute top-0 left-0 right-0 bg-white p-3 border-b-4 border-gray-800">
+            <div className="absolute top-0 left-0 right-0 bg-white p-3">
               <h3 className="font-bold text-sm text-gray-800 text-center">{displayTitle}</h3>
               {datePosition === 'top' && edition && (
                 <p className="text-xs text-gray-500 text-center mt-1">
@@ -315,6 +240,30 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
             </div>
           )}
         </Link>
+
+        {/* Category Name Bottom */}
+        {categoryNamePosition === 'bottom' && (
+          <div className="absolute bottom-1 left-0 right-0 bg-white p-2" style={{ zIndex: 1 }}>
+            <h3 className="font-bold text-sm text-gray-800 text-center">{displayTitle}</h3>
+            {datePosition === 'bottom' && edition && (
+              <p className="text-xs text-gray-500 text-center mt-1">
+                {new Date(edition.date).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Date Bottom (when category is none but date is bottom) */}
+        {categoryNamePosition !== 'bottom' && datePosition === 'bottom' && edition && (
+          <div className="absolute bottom-1 left-0 right-0 bg-white px-2 py-1" style={{ zIndex: 1 }}>
+            <p className="text-xs text-gray-500 text-center">
+              {new Date(edition.date).toLocaleDateString()}
+            </p>
+          </div>
+        )}
+
+        {/* Orange horizontal line at bottom */}
+        <div className="w-full h-1 bg-orange-500 absolute bottom-0 left-0" style={{ zIndex: 2 }}></div>
 
         {/* Render Children - Only if showChildren is true */}
         {showChildren && node.children && node.children.length > 0 && (
@@ -330,7 +279,7 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
     return (
       <div className={`epaper-featured-widget ${config.cssClasses || ''}`} style={parseInlineStyle(config.style)}>
         {config.title && <h2 className="text-2xl font-bold mb-6">{config.title}</h2>}
-        <div className="text-center py-8 text-gray-500">Loading categories...</div>
+        {/* Loading removed - content will appear directly */}
       </div>
     );
   }
@@ -354,47 +303,31 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
   const maxColumns = isMobile ? 1 : perRowCount;
   const actualColumns = Math.min(actualCategoriesCount, maxColumns);
   
-  // Calculate container width based on actual content - Mobile responsive
   const thumbnailWidth = isMobile ? 350 : (config.thumbnailWidth || 180);
-  const gap = 12;
-  const padding = isMobile ? 16 : 32; // Less padding on mobile
-  const containerWidth = isMobile 
-    ? '100%' // Full width on mobile
-    : `${(thumbnailWidth * actualColumns) + (gap * (actualColumns - 1)) + padding}px`;
 
   return (
-    <div className={`epaper-featured-widget ${config.cssClasses || ''}`} style={{...parseInlineStyle(config.style), width: '100%', maxWidth: '100%', overflow: 'hidden'}}>
+    <div className={`epaper-featured-widget`} style={{width: '100%', maxWidth: '100%', overflow: 'hidden', paddingTop: '16px', paddingBottom: '16px'}}>
       {config.title && <h2 className="text-2xl font-bold mb-6">{config.title}</h2>}
       
       {/* Back Button - Show only in cities view */}
       {currentView === 'cities' && (
-        <div className="mb-4">
+        <div className="my-6">
           <button
             onClick={handleBackClick}
-            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-red-500 text-white rounded"
+            style={{ width: '8%', minWidth: '80px' }}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
             {config.backButtonText || 'Back'}
           </button>
         </div>
       )}
       
-      <div className={isMobile ? "px-4" : "flex justify-center"}>
-        <div 
-          className={`bg-gray-50 rounded-lg ${isMobile ? 'p-3' : 'p-4'}`}
-          style={{
-            width: containerWidth,
-            height: 'fit-content',
-            maxWidth: isMobile ? '100%' : 'none',
-            overflow: 'hidden',
-            boxSizing: 'border-box',
-          }}
-        >
+      <div className={`${isMobile ? "px-4" : ""} ${config.cssClasses || ''}`} style={{width: '100%', ...parseInlineStyle(config.style)}}>
           <div 
-            className={isMobile ? "flex flex-col space-y-4" : "grid"}
-            style={isMobile ? {} : {
+            className={isMobile ? "flex flex-col" : "grid"}
+            style={isMobile ? {
+              gap: '5px'
+            } : {
               gridTemplateColumns: `repeat(${actualColumns}, 1fr)`,
               gap: '12px',
             }}
@@ -411,7 +344,6 @@ export function EpaperFeaturedWidget({ config }: EpaperFeaturedWidgetProps) {
               )
             )}
           </div>
-        </div>
       </div>
     </div>
   );

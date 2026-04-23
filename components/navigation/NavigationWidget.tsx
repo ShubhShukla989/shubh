@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -23,329 +24,286 @@ interface NavigationWidgetProps {
   };
 }
 
+const NAV_HEIGHT = 56;
+
 export function NavigationWidget({ config }: NavigationWidgetProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
-  const [isMounted, setIsMounted] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-
+  const bg = config.backgroundColor || '#000000';
+  const textColor = config.textColor || '#ffffff';
 
   useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 992);
+    check();
+    window.addEventListener('resize', check);
     setIsMounted(true);
+    return () => window.removeEventListener('resize', check);
   }, []);
 
   useEffect(() => {
-    // Lock body scroll when sidebar is open
-    if (isMenuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-
-    // Cleanup on unmount
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [isMenuOpen]);
+    if (!isMounted) return;
+    document.body.style.overflow = isMenuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isMenuOpen, isMounted]);
 
   useEffect(() => {
-    if (config.menuId) {
-      fetchMenuItems();
-    } else {
-      setMenuItems([]);
-    }
+    if (config.menuId) fetchMenuItems();
+    else setMenuItems([]);
   }, [config.menuId]);
 
   const fetchMenuItems = async () => {
     try {
-      // Use the correct menu items API endpoint
-      const response = await fetch(`/api/menu/${config.menuId}/items`);
-      const menuItems = await response.json();
-      
-      if (Array.isArray(menuItems) && menuItems.length > 0) {
-        // Convert database menu items to our format
-        const formattedItems = menuItems.map(item => {
-          let url = '#';
-          
-          // Handle different menu item types
-          if (item.type === 'external' && item.url) {
-            url = item.url;
-          } else if (item.type === 'page' && item.pages) {
-            // Use page alias instead of ID
-            url = `/epaper/page/${item.pages.alias}`;
-          } else if (item.type === 'epaper_category' && item.category_id) {
-            url = `/category/${item.category_id}`; // Adjust based on your category routing
-          }
-          
-          return {
-            id: item.id.toString(),
-            title: item.title,
-            url: url,
-            children: [] // For now, no nested items
-          };
-        });
-        setMenuItems(formattedItems);
-      } else {
-        setMenuItems([]);
-      }
-    } catch (error) {
-      console.error('Failed to fetch menu items:', error);
+      const res = await fetch(`/api/menu/${config.menuId}/items`);
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) return setMenuItems([]);
+      setMenuItems(data.map((item: any) => {
+        let url = '#';
+        if (item.type === 'external' && item.url) url = item.url;
+        else if (item.type === 'page' && item.pages) url = `/epaper/page/${item.pages.alias}`;
+        else if (item.type === 'epaper_category' && item.category_id) url = `/category/${item.category_id}`;
+        return { id: item.id.toString(), title: item.title, url, children: [] };
+      }));
+    } catch {
       setMenuItems([]);
     }
   };
 
-  const toggleDropdown = (menuId: string) => {
-    const newOpenDropdowns = new Set(openDropdowns);
-    if (newOpenDropdowns.has(menuId)) {
-      newOpenDropdowns.delete(menuId);
-    } else {
-      newOpenDropdowns.add(menuId);
-    }
-    setOpenDropdowns(newOpenDropdowns);
+  const stripHtml = (html: string) =>
+    html.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]*>/g, '');
+
+  const navStyle: React.CSSProperties = {
+    backgroundColor: bg,
+    width: '100%',
+    height: `${NAV_HEIGHT}px`,
+    display: 'flex',
+    alignItems: 'center',
+    position: 'relative',
+    boxSizing: 'border-box',
+    padding: '0 12px',
+    ...parseInlineStyle(config.style),
   };
 
-  const renderMenuItem = (item: MenuItem, isMobile: boolean = false) => {
-    const hasChildren = item.children && item.children.length > 0;
-
-    if (isMobile) {
-      // Mobile accordion style
-      return (
-        <div key={item.id} className="nav-item">
-          <div className="d-flex align-items-center">
-            <Link
-              href={item.url}
-              className="nav-link flex-grow-1"
-              style={{ color: config.textColor }}
-              onClick={() => !hasChildren && setIsMenuOpen(false)}
-              dangerouslySetInnerHTML={{ __html: item.title }}
-            >
-            </Link>
-            {hasChildren && (
-              <button
-                className="btn btn-sm"
-                onClick={() => toggleDropdown(item.id)}
-                style={{ color: config.textColor }}
-              >
-                {openDropdowns.has(item.id) ? '▼' : '▶'}
-              </button>
-            )}
-          </div>
-          {hasChildren && openDropdowns.has(item.id) && (
-            <div className="ms-3 mt-2">
-              {item.children.map(child => renderMenuItem(child, true))}
-            </div>
-          )}
-        </div>
-      );
-    } else {
-      // Desktop dropdown style
-      if (hasChildren) {
-        return (
-          <div key={item.id} className="nav-item dropdown">
-            <a
-              className="nav-link dropdown-toggle"
-              href="#"
-              role="button"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-              style={{ color: config.textColor }}
-              dangerouslySetInnerHTML={{ __html: item.title }}
-            >
-            </a>
-            <ul className="dropdown-menu">
-              {item.children.map(child => (
-                <li key={child.id}>
-                  <Link className="dropdown-item" href={child.url} dangerouslySetInnerHTML={{ __html: child.title }}>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        );
-      } else {
-        return (
-          <div key={item.id} className="nav-item">
-            <Link
-              className="nav-link"
-              href={item.url}
-              style={{ color: config.textColor }}
-              dangerouslySetInnerHTML={{ __html: item.title }}
-            >
-            </Link>
-          </div>
-        );
-      }
-    }
-  };
-
-  const shouldShowLogo = () => {
-    if (!config.logoUrl || !isMounted) return false;
-    
-    switch (config.logoStatus) {
-      case 'hide-desktop':
-        return window.innerWidth < 992; // Show only on mobile
-      case 'hide-mobile':
-        return window.innerWidth >= 992; // Show only on desktop
-      case 'display-both':
-      default:
-        return true; // Show on both
-    }
-  };
-
+  // Always render the full nav — use CSS to show/hide parts
+  // Never return null or a different element — this prevents layout shift
   return (
-    <nav 
-      className={`navbar ${config.cssClasses || 'navbar-expand-lg'}`}
-      style={{
-        backgroundColor: config.backgroundColor || '#000000',
-        ...parseInlineStyle(config.style)
-      }}
-    >
-      <div className="container-fluid">
-        {/* Logo */}
-        {config.logoUrl && shouldShowLogo() && (
-          <Link className="navbar-brand" href="/">
-            <Image
-              src={config.logoUrl}
-              alt="Logo"
-              width={150}
-              height={50}
-              className="d-inline-block align-text-top"
-            />
-          </Link>
+    <>
+      <nav style={navStyle}>
+
+        {/* LEFT: Hamburger (mobile) */}
+        {isMounted && isMobile && (
+          <button
+            onClick={() => setIsMenuOpen(true)}
+            aria-label="Open menu"
+            style={{
+              background: 'none',
+              border: `1.5px solid ${textColor}`,
+              borderRadius: '4px',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-around',
+              alignItems: 'center',
+              height: '34px',
+              width: '40px',
+              padding: '6px 8px',
+              boxSizing: 'border-box',
+              flexShrink: 0,
+              zIndex: 2,
+            }}
+          >
+            {[0, 1, 2].map(i => (
+              <span key={i} style={{
+                display: 'block',
+                height: '2px',
+                width: '100%',
+                background: textColor,
+                borderRadius: '2px',
+              }} />
+            ))}
+          </button>
         )}
 
-        {/* Mobile menu toggle - Only show on mobile */}
-        <button
-          className="navbar-toggler d-lg-none"
-          type="button"
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          aria-controls="navbarNav"
-          aria-expanded={isMenuOpen}
-          aria-label="Toggle navigation"
-          style={{ borderColor: config.textColor }}
-        >
-          <span 
-            className="navbar-toggler-icon"
-            style={{ 
-              backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='${encodeURIComponent(config.textColor || '#fff')}' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e")` 
-            }}
-          />
-        </button>
+        {/* LEFT: Logo */}
+        {isMounted && config.logoUrl && (
+          (() => {
+            let show = true;
+            if (config.logoStatus === 'hide-desktop') show = isMobile;
+            if (config.logoStatus === 'hide-mobile') show = !isMobile;
+            return show ? (
+              <Link
+                href="/"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginLeft: isMobile ? '10px' : '0',
+                  textDecoration: 'none',
+                  flexShrink: 0,
+                  zIndex: 2,
+                }}
+              >
+                <Image
+                  src={config.logoUrl}
+                  alt="Logo"
+                  width={120}
+                  height={38}
+                  style={{ objectFit: 'contain', display: 'block' }}
+                />
+              </Link>
+            ) : null;
+          })()
+        )}
 
-        {/* Menu items - Always visible */}
-        <div className="d-flex align-items-center justify-content-center flex-grow-1">
-          {/* Desktop menu - Centered */}
-          <div className="d-none d-lg-flex justify-content-center">
-            {/* Menu Items Only - No Home Icon */}
+        {/* CENTER: Desktop menu — absolutely centered over full nav width */}
+        <div style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          display: isMounted && isMobile ? 'none' : 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          zIndex: 1,
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            pointerEvents: 'auto',
+          }}>
             {menuItems.map(item => (
               <Link
                 key={item.id}
                 href={item.url}
-                style={{ 
-                  color: config.textColor || '#ffffff',
-                  marginRight: '20px',
+                style={{
+                  color: textColor,
                   textDecoration: 'none',
-                  padding: '8px 12px',
-                  display: 'block'
+                  padding: '0 14px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  whiteSpace: 'nowrap',
+                  height: `${NAV_HEIGHT}px`,
+                  display: 'inline-flex',
+                  alignItems: 'center',
                 }}
-                dangerouslySetInnerHTML={{ __html: item.title }}
               >
+                {stripHtml(item.title)}
               </Link>
             ))}
           </div>
+        </div>
+      </nav>
 
-          {/* Mobile Sidebar */}
-          {isMenuOpen && (
-            <>
-              {/* Backdrop */}
-              <div 
-                className="d-lg-none position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50"
-                style={{ zIndex: 1040 }}
+      {/* Mobile sidebar portal */}
+      {isMounted && isMobile && isMenuOpen && createPortal(
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setIsMenuOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.5)',
+              zIndex: 9998,
+            }}
+          />
+
+          {/* Drawer */}
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            bottom: 0,
+            width: '280px',
+            background: '#fff',
+            zIndex: 9999,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            {/* Drawer header */}
+            <div style={{
+              backgroundColor: bg,
+              height: `${NAV_HEIGHT}px`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0 16px',
+              flexShrink: 0,
+              boxSizing: 'border-box',
+            }}>
+              {config.logoUrl && (
+                <Image
+                  src={config.logoUrl}
+                  alt="Logo"
+                  width={100}
+                  height={32}
+                  style={{ objectFit: 'contain' }}
+                />
+              )}
+              <button
                 onClick={() => setIsMenuOpen(false)}
-              />
-              
-              {/* Sidebar */}
-              <div 
-                className="d-lg-none position-fixed top-0 start-0 h-100 bg-white shadow-lg"
-                style={{ 
-                  width: '280px',
-                  zIndex: 1050,
-                  transform: isMenuOpen ? 'translateX(0)' : 'translateX(-100%)',
-                  transition: 'transform 0.3s ease-in-out',
-                  overflowY: 'auto'
+                aria-label="Close menu"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  color: textColor,
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginLeft: 'auto',
                 }}
               >
-                {/* Sidebar Header */}
-                <div 
-                  className="d-flex justify-content-between align-items-center p-3 border-bottom"
-                  style={{ backgroundColor: config.backgroundColor || '#000000' }}
-                >
-                  {config.logoUrl && (
-                    <Image
-                      src={config.logoUrl}
-                      alt="Logo"
-                      width={120}
-                      height={40}
-                      className="d-inline-block"
-                    />
-                  )}
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => setIsMenuOpen(false)}
-                    style={{ color: config.textColor || '#ffffff' }}
-                  >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                  </button>
-                </div>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
 
-                {/* Sidebar Menu Items */}
-                <div className="p-0">
-                  {menuItems.map(item => (
-                    <Link
-                      key={item.id}
-                      href={item.url}
-                      className="d-block text-decoration-none border-bottom"
-                      style={{ 
-                        color: '#333',
-                        padding: '15px 20px',
-                        borderBottomColor: '#eee !important',
-                        transition: 'background-color 0.2s ease'
-                      }}
-                      onClick={() => setIsMenuOpen(false)}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f8f9fa';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }}
-                    >
-                      <span className="fw-medium" dangerouslySetInnerHTML={{ __html: item.title }}></span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </nav>
+            {/* Drawer items */}
+            <div style={{ flex: 1 }}>
+              {menuItems.map(item => (
+                <Link
+                  key={item.id}
+                  href={item.url}
+                  onClick={() => setIsMenuOpen(false)}
+                  style={{
+                    display: 'block',
+                    padding: '15px 20px',
+                    color: '#222',
+                    textDecoration: 'none',
+                    fontWeight: 600,
+                    fontSize: '15px',
+                    borderBottom: '1px solid #eee',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <span dangerouslySetInnerHTML={{ __html: item.title }} />
+                </Link>
+              ))}
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
+    </>
   );
 }
 
 function parseInlineStyle(styleString?: string): React.CSSProperties {
   if (!styleString) return {};
-  
   try {
     const styles: any = {};
     styleString.split(';').forEach(rule => {
-      const [property, value] = rule.split(':').map(s => s.trim());
-      if (property && value) {
-        const camelProperty = property.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-        styles[camelProperty] = value;
+      const [prop, val] = rule.split(':').map(s => s.trim());
+      if (prop && val) {
+        const camel = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        styles[camel] = val;
       }
     });
     return styles;

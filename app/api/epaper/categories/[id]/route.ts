@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { epaper_categories } from '@/lib/schema/categories';
 import { eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { invalidateWidgetCaches } from '@/lib/cache/universal';
 
 // Disable Next.js caching for categories
 export const dynamic = 'force-dynamic';
@@ -101,6 +103,11 @@ export async function PUT(
       );
     }
 
+    // Clear caches so updates reflect on frontend immediately
+    await invalidateWidgetCaches();
+    revalidatePath('/', 'page');
+    revalidatePath('/epaper', 'page');
+
     return NextResponse.json({
       success: true,
       data: updatedCategory,
@@ -146,6 +153,15 @@ export async function DELETE(
         { success: false, error: 'Category not found' },
         { status: 404 }
       );
+    }
+
+    // Clear all caches so deleted category stops showing on frontend
+    await invalidateWidgetCaches();
+    revalidatePath('/', 'page');
+    revalidatePath('/epaper', 'page');
+    revalidatePath('/epaper/display', 'page');
+    if (deletedCategory.alias) {
+      revalidatePath(`/epaper/category/${deletedCategory.alias}`, 'page');
     }
 
     return NextResponse.json({

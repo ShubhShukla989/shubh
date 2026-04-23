@@ -41,7 +41,6 @@ export async function POST() {
       published: scheduledEditions.length,
     });
   } catch (error) {
-    console.error('Auto-publish error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to auto-publish editions' },
       { status: 500 }

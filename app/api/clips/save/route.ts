@@ -1,144 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { editions, category_watermark_settings, area_map_watermark_settings } from '@/lib/schema';
+import { epaper_clips } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { applyWatermarkToBase64, WatermarkSettings } from '@/lib/watermark';
+import fs from 'fs';
+import path from 'path';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  let imageBuffer: Buffer;
+  let edition_id: number;
+  let page_number: number;
+
   try {
-    const body = await request.json();
-    const { image_data, edition_id, page_number, category_id, apply_watermark = true } = body;
+    const form = await request.formData();
+    const imageFile = form.get('image') as File | null;
+    edition_id = parseInt(form.get('edition_id') as string || '0');
+    page_number = parseInt(form.get('page_number') as string || '1');
 
-    if (!image_data || !edition_id) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
-      );
+    if (!edition_id || isNaN(edition_id)) {
+      console.error('clips/save: invalid edition_id:', form.get('edition_id'));
+      return NextResponse.json({ success: false, error: 'Missing edition_id' }, { status: 400 });
     }
-
-    let processedImageData = image_data;
-
-    // Apply watermark if requested
-    if (apply_watermark) {
-      try {
-        // Get edition details first (includes category)
-        const [edition] = await db
-          .select()
-          .from(editions)
-          .where(eq(editions.id, edition_id))
-          .limit(1);
-
-        // Determine which category to use (passed or from edition)
-        const effectiveCategoryId = category_id || edition?.category_id;
-
-        // Fetch category-specific or global watermark settings
-        let watermarkSettings = null;
-
-        // Try category-specific settings first if category_id available
-        if (effectiveCategoryId) {
-          const [categorySettings] = await db
-            .select()
-            .from(category_watermark_settings)
-            .where(eq(category_watermark_settings.category_id, effectiveCategoryId))
-            .limit(1);
-
-          // Use category settings if override is enabled
-          if (categorySettings && categorySettings.override_global_settings) {
-            watermarkSettings = categorySettings;
-            console.log(`Using category watermark settings for category ${effectiveCategoryId}`);
-          }
-        }
-
-        // Fallback to global settings if no category override
-        if (!watermarkSettings) {
-          const [globalSettings] = await db
-            .select()
-            .from(area_map_watermark_settings)
-            .where(eq(area_map_watermark_settings.id, 1))
-            .limit(1);
-          
-          watermarkSettings = globalSettings;
-          console.log('Using global watermark settings');
-        }
-
-        if (watermarkSettings && watermarkSettings.enable_watermarking) {
-
-          // Generate unique clip ID first for URL
-          const clipId = `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          const clipUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/epaper/clip/${clipId}`;
-
-          const context = {
-            edition_title: edition?.title || '',
-            date: edition?.date || new Date().toISOString().split('T')[0],
-            url: clipUrl
-          };
-
-          console.log(`✅ Applying watermark for category ${effectiveCategoryId}`);
-
-          // Apply watermark to image (with DBD logo removal)
-          processedImageData = await applyWatermarkToBase64(
-            image_data,
-            watermarkSettings as WatermarkSettings,
-            context,
-            true // Remove DBD logo first
-          );
-
-          // Store with watermarked image
-          const clipData = {
-            id: clipId,
-            image_url: processedImageData,
-            clip_url: clipUrl,
-            edition_id,
-            page_number,
-            created_at: new Date().toISOString()
-          };
-
-          // Note: epaper_clips table needs to be added to schema
-          // For now, just return the clip data without saving
-          console.warn('epaper_clips table not in schema - returning clip data without database save');
-
-          return NextResponse.json({
-            success: true,
-            data: clipData
-          });
-        } else {
-          console.log('⚠️ Watermarking disabled, only removing DBD logo');
-          // Even if watermarking is disabled, remove DBD logo
-          const { removeDBDLogoFromBase64 } = await import('@/lib/remove-logo');
-          processedImageData = await removeDBDLogoFromBase64(image_data);
-        }
-      } catch (watermarkError) {
-        console.error('Watermark application error:', watermarkError);
-        // Continue without watermark on error
-      }
+    if (!imageFile || imageFile.size === 0) {
+      console.error('clips/save: missing or empty image');
+      return NextResponse.json({ success: false, error: 'Missing image' }, { status: 400 });
     }
+    imageBuffer = Buffer.from(await imageFile.arrayBuffer());
+  } catch (err) {
+    console.error('clips/save: failed to parse request:', err);
+    return NextResponse.json({ success: false, error: 'Invalid request body' }, { status: 400 });
+  }
 
-    // Fallback: save without watermark
-    const clipId = `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const clipUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/epaper/clip/${clipId}`;
+  try {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
-    const clipData = {
-      id: clipId,
-      image_url: processedImageData,
-      clip_url: clipUrl,
+    // Insert clip record
+    const [savedClip] = await db.insert(epaper_clips).values({
+      image_url: '',
+      clip_url: '',
       edition_id,
       page_number,
-      created_at: new Date().toISOString()
-    };
+      created_at: new Date().toISOString(),
+    }).returning();
 
-    // Note: epaper_clips table needs to be added to schema
-    // For now, just return the clip data without saving
-    console.warn('epaper_clips table not in schema - returning clip data without database save');
+    const clipUrl = `${siteUrl}/epaper/clip/${savedClip.id}`;
+
+    // Detect format from magic bytes
+    let ext = 'jpg';
+    if (imageBuffer.length > 12 &&
+        imageBuffer[0] === 0x52 && imageBuffer[1] === 0x49 &&
+        imageBuffer[8] === 0x57 && imageBuffer[9] === 0x45) {
+      ext = 'webp';
+    } else if (imageBuffer.length > 4 &&
+               imageBuffer[0] === 0x89 && imageBuffer[1] === 0x50) {
+      ext = 'png';
+    }
+
+    // Save file directly — watermark already applied client-side
+    const fileName = `clip-${savedClip.id}.${ext}`;
+    // Use UPLOAD_DIR if set (absolute path, works in standalone mode), else fallback
+    const uploadsBase = process.env.UPLOAD_DIR || path.join(process.cwd(), 'public', 'uploads');
+    const uploadsDir = path.join(uploadsBase, 'clips');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    fs.writeFileSync(path.join(uploadsDir, fileName), imageBuffer);
+
+    const imageUrl = `/uploads/clips/${fileName}`;
+
+    await db.update(epaper_clips)
+      .set({ image_url: imageUrl, clip_url: clipUrl })
+      .where(eq(epaper_clips.id, savedClip.id));
 
     return NextResponse.json({
       success: true,
-      data: clipData
+      data: {
+        id: savedClip.id,
+        image_url: imageUrl,
+        clip_url: clipUrl,
+        edition_id: savedClip.edition_id,
+        page_number: savedClip.page_number,
+        created_at: savedClip.created_at,
+      },
     });
-  } catch (error) {
-    console.error('Error in save clip API:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    console.error('Clip save error:', error);
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
   }
 }

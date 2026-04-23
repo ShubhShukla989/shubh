@@ -57,7 +57,6 @@ export async function PUT(request: NextRequest) {
       message: `Updated ${updatedCount} menu item(s)`,
     });
   } catch (error) {
-    console.error('API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

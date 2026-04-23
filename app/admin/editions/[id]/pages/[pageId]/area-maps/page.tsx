@@ -42,8 +42,38 @@ export default function AreaMapsPage() {
   const [page, setPage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [areaMaps, setAreaMaps] = useState<AreaMap[]>([]);
-  const [imageScale, setImageScale] = useState(1);
+  const [imageScale, setImageScale] = useState(1); // Natural scale based on image dimensions
+  const [zoom, setZoom] = useState(100); // Zoom percentage (100% default)
   const [imageCacheKey, setImageCacheKey] = useState(Date.now());
+
+  // Calculate the effective scale (combines natural image scale with zoom)
+  const effectiveScale = imageScale * (zoom / 100);
+  
+  // Debug log whenever effectiveScale changes
+  useEffect(() => {
+    console.log('📐 EFFECTIVE SCALE CHANGED:', {
+      imageScale,
+      zoom,
+      effectiveScale,
+      calculation: `${imageScale} * (${zoom} / 100) = ${effectiveScale}`
+    });
+    
+    if (effectiveScale <= 0 || !isFinite(effectiveScale)) {
+      console.error('❌ INVALID EFFECTIVE SCALE! This will cause coordinate corruption!');
+    }
+    
+    if (effectiveScale < 0.001) {
+      console.warn('⚠️ EXTREMELY SMALL EFFECTIVE SCALE! This may cause issues.');
+    }
+  }, [imageScale, zoom, effectiveScale]);
+
+  // Handle zoom change
+  const handleZoomChange = (newZoom: number) => {
+    console.log(`🔍 Zoom changed: ${zoom}% → ${newZoom}%`);
+    console.log(`📏 Image scale: ${imageScale}, New effective scale: ${imageScale * (newZoom / 100)}`);
+    setZoom(newZoom);
+    // Don't modify imageScale - it should only be based on natural image dimensions
+  };
   const [availableAreaMaps, setAvailableAreaMaps] = useState<AvailableAreaMap[]>([]);
   const [editingArea, setEditingArea] = useState<AreaMap | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -80,6 +110,24 @@ export default function AreaMapsPage() {
   // Save state
   const [isSaving, setIsSaving] = useState(false);
   
+  // Pan/Drag state for image navigation
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const panStateRef = useRef<{
+    isPanning: boolean;
+    startX: number;
+    startY: number;
+    initialOffsetX: number;
+    initialOffsetY: number;
+  }>({
+    isPanning: false,
+    startX: 0,
+    startY: 0,
+    initialOffsetX: 0,
+    initialOffsetY: 0
+  });
+  
   // Copy/Paste state
   const [copiedAreaMaps, setCopiedAreaMaps] = useState<AreaMap[]>([]);
   const [showPasteOptions, setShowPasteOptions] = useState(false);
@@ -91,6 +139,17 @@ export default function AreaMapsPage() {
   const [savedTemplates, setSavedTemplates] = useState<any[]>([]);
 
   useEffect(() => {
+    // Clear any existing state when pageId changes
+    setAreaMaps([]);
+    setEditingArea(null);
+    setShowEditModal(false);
+    setLoading(true);
+    
+    // Reset pan and zoom when changing pages
+    setPanOffset({ x: 0, y: 0 });
+    setZoom(100);
+    
+    // Fetch fresh data for new page
     fetchPage();
     fetchAreaMaps();
     fetchAvailableAreaMaps();
@@ -98,6 +157,73 @@ export default function AreaMapsPage() {
     fetchAvailableEditions();
     loadSavedTemplates();
   }, [pageId]);
+
+  // Keyboard shortcuts for navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle shortcuts when not typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      switch (e.key) {
+        case 'r':
+        case 'R':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            handleResetPan();
+          }
+          break;
+        case '=':
+        case '+':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            handleZoomChange(Math.min(200, zoom + 25));
+          }
+          break;
+        case '-':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            handleZoomChange(Math.max(25, zoom - 25));
+          }
+          break;
+        case '0':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            handleZoomChange(100);
+            handleResetPan();
+          }
+          break;
+        case 'ArrowUp':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            setPanOffset(prev => ({ x: prev.x, y: prev.y + 50 }));
+          }
+          break;
+        case 'ArrowDown':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            setPanOffset(prev => ({ x: prev.x, y: prev.y - 50 }));
+          }
+          break;
+        case 'ArrowLeft':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            setPanOffset(prev => ({ x: prev.x + 50, y: prev.y }));
+          }
+          break;
+        case 'ArrowRight':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            setPanOffset(prev => ({ x: prev.x - 50, y: prev.y }));
+          }
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [zoom]);
 
   // Cleanup debounce timeout on unmount
   useEffect(() => {
@@ -168,7 +294,40 @@ export default function AreaMapsPage() {
     if (img.naturalWidth > 0) {
       const newScale = img.clientWidth / img.naturalWidth;
       setImageScale(newScale);
-      console.log('📐 Image loaded - Natural size:', img.naturalWidth, 'x', img.naturalHeight, 'Display size:', img.clientWidth, 'x', img.clientHeight, 'Scale:', newScale);
+      
+      console.log('🖼️ Image loaded! Dimensions:', {
+        natural: { width: img.naturalWidth, height: img.naturalHeight },
+        display: { width: img.clientWidth, height: img.clientHeight },
+        scale: newScale
+      });
+      
+      // Re-validate area maps now that image is loaded
+      if (areaMaps.length > 0) {
+        console.log('🔄 Re-validating area maps after image load...');
+        const validMaps = areaMaps.filter((area: AreaMap) => {
+          const isValid = area.x >= 0 && area.y >= 0 && 
+                         area.x + area.width <= img.naturalWidth && 
+                         area.y + area.height <= img.naturalHeight;
+          
+          if (!isValid) {
+            console.warn('❌ Area map outside bounds after image load:', {
+              area: area.id,
+              position: { x: area.x, y: area.y },
+              size: { width: area.width, height: area.height },
+              imageSize: { width: img.naturalWidth, height: img.naturalHeight }
+            });
+          }
+          
+          return isValid;
+        });
+        
+        if (validMaps.length !== areaMaps.length) {
+          console.log(`🔄 Updated area maps: ${areaMaps.length} → ${validMaps.length}`);
+          setAreaMaps(validMaps);
+        } else {
+          console.log('✅ All area maps are valid after image load');
+        }
+      }
     }
   };
 
@@ -224,40 +383,32 @@ export default function AreaMapsPage() {
 
   const fetchAreaMaps = async () => {
     try {
-      const response = await fetch(`/api/editions/${editionId}/pages/${pageId}/area-maps`, {
-        cache: 'no-store'
+      // Fix cache issue with timestamp and stronger cache headers
+      const timestamp = Date.now();
+      const response = await fetch(`/api/editions/${editionId}/pages/${pageId}/area-maps?t=${timestamp}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
       const result = await response.json();
+      
+      console.log('🔍 Area maps API response:', result);
+      console.log('📊 Area maps count from API:', result.data?.length || 0);
+      
       if (result.success) {
         const maps = result.data || [];
-        console.log('📥 Loaded area maps:', maps.length, maps);
+        console.log('✅ Raw area maps from database:', maps);
         
-        // Validate area maps are within image bounds
-        if (imageRef.current && maps.length > 0) {
-          const imgWidth = imageRef.current.naturalWidth;
-          const imgHeight = imageRef.current.naturalHeight;
-          
-          const validMaps = maps.filter((area: AreaMap) => {
-            const isValid = area.x >= 0 && area.y >= 0 && 
-                           area.x + area.width <= imgWidth && 
-                           area.y + area.height <= imgHeight;
-            if (!isValid) {
-              console.warn('⚠️ Area map outside image bounds:', area, 'Image size:', imgWidth, 'x', imgHeight);
-            }
-            return isValid;
-          });
-          
-          if (validMaps.length < maps.length) {
-            console.warn(`⚠️ Filtered out ${maps.length - validMaps.length} invalid area maps`);
-          }
-          
-          setAreaMaps(validMaps);
-        } else {
-          setAreaMaps(maps);
-        }
+        console.log('✅ Valid area maps after bounds check:', maps.length);
+        setAreaMaps(maps);
+      } else {
+        console.error('❌ API returned error:', result.error);
       }
     } catch (error) {
-      console.error('Failed to fetch area maps:', error);
+      console.error('💥 Failed to fetch area maps:', error);
     }
   };
 
@@ -335,13 +486,76 @@ export default function AreaMapsPage() {
 
   // Mouse down to start drawing
   const handleImageMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Check if this is a right-click, middle-click, or holding Space key for panning
+    const isPanClick = e.button === 1 || e.button === 2 || e.shiftKey;
+    
+    if (isPanClick) {
+      // Start panning
+      e.preventDefault();
+      e.stopPropagation();
+      
+      panStateRef.current = {
+        isPanning: true,
+        startX: e.clientX,
+        startY: e.clientY,
+        initialOffsetX: panOffset.x,
+        initialOffsetY: panOffset.y
+      };
+      
+      setIsPanning(true);
+      
+      document.addEventListener('mousemove', handlePanMove);
+      document.addEventListener('mouseup', handlePanEnd);
+      document.addEventListener('contextmenu', preventContextMenu);
+      
+      return;
+    }
+    
     // Only start drawing if clicking directly on the image (not on existing boxes)
     if (e.target !== e.currentTarget && e.target !== imageRef.current) return;
     if (!imageRef.current || !containerRef.current) return;
     
-    const rect = imageRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / imageScale;
-    const y = (e.clientY - rect.top) / imageScale;
+    // CRITICAL FIX: Ensure image is loaded and scale is valid before drawing
+    if (!imageRef.current.naturalWidth || imageRef.current.naturalWidth === 0) {
+      console.error('❌ Image not loaded yet! Cannot create area map.');
+      alert('Please wait for the image to load completely before creating area maps.');
+      return;
+    }
+    
+    if (imageScale <= 0 || !isFinite(imageScale)) {
+      console.error('❌ Invalid imageScale:', imageScale);
+      alert('Error: Invalid scale detected. Please refresh the page.');
+      return;
+    }
+    
+    // SIMPLIFIED: Use image rect directly (not container)
+    const imageRect = imageRef.current.getBoundingClientRect();
+    const x = (e.clientX - imageRect.left) / imageScale;
+    const y = (e.clientY - imageRect.top) / imageScale;
+    
+    console.log('🖱️ MOUSE DOWN - Starting draw:', {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      imageLeft: imageRect.left,
+      imageTop: imageRect.top,
+      imageScale,
+      zoom,
+      effectiveScale,
+      calculatedX: x,
+      calculatedY: y,
+      imageNaturalSize: {
+        width: imageRef.current.naturalWidth,
+        height: imageRef.current.naturalHeight
+      }
+    });
+    
+    // Check for corruption immediately
+    if (x > 100000 || y > 100000 || x < -100000 || y < -100000) {
+      console.error('❌ CORRUPT COORDINATES DETECTED IN MOUSE DOWN!');
+      console.error('This suggests imageScale is extremely small or negative');
+      alert('Error: Corrupt coordinates detected. Please check console and report this issue.');
+      return;
+    }
     
     isDrawingRef.current = true;
     drawStartRef.current = { x, y };
@@ -360,12 +574,103 @@ export default function AreaMapsPage() {
     document.addEventListener('mouseup', handleDrawEnd);
   };
 
-  const handleDrawMove = (e: MouseEvent) => {
-    if (!isDrawingRef.current || !drawStartRef.current || !imageRef.current) return;
+  // Pan move handler
+  const handlePanMove = (e: MouseEvent) => {
+    if (!panStateRef.current.isPanning) return;
     
-    const rect = imageRef.current.getBoundingClientRect();
-    const currentX = (e.clientX - rect.left) / imageScale;
-    const currentY = (e.clientY - rect.top) / imageScale;
+    const deltaX = e.clientX - panStateRef.current.startX;
+    const deltaY = e.clientY - panStateRef.current.startY;
+    
+    const newOffsetX = panStateRef.current.initialOffsetX + deltaX;
+    const newOffsetY = panStateRef.current.initialOffsetY + deltaY;
+    
+    setPanOffset({ x: newOffsetX, y: newOffsetY });
+  };
+
+  // Pan end handler
+  const handlePanEnd = () => {
+    panStateRef.current.isPanning = false;
+    setIsPanning(false);
+    
+    document.removeEventListener('mousemove', handlePanMove);
+    document.removeEventListener('mouseup', handlePanEnd);
+    document.removeEventListener('contextmenu', preventContextMenu);
+    
+    // Remove touch listeners
+    document.removeEventListener('touchmove', handleTouchPanMove);
+    document.removeEventListener('touchend', handleTouchPanEnd);
+  };
+
+  // Touch pan handlers for mobile support
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2) {
+      // Two finger touch - start panning
+      e.preventDefault();
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const centerX = (touch1.clientX + touch2.clientX) / 2;
+      const centerY = (touch1.clientY + touch2.clientY) / 2;
+      
+      panStateRef.current = {
+        isPanning: true,
+        startX: centerX,
+        startY: centerY,
+        initialOffsetX: panOffset.x,
+        initialOffsetY: panOffset.y
+      };
+      
+      setIsPanning(true);
+      
+      document.addEventListener('touchmove', handleTouchPanMove, { passive: false });
+      document.addEventListener('touchend', handleTouchPanEnd);
+    }
+  };
+
+  const handleTouchPanMove = (e: TouchEvent) => {
+    if (e.touches.length === 2 && panStateRef.current.isPanning) {
+      e.preventDefault();
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const centerX = (touch1.clientX + touch2.clientX) / 2;
+      const centerY = (touch1.clientY + touch2.clientY) / 2;
+      
+      const deltaX = centerX - panStateRef.current.startX;
+      const deltaY = centerY - panStateRef.current.startY;
+      
+      const newOffsetX = panStateRef.current.initialOffsetX + deltaX;
+      const newOffsetY = panStateRef.current.initialOffsetY + deltaY;
+      
+      setPanOffset({ x: newOffsetX, y: newOffsetY });
+    }
+  };
+
+  const handleTouchPanEnd = () => {
+    document.removeEventListener('touchmove', handleTouchPanMove);
+    document.removeEventListener('touchend', handleTouchPanEnd);
+    
+    if (panStateRef.current.isPanning) {
+      panStateRef.current.isPanning = false;
+      setIsPanning(false);
+    }
+  };
+
+  // Prevent context menu during panning
+  const preventContextMenu = (e: MouseEvent) => {
+    e.preventDefault();
+  };
+
+  // Reset pan position
+  const handleResetPan = () => {
+    setPanOffset({ x: 0, y: 0 });
+  };
+
+  const handleDrawMove = (e: MouseEvent) => {
+    if (!isDrawingRef.current || !drawStartRef.current || !containerRef.current || !imageRef.current) return;
+    
+    // SIMPLIFIED: Get image rect directly
+    const imageRect = imageRef.current.getBoundingClientRect();
+    const currentX = (e.clientX - imageRect.left) / imageScale;
+    const currentY = (e.clientY - imageRect.top) / imageScale;
     
     const width = currentX - drawStartRef.current.x;
     const height = currentY - drawStartRef.current.y;
@@ -382,10 +687,10 @@ export default function AreaMapsPage() {
     
     // Force re-render to show the drawing box
     if (drawingRectRef.current) {
-      drawingRectRef.current.style.left = `${currentRectRef.current.x * imageScale}px`;
-      drawingRectRef.current.style.top = `${currentRectRef.current.y * imageScale}px`;
-      drawingRectRef.current.style.width = `${currentRectRef.current.width * imageScale}px`;
-      drawingRectRef.current.style.height = `${currentRectRef.current.height * imageScale}px`;
+      drawingRectRef.current.style.left = `${currentRectRef.current.x * effectiveScale}px`;
+      drawingRectRef.current.style.top = `${currentRectRef.current.y * effectiveScale}px`;
+      drawingRectRef.current.style.width = `${currentRectRef.current.width * effectiveScale}px`;
+      drawingRectRef.current.style.height = `${currentRectRef.current.height * effectiveScale}px`;
       drawingRectRef.current.style.display = 'block';
     }
   };
@@ -413,11 +718,32 @@ export default function AreaMapsPage() {
         
         const area = { ...currentRectRef.current };
         
+        console.log('🎨 DRAW END - Before clamping:', {
+          x: area.x,
+          y: area.y,
+          width: area.width,
+          height: area.height,
+          imageSize: { width: imgWidth, height: imgHeight },
+          effectiveScale
+        });
+        
         // Clamp coordinates to image bounds
         area.x = Math.max(0, Math.min(area.x, imgWidth - area.width));
         area.y = Math.max(0, Math.min(area.y, imgHeight - area.height));
         area.width = Math.min(area.width, imgWidth - area.x);
         area.height = Math.min(area.height, imgHeight - area.y);
+        
+        console.log('🎨 DRAW END - After clamping:', {
+          x: area.x,
+          y: area.y,
+          width: area.width,
+          height: area.height
+        });
+        
+        // Check for corruption
+        if (area.x > 100000 || area.y > 100000) {
+          console.error('❌ CORRUPT COORDINATES DETECTED IN DRAW END!');
+        }
         
         area.isNew = false;
         setAreaMaps([...areaMaps, area]);
@@ -459,6 +785,7 @@ export default function AreaMapsPage() {
     const state = moveStateRef.current;
     if (state.index === null || !state.originalArea) return;
     
+    // CRITICAL FIX: Use imageScale ONLY (not effectiveScale) for natural coordinates
     const deltaX = (e.clientX - state.startX) / imageScale;
     const deltaY = (e.clientY - state.startY) / imageScale;
     
@@ -475,6 +802,26 @@ export default function AreaMapsPage() {
   };
 
   const handleMoveEnd = () => {
+    const state = moveStateRef.current;
+    
+    // Log final position before saving to state
+    if (state.index !== null) {
+      const movedArea = areaMaps[state.index];
+      console.log('🚚 MOVE END - Final position:', {
+        index: state.index,
+        x: movedArea.x,
+        y: movedArea.y,
+        width: movedArea.width,
+        height: movedArea.height,
+        effectiveScale
+      });
+      
+      // Check for corruption
+      if (movedArea.x > 100000 || movedArea.y > 100000) {
+        console.error('❌ CORRUPT COORDINATES DETECTED IN MOVE END!');
+      }
+    }
+    
     moveStateRef.current = {
       index: null,
       startX: 0,
@@ -508,8 +855,6 @@ export default function AreaMapsPage() {
     e.stopPropagation();
     e.preventDefault();
     
-    console.log('🔧 Resize handle clicked:', handle, 'for area', index);
-    
     // Get client coordinates from either mouse or touch event
     const clientX = 'clientX' in e ? e.clientX : e.touches[0].clientX;
     const clientY = 'clientY' in e ? e.clientY : e.touches[0].clientY;
@@ -535,6 +880,7 @@ export default function AreaMapsPage() {
     const state = resizeStateRef.current;
     if (state.index === null || !state.originalArea || !state.handle) return;
     
+    // CRITICAL FIX: Use imageScale ONLY (not effectiveScale) for natural coordinates
     const deltaX = (e.clientX - state.startX) / imageScale;
     const deltaY = (e.clientY - state.startY) / imageScale;
     
@@ -602,6 +948,26 @@ export default function AreaMapsPage() {
   };
 
   const handleResizeEnd = () => {
+    const state = resizeStateRef.current;
+    
+    // Log final size before saving to state
+    if (state.index !== null) {
+      const resizedArea = areaMaps[state.index];
+      console.log('📏 RESIZE END - Final size:', {
+        index: state.index,
+        x: resizedArea.x,
+        y: resizedArea.y,
+        width: resizedArea.width,
+        height: resizedArea.height,
+        handle: state.handle,
+        effectiveScale
+      });
+      
+      // Check for corruption
+      if (resizedArea.x > 100000 || resizedArea.y > 100000 || resizedArea.width > 100000 || resizedArea.height > 100000) {
+        console.error('❌ CORRUPT COORDINATES DETECTED IN RESIZE END!');
+      }
+    }
     
     resizeStateRef.current = {
       index: null,
@@ -657,12 +1023,35 @@ export default function AreaMapsPage() {
     try {
       setIsSaving(true);
       
+      // CRITICAL DEBUG: Log what we're about to save
+      console.log('🔍 ===== SAVE DEBUG START =====');
+      console.log('📏 Current imageScale:', imageScale);
+      console.log('🔍 Current zoom:', zoom);
+      console.log('📐 Current effectiveScale:', effectiveScale);
+      console.log('🖼️ Image natural dimensions:', {
+        width: imageRef.current?.naturalWidth,
+        height: imageRef.current?.naturalHeight
+      });
+      console.log('📦 Area maps being saved:', JSON.stringify(areaMaps, null, 2));
+      
       // Log linked area IDs for each area
       areaMaps.forEach((area, index) => {
-        if (area.linked_area_ids && area.linked_area_ids.length > 0) {
-          console.log(`🔗 Area ${index + 1} (ID: ${area.id}) links to:`, area.linked_area_ids);
+        console.log(`📍 Area ${index + 1}:`, {
+          id: area.id,
+          x: area.x,
+          y: area.y,
+          width: area.width,
+          height: area.height,
+          title: area.title,
+          linkedAreas: area.linked_area_ids
+        });
+        
+        // Check if coordinates are corrupt
+        if (area.x > 100000 || area.y > 100000 || area.width > 100000 || area.height > 100000) {
+          console.error(`❌ CORRUPT COORDINATES DETECTED in Area ${index + 1}!`);
         }
       });
+      console.log('🔍 ===== SAVE DEBUG END =====');
       
       const response = await fetch(`/api/editions/${editionId}/pages/${pageId}/area-maps`, {
         method: 'POST',
@@ -699,7 +1088,7 @@ export default function AreaMapsPage() {
         return result.data;
       }
     } catch (error) {
-      console.error('Failed to fetch pages:', error);
+      // Handle error silently
     }
     return [];
   };
@@ -792,11 +1181,9 @@ export default function AreaMapsPage() {
             successCount++;
           } else {
             errorCount++;
-            console.error(`Failed to paste to page ${targetPageId}:`, result.error);
           }
         } catch (error) {
           errorCount++;
-          console.error(`Error pasting to page ${targetPageId}:`, error);
         }
       }
 
@@ -920,7 +1307,6 @@ export default function AreaMapsPage() {
         alert(`Successfully imported ${validAreaMaps.length} area maps!${importData.pageNumber ? ` (Originally from page ${importData.pageNumber})` : ''}\n\nDon't forget to click "Save All Area Maps" to save them.`);
 
       } catch (error) {
-        console.error('Import error:', error);
         alert('Failed to import area maps. Please check the file format.');
       }
     };
@@ -969,7 +1355,6 @@ export default function AreaMapsPage() {
       alert(`Successfully imported ${sourceAreaMaps.length} area maps from page ${sourcePage?.page_number}!\n\nDon't forget to click "Save All Area Maps" to save them.`);
 
     } catch (error) {
-      console.error('Import from page error:', error);
       alert('Failed to import area maps from the selected page.');
     }
   };
@@ -983,7 +1368,7 @@ export default function AreaMapsPage() {
         setAvailableEditions(result.data || []);
       }
     } catch (error) {
-      console.error('Failed to fetch available editions:', error);
+      // Handle error silently
     }
   };
 
@@ -995,7 +1380,7 @@ export default function AreaMapsPage() {
         setSavedTemplates(JSON.parse(templates));
       }
     } catch (error) {
-      console.error('Failed to load saved templates:', error);
+      // Handle error silently
     }
   };
 
@@ -1101,13 +1486,12 @@ export default function AreaMapsPage() {
       setShowImportFullEdition(false);
 
     } catch (error) {
-      console.error('Import full edition error:', error);
       alert('Failed to import full edition area maps.');
     }
   };
 
   // Import from saved template
-  const handleImportTemplate = async (templateId: number) => {
+  const handleImportFromTemplate = (templateId: number) => {
     try {
       const template = savedTemplates.find(t => t.id === templateId);
       if (!template) {
@@ -1144,7 +1528,6 @@ export default function AreaMapsPage() {
       alert(`Successfully imported ${importedAreaMaps.length} area maps from template "${template.name}" for page ${currentPageNumber}!\n\nDon't forget to click "Save All Area Maps" to save them.`);
 
     } catch (error) {
-      console.error('Import template error:', error);
       alert('Failed to import from template.');
     }
   };
@@ -1190,8 +1573,7 @@ export default function AreaMapsPage() {
     alert(`Template "${template.name}" exported successfully!`);
   };
 
-
-
+  // Early returns for loading and error states
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
@@ -1268,16 +1650,44 @@ export default function AreaMapsPage() {
             <SaveIcon className="w-4 h-4" /> {isSaving ? 'Saving...' : `Save All Area Maps (${areaMaps.length})`}
           </button>
           <button
-            onClick={() => {
+            onClick={async () => {
               if (confirm('Delete ALL area maps from this page? This cannot be undone!')) {
-                setAreaMaps([]);
-                handleSaveAll();
+                try {
+                  setIsSaving(true);
+                  setAreaMaps([]);
+                  
+                  // Save empty array to database immediately
+                  const response = await fetch(`/api/editions/${editionId}/pages/${pageId}/area-maps`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ areaMaps: [] }),
+                  });
+                  
+                  const result = await response.json();
+                  if (result.success) {
+                    alert('All area maps deleted successfully!');
+                    // Refresh data to ensure consistency
+                    await fetchAreaMaps();
+                    await fetchAvailableAreaMaps();
+                  } else {
+                    alert('Error deleting area maps: ' + result.error);
+                    // Revert on error
+                    await fetchAreaMaps();
+                  }
+                } catch (error) {
+                  console.error('Delete all error:', error);
+                  alert('Failed to delete area maps');
+                  // Revert on error
+                  await fetchAreaMaps();
+                } finally {
+                  setIsSaving(false);
+                }
               }
             }}
-            disabled={areaMaps.length === 0}
+            disabled={areaMaps.length === 0 || isSaving}
             className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-2 text-sm font-medium disabled:opacity-50"
           >
-            🗑️ Delete All
+            🗑️ {isSaving ? 'Deleting...' : 'Delete All'}
           </button>
 
         </div>
@@ -1429,18 +1839,51 @@ export default function AreaMapsPage() {
           <p className="text-sm text-yellow-800">
             <strong>Instructions:</strong> Hold mouse to drag and create boxes. Click and drag the box to move it. Use corner/edge handles to resize.
           </p>
+          <p className="text-sm text-yellow-800 mt-1">
+            <strong>Navigation:</strong> Right-click + drag OR Shift + left-click + drag to pan around the image. On touch devices, use two fingers to pan. Use zoom controls to zoom in/out.
+          </p>
+          <details className="mt-2">
+            <summary className="text-sm text-yellow-800 cursor-pointer hover:text-yellow-900">
+              <strong>Keyboard Shortcuts</strong> (click to expand)
+            </summary>
+            <div className="mt-2 text-xs text-yellow-700 grid grid-cols-2 gap-2">
+              <div><kbd className="bg-yellow-200 px-1 rounded">Ctrl/Cmd + Plus</kbd> - Zoom In</div>
+              <div><kbd className="bg-yellow-200 px-1 rounded">Ctrl/Cmd + Minus</kbd> - Zoom Out</div>
+              <div><kbd className="bg-yellow-200 px-1 rounded">Ctrl/Cmd + 0</kbd> - Reset Zoom & Pan</div>
+              <div><kbd className="bg-yellow-200 px-1 rounded">Ctrl/Cmd + R</kbd> - Reset Pan</div>
+              <div><kbd className="bg-yellow-200 px-1 rounded">Ctrl/Cmd + Arrows</kbd> - Pan Direction</div>
+              <div><kbd className="bg-yellow-200 px-1 rounded">Right Click + Drag</kbd> - Pan Image</div>
+              <div><kbd className="bg-yellow-200 px-1 rounded">Shift + Drag</kbd> - Pan Image</div>
+              <div><kbd className="bg-yellow-200 px-1 rounded">Two Finger Drag</kbd> - Pan (Touch)</div>
+            </div>
+          </details>
           <div className="mt-2 flex items-center gap-4 text-xs text-gray-600">
-            <span>Image Scale: {(imageScale * 100).toFixed(1)}%</span>
+            <span>Natural Scale: {(imageScale * 100).toFixed(1)}%</span>
+            <span>Zoom: {zoom}%</span>
+            <span>Effective Scale: {(effectiveScale * 100).toFixed(1)}%</span>
+            <span>Pan: ({panOffset.x.toFixed(0)}, {panOffset.y.toFixed(0)})</span>
           </div>
         </div>
         
         <div
           ref={containerRef}
           className="relative border-2 border-gray-300 rounded overflow-hidden"
-          style={{ userSelect: 'none' }}
+          style={{ 
+            userSelect: 'none',
+            cursor: isPanning ? 'grabbing' : 'crosshair',
+            touchAction: 'none' // Prevent default touch behaviors
+          }}
           onMouseDown={handleImageMouseDown}
+          onTouchStart={handleTouchStart}
+          onContextMenu={(e) => e.preventDefault()} // Prevent context menu
         >
-          <div className="relative">
+          <div 
+            className="relative"
+            style={{
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+              transition: isPanning ? 'none' : 'transform 0.1s ease-out'
+            }}
+          >
             <img
               ref={imageRef}
               src={`${page.image_url}${page.image_url.includes('?') ? '&' : '?'}v=${imageCacheKey}`}
@@ -1452,7 +1895,88 @@ export default function AreaMapsPage() {
               }}
               draggable={false}
               key={`area-map-image-${imageCacheKey}`}
+              style={{ 
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: 'top left',
+                width: '100%'
+              }}
             />
+          </div>
+
+          {/* Pan Mode Indicator */}
+          {isPanning && (
+            <div className="absolute top-4 left-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium z-50 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+              </svg>
+              Pan Mode Active
+            </div>
+          )}
+
+          {/* Zoom Control - Bottom Right Corner */}
+          <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm border border-gray-300 rounded-lg p-3 shadow-lg z-50">
+            <div className="flex flex-col items-center gap-2 min-w-[200px]">
+              <div className="text-sm font-medium text-gray-700">Zoom Control</div>
+              <div className="flex items-center gap-3 w-full">
+                <button
+                  onClick={() => handleZoomChange(Math.max(25, zoom - 25))}
+                  className="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded flex items-center justify-center text-lg font-bold"
+                  title="Zoom Out"
+                >
+                  −
+                </button>
+                <div className="flex-1 relative">
+                  <input
+                    type="range"
+                    min="25"
+                    max="200"
+                    step="25"
+                    value={zoom}
+                    onChange={(e) => handleZoomChange(parseInt(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                    style={{
+                      background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((zoom - 25) / (200 - 25)) * 100}%, #e5e7eb ${((zoom - 25) / (200 - 25)) * 100}%, #e5e7eb 100%)`
+                    }}
+                  />
+                  <div 
+                    className="absolute top-1/2 transform -translate-y-1/2 w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md pointer-events-none"
+                    style={{
+                      left: `calc(${((zoom - 25) / (200 - 25)) * 100}% - 8px)`
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={() => handleZoomChange(Math.min(200, zoom + 25))}
+                  className="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded flex items-center justify-center text-lg font-bold"
+                  title="Zoom In"
+                >
+                  +
+                </button>
+              </div>
+              <div className="text-xs text-center text-gray-600 mt-1">
+                {zoom}%
+              </div>
+              
+              {/* Pan Controls */}
+              <div className="border-t pt-2 mt-2 w-full">
+                <div className="text-sm font-medium text-gray-700 text-center mb-2">Pan Control</div>
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    onClick={handleResetPan}
+                    className="px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded text-xs font-medium"
+                    title="Reset Pan Position"
+                  >
+                    Reset Pan
+                  </button>
+                  <div className="text-xs text-gray-600">
+                    ({panOffset.x.toFixed(0)}, {panOffset.y.toFixed(0)})
+                  </div>
+                </div>
+                <div className="text-xs text-center text-gray-500 mt-1">
+                  Right-click + drag or Shift + drag to pan
+                </div>
+              </div>
+            </div>
           </div>
           
           {/* Drawing rectangle - shown while creating new box */}
@@ -1466,17 +1990,19 @@ export default function AreaMapsPage() {
           {areaMaps.map((area, index) => (
             <div
               key={index}
-              className="absolute group"
+              className="absolute group area-map-box"
               style={{
-                left: `${area.x * imageScale}px`,
-                top: `${area.y * imageScale}px`,
-                width: `${area.width * imageScale}px`,
-                height: `${area.height * imageScale}px`,
+                // Fix: Add pan offset to area map position so they move with the image
+                left: `${(area.x * effectiveScale) + panOffset.x}px`,
+                top: `${(area.y * effectiveScale) + panOffset.y}px`,
+                width: `${area.width * effectiveScale}px`,
+                height: `${area.height * effectiveScale}px`,
+                zIndex: showEditModal ? 10 : 20, // Lower z-index when modal is open
               }}
             >
               {/* Area Rectangle - Click and drag to move */}
               <div 
-                className="w-full h-full border-2 border-red-500 bg-red-500/20 cursor-move hover:bg-red-500/30"
+                className="w-full h-full border-2 border-red-500 bg-red-500/20 hover:bg-red-500/30 cursor-move transition-colors duration-200"
                 onMouseDown={(e) => handleMoveStart(e, index)}
               >
                 {/* Area number - top right */}
@@ -1493,7 +2019,6 @@ export default function AreaMapsPage() {
                       
                       // Prevent editing while saving or loading
                       if (isSaving || loading) {
-                        console.log('⏳ Cannot edit while saving or loading');
                         return;
                       }
                       
@@ -1511,10 +2036,8 @@ export default function AreaMapsPage() {
                           await new Promise(resolve => setTimeout(resolve, 100));
                         }
                       } catch (error) {
-                        console.error('Failed to fetch area maps:', error);
+                        // Handle error silently
                       }
-                      console.log('🔧 Opening edit modal for area:', area);
-                      console.log('🔗 Area linked_area_ids:', area.linked_area_ids, typeof area.linked_area_ids);
                       setEditingArea(area);
                       setShowEditModal(true);
                     }}
@@ -1553,7 +2076,6 @@ export default function AreaMapsPage() {
                           alert('Error: ' + result.error);
                         }
                       } catch (error) {
-                        console.error('Save error:', error);
                         alert('Failed to save area map');
                       } finally {
                         setIsSaving(false);

@@ -11,10 +11,10 @@ export const queryClient = new QueryClient({
       retry: 3,
       // Don't refetch on window focus (can be annoying for users)
       refetchOnWindowFocus: false,
-      // Refetch on reconnect
+      // Refetch on reconnect (network recovery)
       refetchOnReconnect: true,
-      // Refetch on mount if data is stale
-      refetchOnMount: true,
+      // Don't refetch on mount (use cache for fast navigation)
+      refetchOnMount: false,
     },
     mutations: {
       // Retry failed mutations once

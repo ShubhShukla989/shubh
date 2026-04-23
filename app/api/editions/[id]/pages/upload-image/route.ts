@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { db } from '@/lib/db';
-import { edition_pages } from '@/lib/schema';
+import { editions, edition_pages, epaper_categories } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { invalidateCompleteEditionCache } from '@/lib/services/editionService';
+import { deleteCachePattern } from '@/lib/cache/redis';
 
 /**
  * POST /api/editions/[id]/pages/upload-image
@@ -51,6 +54,26 @@ export async function POST(
     // Save file
     await writeFile(filePath, buffer);
 
+    // Generate thumbnail (200px width, maintain aspect ratio)
+    const sharp = require('sharp');
+    const thumbFilename = `edition-${editionId}-page-${pageNumber}-thumb.jpg`;
+    const thumbPath = join(dirPath, thumbFilename);
+    
+    let thumbUrl = null;
+    try {
+      await sharp(buffer)
+        .resize(150, null, {
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .jpeg({ quality: 5, mozjpeg: true })
+        .toFile(thumbPath);
+      
+      thumbUrl = `/uploads/page-assets/${thumbFilename}`;
+    } catch (thumbError) {
+      console.error(`Failed to generate thumbnail:`, thumbError);
+    }
+
     // Generate public URL
     const imageUrl = `/uploads/page-assets/${fileName}`;
 
@@ -74,6 +97,7 @@ export async function POST(
         .update(edition_pages)
         .set({
           image_url: imageUrl,
+          thumb_url: thumbUrl,
         })
         .where(eq(edition_pages.id, existingPage[0].id))
         .returning();
@@ -85,10 +109,45 @@ export async function POST(
           edition_id: editionId,
           page_number: pageNumber,
           image_url: imageUrl,
+          thumb_url: thumbUrl,
           title: `Page ${pageNumber}`,
           created_at: new Date().toISOString(),
         })
         .returning();
+    }
+
+    // 🚀 AUTO-CLEAR cache after page upload
+    await Promise.all([
+      invalidateCompleteEditionCache(editionId),
+      deleteCachePattern('editions:featured:*'),
+      deleteCachePattern('editions:latest-by-categories:*'),
+      deleteCachePattern('epaper:editions-by-category:*'),
+    ]);
+
+    // Clear Next.js cache if published
+    try {
+      const [edition] = await db.select().from(editions).where(eq(editions.id, editionId)).limit(1);
+      
+      if (edition?.status === 'published') {
+        revalidatePath('/', 'page');
+        revalidatePath('/epaper/display', 'page');
+        revalidatePath(`/epaper/view/${editionId}`, 'page');
+        
+        if (edition.category_id) {
+          const [cat] = await db.select({ alias: epaper_categories.alias })
+            .from(epaper_categories)
+            .where(eq(epaper_categories.id, edition.category_id))
+            .limit(1);
+          
+          if (cat?.alias) {
+            revalidatePath(`/epaper/category/${cat.alias}`, 'page');
+          }
+        }
+        
+        console.log('✅ Cache cleared after page image upload');
+      }
+    } catch (e) {
+      console.error('Failed to clear cache:', e);
     }
 
     return NextResponse.json({

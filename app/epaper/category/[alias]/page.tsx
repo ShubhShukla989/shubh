@@ -1,11 +1,11 @@
 import { notFound } from 'next/navigation';
-import { Suspense } from 'react';
+import type { Metadata } from 'next';
 import { db } from '@/lib/db';
 import { epaper_categories } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { LayoutRenderer } from '@/components/layout-renderer/LayoutRenderer';
 import { CategoryProvider } from '@/contexts/CategoryContext';
-import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
+import { CategoryArchiveContent } from './CategoryArchiveContent';
+import { buildOgMetadata, buildNotFoundMetadata, safeMetadata } from '@/lib/metadata';
 
 interface CategoryPageProps {
   params: {
@@ -13,7 +13,14 @@ interface CategoryPageProps {
   };
 }
 
-async function getCategory(alias: string) {
+interface Category {
+  id: number;
+  title: string;
+  alias: string;
+  archive_layout?: string | null;
+}
+
+async function getCategory(alias: string): Promise<Category | null> {
   try {
     // Check if alias is in format "id-123"
     if (alias.startsWith('id-')) {
@@ -40,29 +47,29 @@ async function getCategory(alias: string) {
   }
 }
 
-async function getCategoryLayout(categoryId: number) {
-  try {
-    const [data] = await db
-      .select({ archive_layout: epaper_categories.archive_layout })
-      .from(epaper_categories)
-      .where(eq(epaper_categories.id, categoryId))
-      .limit(1);
+export const revalidate = 60;
 
-    // If category has specific layout, use it
-    if (data?.archive_layout) {
-      return data.archive_layout;
-    }
+export async function generateMetadata({
+  params,
+}: {
+  params: { alias: string };
+}): Promise<Metadata> {
+  return safeMetadata(
+    async () => {
+      const category = await getCategory(params.alias);
+      if (!category) return buildNotFoundMetadata('Category');
 
-    // Otherwise, use default category archive layout
-    return 'Epaper Archive';
-  } catch (error) {
-    // Fallback to default layout
-    return 'Epaper Archive';
-  }
+      return buildOgMetadata({
+        title: `${category.title} — Archive`,
+        description: `Browse all editions in ${category.title}`,
+        image: null, // no image in schema → falls back to DEFAULT_OG via helper
+        url: `/epaper/category/${params.alias}`,
+      });
+    },
+    buildNotFoundMetadata('Category'),
+    `category-metadata-${params.alias}`
+  );
 }
-
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const category = await getCategory(params.alias);
@@ -70,13 +77,6 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   if (!category) {
     notFound();
   }
-
-  // Check if category has a custom layout from Page Designer
-  const categoryLayout = await getCategoryLayout(category.id);
-
-  // Always render with layout (either custom or default)
-  // Force use Epaper Archive layout for now
-  const finalLayout = 'Epaper Archive';
   
   return (
     <CategoryProvider
@@ -84,20 +84,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       categoryAlias={category.alias}
       categoryTitle={category.title}
     >
-      <div className="category-archive-page">
-        <Suspense fallback={
-          <div className="space-y-4 p-4">
-            <SkeletonLoader variant="text" width="40%" height="32px" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <SkeletonLoader variant="card" height="300px" />
-              <SkeletonLoader variant="card" height="300px" />
-              <SkeletonLoader variant="card" height="300px" />
-            </div>
-          </div>
-        }>
-          <LayoutRenderer layoutName={finalLayout} />
-        </Suspense>
-      </div>
+      <CategoryArchiveContent category={category} />
     </CategoryProvider>
   );
 }

@@ -2,9 +2,6 @@ import { db } from '@/lib/db';
 import { site_settings, editions, epaper_categories, layouts } from '@/lib/schema';
 import { eq, desc, asc, and } from 'drizzle-orm';
 import { LayoutRenderer } from '@/components/layout-renderer/LayoutRenderer';
-import { redirect } from 'next/navigation';
-import { Suspense } from 'react';
-import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 
 async function getHomepageSettings() {
   try {
@@ -41,11 +38,11 @@ async function getHomepageSettings() {
       
       layoutName = layoutMapping[data.setting_value as keyof typeof layoutMapping] || 'Website Homepage';
       
-      // Auto-fix the database
-      await db
-        .update(site_settings)
+      // Auto-fix the database (non-blocking)
+      db.update(site_settings)
         .set({ homepage_layout: layoutName })
-        .where(eq(site_settings.setting_key, 'home_page'));
+        .where(eq(site_settings.setting_key, 'home_page'))
+        .catch(() => {}); // Silent fail
       
       console.log(`🔧 Auto-fixed homepage_layout to: ${layoutName}`);
     }
@@ -61,11 +58,11 @@ async function getHomepageSettings() {
       console.log(`⚠️ Layout "${layoutName}" not found, falling back to Website Homepage`);
       layoutName = 'Website Homepage';
       
-      // Update database with working layout
-      await db
-        .update(site_settings)
+      // Update database with working layout (non-blocking)
+      db.update(site_settings)
         .set({ homepage_layout: layoutName })
-        .where(eq(site_settings.setting_key, 'home_page'));
+        .where(eq(site_settings.setting_key, 'home_page'))
+        .catch(() => {}); // Silent fail
     }
 
     return {
@@ -158,6 +155,20 @@ async function getCategoriesCount() {
 async function getDefaultCategory() {
   try {
     const [data] = await db
+      .select({ id: epaper_categories.id })
+      .from(epaper_categories)
+      .orderBy(asc(epaper_categories.id))
+      .limit(1);
+
+    return data?.id || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function getDefaultCategoryAlias() {
+  try {
+    const [data] = await db
       .select({ alias: epaper_categories.alias })
       .from(epaper_categories)
       .orderBy(asc(epaper_categories.id))
@@ -182,66 +193,76 @@ async function getEditionsCount() {
   }
 }
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// ISR with on-demand revalidation for fresh content + performance
+export const revalidate = 60; // 60 seconds (on-demand handles instant updates, ISR is fallback)
 
 export default async function HomePage() {
   const settings = await getHomepageSettings();
 
   console.log('🏠 Homepage rendering with settings:', settings);
 
-  // Handle different homepage types based on setting_value
+  // Always render on "/" - no redirects for clean URL
+  // Content changes based on settings, but URL stays "/"
+  
   if (settings.page === 'epaper-display') {
-    console.log('📰 Epaper Display mode activated');
-    // Check for featured editions first
-    const featuredEditions = await getFeaturedEditions();
+    console.log('📰 Epaper Display mode - rendering on homepage');
     
-    if (featuredEditions.length > 0) {
-      // Redirect to first featured edition
-      redirect(`/epaper/view/${featuredEditions[0].id}`);
-    } else {
-      // Fallback: latest edition
-      const latestEditionId = await getLatestEdition();
-      if (latestEditionId) {
-        redirect(`/epaper/view/${latestEditionId}`);
-      }
+    // Parallel fetch for better performance
+    const [featuredEditions, latestEdition] = await Promise.all([
+      getFeaturedEditions(),
+      getLatestEdition()
+    ]);
+    
+    const editionId = featuredEditions.length > 0 
+      ? featuredEditions[0].id 
+      : latestEdition;
+    
+    if (editionId) {
+      // Render StaticEpaperLayout on homepage (no redirect)
+      const { StaticEpaperLayout } = await import('@/components/epaper/StaticEpaperLayout');
+      return (
+        <div className="homepage w-full">
+          <StaticEpaperLayout editionId={editionId.toString()} />
+        </div>
+      );
     }
   } else if (settings.page === 'epaper-archive') {
-    console.log('📚 Epaper Archive mode activated');
-    // Check for featured categories first
-    const featuredCategoryAlias = await getFirstFeaturedCategory();
+    console.log('📚 Epaper Archive mode - rendering on homepage');
     
-    if (featuredCategoryAlias) {
-      redirect(`/epaper/category/${featuredCategoryAlias}`);
-    } else {
-      // Fallback: first available category
-      const fallbackCategoryAlias = await getDefaultCategory();
-      if (fallbackCategoryAlias) {
-        redirect(`/epaper/category/${fallbackCategoryAlias}`);
-      } else {
-        // If no categories at all, redirect to archive page
-        redirect('/epaper/archive');
+    // Parallel fetch for better performance
+    const [featuredCategoryAlias, defaultCategoryAlias] = await Promise.all([
+      getFirstFeaturedCategory(),
+      getDefaultCategoryAlias()
+    ]);
+    
+    const categoryAlias = featuredCategoryAlias || defaultCategoryAlias;
+    
+    if (categoryAlias) {
+      // Fetch category data
+      const [category] = await db
+        .select()
+        .from(epaper_categories)
+        .where(eq(epaper_categories.alias, categoryAlias))
+        .limit(1);
+      
+      if (category) {
+        // Render CategoryArchiveContent on homepage (no redirect)
+        const { CategoryArchiveContent } = await import('@/app/epaper/category/[alias]/CategoryArchiveContent');
+        return (
+          <div className="homepage w-full">
+            <CategoryArchiveContent category={category} />
+          </div>
+        );
       }
     }
   }
 
   // Default: render website homepage with layout
   return (
-    <div className="homepage w-full">
-      <Suspense fallback={
-        <div className="space-y-4 p-4">
-          <SkeletonLoader variant="text" width="60%" height="32px" />
-          <SkeletonLoader variant="image" height="300px" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <SkeletonLoader variant="card" height="200px" />
-            <SkeletonLoader variant="card" height="200px" />
-            <SkeletonLoader variant="card" height="200px" />
-          </div>
-        </div>
-      }>
+    <div className="homepage w-full" style={{ backgroundColor: 'white' }}>
+      <div style={{ marginLeft: '10%', marginRight: '10%' }}>
         <LayoutRenderer layoutName={settings.layout} />
-      </Suspense>
+      </div>
     </div>
   );
 }

@@ -44,7 +44,7 @@ export default function Navigation({ menuAlias = 'main-menu', className = '' }: 
         setMenuItems(data.items || []);
       }
     } catch (error) {
-      console.error('Failed to fetch menu items:', error);
+      // Silent fail - menu will remain empty
     } finally {
       setLoading(false);
     }

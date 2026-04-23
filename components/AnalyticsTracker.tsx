@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 
 interface AnalyticsTrackerProps {
@@ -10,16 +10,34 @@ interface AnalyticsTrackerProps {
 
 export default function AnalyticsTracker({ editionId, pageNumber }: AnalyticsTrackerProps) {
   const pathname = usePathname();
+  const hasTracked = useRef(false);
 
   useEffect(() => {
-    // Generate or get session ID
+    // Skip tracking for admin routes
+    if (pathname.startsWith('/admin')) {
+      return;
+    }
+
+    // Skip if already tracked for this page
+    if (hasTracked.current) {
+      return;
+    }
+
+    // Generate or get persistent user ID (survives browser restarts)
+    let userId = localStorage.getItem('analytics_user_id');
+    if (!userId) {
+      userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('analytics_user_id', userId);
+    }
+
+    // Generate session ID (resets on browser close)
     let sessionId = sessionStorage.getItem('analytics_session');
     if (!sessionId) {
       sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       sessionStorage.setItem('analytics_session', sessionId);
     }
 
-    // Track page view
+    // Track unique page view
     const trackPageView = async () => {
       try {
         await fetch('/api/analytics/track', {
@@ -31,44 +49,30 @@ export default function AnalyticsTracker({ editionId, pageNumber }: AnalyticsTra
             page_url: pathname,
             edition_id: editionId,
             page_number: pageNumber,
+            user_id: userId,
             session_id: sessionId,
           }),
         });
+        hasTracked.current = true;
       } catch (error) {
-        console.error('Analytics tracking failed:', error);
+        // Silent fail
       }
     };
 
-    // Track immediately
     trackPageView();
 
-    // Track view duration on page unload
-    const startTime = Date.now();
-    
-    const handleBeforeUnload = () => {
-      const viewDuration = Math.floor((Date.now() - startTime) / 1000);
-      
-      // Use sendBeacon for reliable tracking on page unload
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/analytics/track', JSON.stringify({
-          page_url: pathname,
-          edition_id: editionId,
-          page_number: pageNumber,
-          session_id: sessionId,
-          view_duration: viewDuration,
-        }));
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
+    // Reset tracking flag when pathname changes
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      hasTracked.current = false;
     };
   }, [pathname, editionId, pageNumber]);
 
-  // Update session activity every 30 seconds
+  // Update session activity (less frequent)
   useEffect(() => {
+    if (pathname.startsWith('/admin')) {
+      return;
+    }
+
     const interval = setInterval(async () => {
       const sessionId = sessionStorage.getItem('analytics_session');
       if (sessionId) {
@@ -79,18 +83,18 @@ export default function AnalyticsTracker({ editionId, pageNumber }: AnalyticsTra
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              page_url: pathname,
               session_id: sessionId,
+              activity_update: true,
             }),
           });
         } catch (error) {
-          // Silently fail - don't spam console
+          // Silent fail
         }
       }
-    }, 30000); // 30 seconds
+    }, 60000); // 1 minute instead of 30 seconds
 
     return () => clearInterval(interval);
   }, [pathname]);
 
-  return null; // This component doesn't render anything
+  return null;
 }

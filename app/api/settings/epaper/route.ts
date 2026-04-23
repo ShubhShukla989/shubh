@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { epaper_settings } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { invalidateCacheKeysAsync } from '@/lib/cache/universal';
 
 export async function GET() {
   try {
@@ -24,7 +26,6 @@ export async function GET() {
       }
     });
   } catch (error: any) {
-    console.error('Error fetching epaper settings:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -63,12 +64,14 @@ export async function POST(request: NextRequest) {
         .returning();
     }
 
+    invalidateCacheKeysAsync(['settings:epaper*', 'layout:compiled:*']);
+    revalidatePath('/epaper', 'page');
+
     return NextResponse.json({
       success: true,
       data
     });
   } catch (error: any) {
-    console.error('Error saving epaper settings:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

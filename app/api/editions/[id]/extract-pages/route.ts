@@ -1,240 +1,249 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { join } from 'path';
-import { mkdir } from 'fs/promises';
+import { mkdir, rename, copyFile, unlink, readdir } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { PDFDocument } from 'pdf-lib';
 import { readFile } from 'fs/promises';
 import { db } from '@/lib/db';
-import { editions, edition_pages } from '@/lib/schema/index';
+import { editions, edition_pages, epaper_categories } from '@/lib/schema/index';
 import { eq } from 'drizzle-orm';
-
-/**
- * Ghostscript + ImageMagick PDF Page Extraction
- * 
- * Uses the most reliable combination:
- * - Ghostscript: PDF to PostScript conversion
- * - ImageMagick: PostScript to high-quality images
- * - pdf-lib: PDF metadata reading
- * 
- * Requirements:
- * - Ghostscript: Already installed at C:\Program Files\gs\gs10.03.1\bin\gswin64c.exe
- * - ImageMagick: Need to install for image processing
- * 
- * Usage: POST /api/editions/[id]/extract-pages
- * Body: { resolution?: number, format?: 'png' | 'jpg', quality?: number }
- */
+import { getUploadsDir, resolvePublicPath } from '@/lib/paths';
+import { join } from 'path';
+import { existsSync } from 'fs';
+import { tmpdir } from 'os';
+import { invalidateCompleteEditionCache } from '@/lib/services/editionService';
+import { deleteCachePattern } from '@/lib/cache/redis';
+import { revalidatePath } from 'next/cache';
 
 const execAsync = promisify(exec);
+const IS_WINDOWS = process.platform === 'win32';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+/**
+ * Wraps a path for GS CLI usage.
+ * On Windows, GS chokes on spaces even with quotes in -sOutputFile,
+ * so we route output through %TEMP% which is guaranteed space-free.
+ */
+function gsOutputPath(pattern: string): { arg: string; tmpDir: string | null } {
+  if (!IS_WINDOWS || !pattern.includes(' ')) {
+    return { arg: `-sOutputFile="${pattern}"`, tmpDir: null };
+  }
+  // Use temp dir to avoid spaces issue
+  const tmp = tmpdir();
+  const filename = pattern.split(/[\\/]/).pop()!;
+  return { arg: `-sOutputFile="${join(tmp, filename)}"`, tmpDir: tmp };
+}
+
+function buildGsCommand(gsPath: string, args: string[]): string {
+  const joined = args.filter(Boolean).join(' ');
+  return IS_WINDOWS ? `"${gsPath}" ${joined}` : `${gsPath} ${joined}`;
+}
+
+async function runGs(command: string, label: string): Promise<void> {
+  console.log(`🔧 ${label}:`, command);
+  const { stdout, stderr } = await execAsync(command, { timeout: 180000 });
+  if (stdout) console.log(`${label} stdout:`, stdout.trim());
+  if (stderr) console.log(`${label} stderr:`, stderr.trim());
+}
+
+async function moveTempFiles(
+  tmpDir: string,
+  uploadsDir: string,
+  editionId: number,
+  pageCount: number,
+  suffix: string,
+  ext: string
+): Promise<void> {
+  // List all files in tmpDir matching this edition's pattern
+  // GS may zero-pad page numbers (e.g. edition-1-page-01.jpg) on some versions
+  const allFiles = await readdir(tmpDir).catch(() => [] as string[]);
+  const prefix = `edition-${editionId}-page-`;
+  const pattern = new RegExp(`^edition-${editionId}-page-(\\d+)${suffix.replace('-', '\\-')}\\.${ext}$`);
+
+  for (const file of allFiles) {
+    const match = file.match(pattern);
+    if (!match) continue;
+    const pageNum = parseInt(match[1], 10);
+    const src = join(tmpDir, file);
+    // Always normalize destination to non-padded page number
+    const dest = join(uploadsDir, `edition-${editionId}-page-${pageNum}${suffix}.${ext}`);
+    try {
+      await rename(src, dest);
+    } catch {
+      try {
+        await copyFile(src, dest);
+        await unlink(src).catch(() => {});
+      } catch (copyErr: any) {
+        console.error(`Failed to move ${src} -> ${dest}:`, copyErr.message);
+        throw copyErr;
+      }
+    }
+  }
+}
+
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const editionId = parseInt(params.id);
     const body = await request.json();
-    
-    // ENHANCED Extract settings for HIGH-QUALITY newspaper pages
-    const resolution = Math.min(body.resolution || 200, 300); // Increased to 300 DPI max for better quality
-    const format = body.format || 'jpg'; // Use JPEG for smaller files
-    const quality = body.quality || 88; // ENHANCED quality for newspapers (was 75)
 
-    // Get edition details
-    const edition = await db
-      .select()
-      .from(editions)
-      .where(eq(editions.id, editionId))
-      .limit(1);
+    const resolution = Math.min(body.resolution || 150, 300);
+    const format: 'jpg' | 'png' = body.format === 'png' ? 'png' : 'jpg';
+    const quality = body.quality || 95;
 
-    if (!edition.length || !edition[0].pdf_url) {
-      return NextResponse.json(
-        { success: false, error: 'Edition or PDF not found' },
-        { status: 404 }
-      );
+    // Fetch edition
+    const [edition] = await db.select().from(editions).where(eq(editions.id, editionId)).limit(1);
+    if (!edition?.pdf_url) {
+      return NextResponse.json({ success: false, error: 'Edition or PDF not found' }, { status: 404 });
     }
 
-    const pdfPath = join(process.cwd(), 'public', edition[0].pdf_url);
+    const pdfPath = resolvePublicPath(edition.pdf_url.replace(/^\//, ''));
+    if (!existsSync(pdfPath)) {
+      return NextResponse.json({ success: false, error: `PDF not found at: ${pdfPath}` }, { status: 404 });
+    }
 
-    // Read PDF to get page count
-    const pdfBuffer = await readFile(pdfPath);
-    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    const pdfDoc = await PDFDocument.load(await readFile(pdfPath));
     const pageCount = pdfDoc.getPageCount();
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads');
+    const uploadsDir = getUploadsDir();
     await mkdir(uploadsDir, { recursive: true });
 
-    // Get tool paths (pdftoppm + ImageMagick v6 combination for Ubuntu VPS)
-    const isWindows = process.platform === 'win32';
-    const isUbuntu = process.platform === 'linux';
-    
-    // Use pdftoppm for Ubuntu VPS (more reliable than Ghostscript)
-    const pdfTool = isUbuntu ? 'pdftoppm' : (isWindows 
-      ? (process.env.GHOSTSCRIPT_PATH || 'C:\\Program Files\\gs\\gs10.03.1\\bin\\gswin64c.exe')
-      : (process.env.GHOSTSCRIPT_PATH || 'gs'));
-    
-    // Use ImageMagick v6 'convert' for Ubuntu VPS
-    const magickPath = isUbuntu ? 'convert' : (isWindows
-      ? (process.env.IMAGEMAGICK_PATH || 'magick')
-      : (process.env.IMAGEMAGICK_PATH || 'convert'));
-    
-    // Extract all pages using pdftoppm (Ubuntu) or Ghostscript (Windows/Mac)
-    const outputPattern = join(uploadsDir, `edition-${editionId}-page`);
-    
-    let extractCommand: string;
-    
-    if (isUbuntu) {
-      // Ubuntu VPS: Use pdftoppm (more reliable)
-      extractCommand = [
-        'pdftoppm',
-        '-jpeg',
-        `-r ${resolution}`,
-        `-jpegopt quality=${quality}`,
-        `"${pdfPath}"`,
-        `"${outputPattern}"`
-      ].join(' ');
-    } else {
-      // Windows/Mac: Use Ghostscript
-      extractCommand = [
-        `"${pdfTool}"`,
-        '-dNOPAUSE',
-        '-dBATCH',
-        '-dSAFER',
-        '-sDEVICE=' + (format === 'png' ? 'png16m' : 'jpeg'),
-        `-r${resolution}`,
-        
-        // ENHANCED JPEG optimization for newspapers
-        format === 'jpg' ? `-dJPEGQ=${quality}` : '',
-        format === 'jpg' ? '-dColorConversionStrategy=/LeaveColorUnchanged' : '',
-        format === 'jpg' ? '-dEncodeColorImages=true' : '',
-        format === 'jpg' ? '-dEncodeGrayImages=true' : '',
-        format === 'jpg' ? '-dOptimize=true' : '', // Enable optimization
-        format === 'jpg' ? '-dDownsampleColorImages=false' : '', // Don't downsample for quality
-        format === 'jpg' ? '-dDownsampleGrayImages=false' : '', // Don't downsample for quality
-        
-        // ENHANCED PNG optimization
-        format === 'png' ? '-dTextAlphaBits=4' : '',
-        format === 'png' ? '-dGraphicsAlphaBits=4' : '',
-        
-        // ENHANCED General optimizations for newspapers
-        '-dUseCropBox',
-        '-dPDFFitPage',
-        '-dAutoRotatePages=/None',
-        '-dPrinted=false', // Better quality for screen viewing
-        '-dMaxBitmap=500000000', // Allow larger bitmaps for quality
-        
-        `-sOutputFile="${join(uploadsDir, `edition-${editionId}-page-%d.${format}`)}"`,
-        `"${pdfPath}"`
-      ].filter(Boolean).join(' ');
+    const gsPath = process.env.GHOSTSCRIPT_PATH || (IS_WINDOWS ? 'gswin64c' : 'gs');
+    const device = format === 'png' ? 'png16m' : 'jpeg';
+
+    // ── Full-res page extraction ──────────────────────────────────────────────
+    const pagePattern = join(uploadsDir, `edition-${editionId}-page-%d.${format}`);
+    const { arg: pageOutputArg, tmpDir: pageTmpDir } = gsOutputPath(pagePattern);
+
+    await runGs(buildGsCommand(gsPath, [
+      '-dNOPAUSE', '-dBATCH', '-dNOSAFER',
+      `-sDEVICE=${device}`,
+      `-r${resolution}`,
+      format === 'jpg' ? `-dJPEGQ=${quality}` : '',
+      pageOutputArg,
+      `"${pdfPath}"`,
+    ]), 'GS pages');
+
+    if (pageTmpDir) await moveTempFiles(pageTmpDir, uploadsDir, editionId, pageCount, '', format);
+
+    // ── Thumbnail extraction: GS renders at 50 DPI, Sharp compresses to 150px ──
+    const thumbPattern = join(uploadsDir, `edition-${editionId}-page-%d-thumb.jpg`);
+    const { arg: thumbOutputArg, tmpDir: thumbTmpDir } = gsOutputPath(thumbPattern);
+
+    await runGs(buildGsCommand(gsPath, [
+      '-dNOPAUSE', '-dBATCH', '-dNOSAFER',
+      '-sDEVICE=jpeg',
+      '-r50',
+      '-dJPEGQ=85', // keep GS quality high — Sharp will compress it down
+      thumbOutputArg,
+      `"${pdfPath}"`,
+    ]), 'GS thumbs');
+
+    if (thumbTmpDir) await moveTempFiles(thumbTmpDir, uploadsDir, editionId, pageCount, '-thumb', 'jpg');
+
+    // ── Sharp post-compression: resize to 150px wide, quality 15 ─────────────
+    const sharp = require('sharp');
+    const fsPromises = require('fs/promises');
+    for (let i = 1; i <= pageCount; i++) {
+      const thumbPath = join(uploadsDir, `edition-${editionId}-page-${i}-thumb.jpg`);
+      if (!existsSync(thumbPath)) continue;
+      try {
+        // Read into buffer first to avoid Windows file lock issues
+        const inputBuffer = await fsPromises.readFile(thumbPath);
+        const compressed = await sharp(inputBuffer)
+          .resize(250, null, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 65, mozjpeg: true })
+          .toBuffer();
+        await fsPromises.writeFile(thumbPath, compressed);
+      } catch (e: any) {
+        console.warn(`⚠️ Sharp compression failed for page ${i}:`, e.message);
+      }
     }
 
-    // Execute extraction command
-    const { stdout, stderr } = await execAsync(extractCommand);
-    
-    if (stderr && !stderr.includes('Warning')) {
-      // Handle extraction errors silently in production
-    }
-
-    // Clear existing pages for this edition
+    // ── Build DB records ──────────────────────────────────────────────────────
     await db.delete(edition_pages).where(eq(edition_pages.edition_id, editionId));
 
-    // Insert new pages into database with VALIDATION
     const newPages = [];
-    const fs = require('fs');
-    
-    if (isUbuntu) {
-      // pdftoppm creates files like: edition-1-page-01.jpg, edition-1-page-02.jpg, etc.
-      for (let i = 1; i <= pageCount; i++) {
-        const pageNum = i.toString().padStart(2, '0'); // 01, 02, 03...
-        const filename = `edition-${editionId}-page-${pageNum}.jpg`;
-        const imagePath = `/uploads/${filename}`;
-        const fullPath = join(uploadsDir, filename);
-        
-        // VALIDATE file exists before adding to database
-        if (fs.existsSync(fullPath)) {
-          newPages.push({
-            edition_id: editionId,
-            page_number: i,
-            image_url: imagePath,
-          });
-        } else {
-          console.error(`❌ Page ${i} not extracted: ${fullPath}`);
-        }
+
+    for (let i = 1; i <= pageCount; i++) {
+      // Find extracted page (format may vary)
+      const candidates = [
+        join(uploadsDir, `edition-${editionId}-page-${i}.${format}`),
+        join(uploadsDir, `edition-${editionId}-page-${i}.jpg`),
+        join(uploadsDir, `edition-${editionId}-page-${i}.png`),
+      ];
+      const foundPath = candidates.find(existsSync) ?? null;
+
+      if (!foundPath) {
+        console.warn(`⚠️ Page ${i} not found after extraction`);
+        continue;
       }
-    } else {
-      // Ghostscript creates files like: edition-1-page-1.jpg, edition-1-page-2.jpg, etc.
-      for (let i = 1; i <= pageCount; i++) {
-        const filename = `edition-${editionId}-page-${i}.${format}`;
-        const imagePath = `/uploads/${filename}`;
-        const fullPath = join(uploadsDir, filename);
-        
-        // VALIDATE file exists before adding to database
-        if (fs.existsSync(fullPath)) {
-          newPages.push({
-            edition_id: editionId,
-            page_number: i,
-            image_url: imagePath,
-          });
-        } else {
-          console.error(`❌ Page ${i} not extracted: ${fullPath}`);
-        }
-      }
+
+      // Normalize filename
+      const finalFilename = `edition-${editionId}-page-${i}.${format}`;
+      const finalPath = join(uploadsDir, finalFilename);
+      if (foundPath !== finalPath) await rename(foundPath, finalPath);
+
+      const thumbFilename = `edition-${editionId}-page-${i}-thumb.jpg`;
+      const thumbExists = existsSync(join(uploadsDir, thumbFilename));
+
+      newPages.push({
+        edition_id: editionId,
+        page_number: i,
+        image_url: `/uploads/${finalFilename}`,
+        thumb_url: thumbExists ? `/uploads/${thumbFilename}` : null,
+      });
     }
 
-    // Only proceed if we have extracted pages
     if (newPages.length === 0) {
       return NextResponse.json({
         success: false,
-        error: `No pages were successfully extracted. Expected ${pageCount} pages.`,
-        details: 'All extraction attempts failed - check PDF file and extraction tools',
-        tool: isUbuntu ? 'pdftoppm' : 'Ghostscript',
-        platform: process.platform
+        error: `No pages extracted. Expected ${pageCount}. GS path: ${gsPath}`,
       }, { status: 500 });
     }
 
     const insertedPages = await db.insert(edition_pages).values(newPages).returning();
 
+    // Invalidate caches
+    await Promise.all([
+      invalidateCompleteEditionCache(editionId),
+      deleteCachePattern('editions:featured:*'),
+      deleteCachePattern('editions:latest-by-categories:*'),
+      deleteCachePattern('epaper:editions-by-category:*'),
+    ]);
+
+    // 🚀 AUTO-CLEAR Next.js cache after page extraction
+    try {
+      const [edition] = await db.select().from(editions).where(eq(editions.id, editionId)).limit(1);
+      
+      if (edition?.status === 'published') {
+        revalidatePath('/', 'page');
+        revalidatePath('/epaper/display', 'page');
+        revalidatePath(`/epaper/view/${editionId}`, 'page');
+        
+        if (edition.category_id) {
+          const [cat] = await db.select({ alias: epaper_categories.alias })
+            .from(epaper_categories)
+            .where(eq(epaper_categories.id, edition.category_id))
+            .limit(1);
+          
+          if (cat?.alias) {
+            revalidatePath(`/epaper/category/${cat.alias}`, 'page');
+          }
+        }
+        
+        console.log('✅ Cache cleared after page extraction');
+      }
+    } catch (e) {
+      console.error('Failed to clear cache:', e);
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Successfully extracted ${newPages.length} of ${pageCount} pages`,
-      data: {
-        pageCount: newPages.length,
-        totalPages: pageCount,
-        pages: insertedPages,
-        settings: { resolution, format, quality },
-        tool: isUbuntu ? 'pdftoppm' : 'Ghostscript',
-        platform: process.platform,
-        failedPages: pageCount - newPages.length
-      }
+      message: `Extracted ${newPages.length} of ${pageCount} pages`,
+      data: { pageCount: newPages.length, totalPages: pageCount, pages: insertedPages },
     });
 
   } catch (error: any) {
-    // Platform detection for error messages
-    const isUbuntu = process.platform === 'linux';
-    
-    // Provide helpful error messages
-    let errorMessage = 'Failed to extract PDF pages';
-    
-    if (error.message?.includes('pdftoppm: command not found') || error.message?.includes('gs: command not found') || error.message?.includes('not recognized')) {
-      errorMessage = isUbuntu ? 'pdftoppm not found. Please install poppler-utils: sudo apt install poppler-utils' : 'Ghostscript not found. Please install Ghostscript.';
-    } else if (error.message?.includes('convert: command not found') || error.message?.includes('magick: command not found')) {
-      errorMessage = 'ImageMagick not found. Please install ImageMagick.';
-    } else if (error.message?.includes('ENOENT')) {
-      errorMessage = 'PDF file not found or extraction tools not found.';
-    } else if (error.message?.includes('invalidpdf') || error.message?.includes('PDF')) {
-      errorMessage = 'Invalid or corrupted PDF file.';
-    }
-
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: errorMessage,
-        details: error.message,
-        tool: isUbuntu ? 'pdftoppm' : 'Ghostscript',
-        platform: process.platform
-      },
-      { status: 500 }
-    );
+    console.error('❌ Extraction error:', error.message);
+    return NextResponse.json({ success: false, error: error.message || 'Extraction failed' }, { status: 500 });
   }
 }

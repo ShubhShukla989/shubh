@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { settings } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
 
 // GET /api/settings/ads - Get ads.txt content
 export async function GET() {
@@ -17,7 +18,6 @@ export async function GET() {
       data: { content: data?.value || '' },
     });
   } catch (error) {
-    console.error('Get ads.txt error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch ads.txt' },
       { status: 500 }
@@ -54,9 +54,9 @@ export async function POST(request: NextRequest) {
         });
     }
 
+    revalidatePath('/ads.txt', 'page');
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Save ads.txt error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to save ads.txt' },
       { status: 500 }

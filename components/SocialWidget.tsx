@@ -1,6 +1,7 @@
 'use client';
 
 import { useClip } from '@/contexts/ClipContext';
+import { shareOnWhatsApp } from '@/lib/whatsappShare';
 
 interface SocialWidgetProps {
   config: {
@@ -41,8 +42,8 @@ export function SocialWidget({ config }: SocialWidgetProps) {
         url = `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedText}`;
         break;
       case 'whatsapp':
-        url = `https://wa.me/?text=${encodedText}%20${encodedUrl}`;
-        break;
+        shareOnWhatsApp(`${encodedText} ${encodedUrl}`);
+        return;
       case 'email':
         url = `mailto:?subject=${encodedText}&body=${encodedUrl}`;
         break;

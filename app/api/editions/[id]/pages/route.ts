@@ -75,57 +75,30 @@ export async function GET(
     for (const page of pages as any[]) {
       try {
         if (page.image_url && !page.image_url.startsWith('data:image')) {
-          // Calculate file size for file-based images with FALLBACK LOGIC
           const fs = require('fs');
           const path = require('path');
-          
-          let filePath = page.image_url;
-          let fileExists = false;
-          
-          // Try original path first
-          if (filePath.startsWith('/uploads/')) {
-            const originalPath = path.join(process.cwd(), 'public', filePath);
-            if (fs.existsSync(originalPath)) {
-              filePath = originalPath;
-              fileExists = true;
-            } else {
-              // FALLBACK: Try different path variations for existing files
-              const filename = path.basename(filePath);
-              
-              // Try direct uploads folder
-              const directPath = path.join(process.cwd(), 'public', 'uploads', filename);
-              if (fs.existsSync(directPath)) {
-                filePath = directPath;
-                fileExists = true;
-                // Update the database with correct path
-                page.image_url = `/uploads/${filename}`;
-              } else {
-                // Try page-assets subfolder
-                const pageAssetsPath = path.join(process.cwd(), 'public', 'uploads', 'page-assets', filename);
-                if (fs.existsSync(pageAssetsPath)) {
-                  filePath = pageAssetsPath;
-                  fileExists = true;
-                  // Update the database with correct path
-                  page.image_url = `/uploads/page-assets/${filename}`;
-                }
-              }
-            }
-          }
-          
-          if (fileExists) {
+          const filePath = path.join(process.cwd(), 'public', page.image_url);
+          if (fs.existsSync(filePath)) {
             const stats = fs.statSync(filePath);
             const fileSizeInBytes = stats.size;
-            const fileSizeInKB = (fileSizeInBytes / 1024).toFixed(2);
-            const fileSizeInMB = (fileSizeInBytes / (1024 * 1024)).toFixed(2);
-            
             if (fileSizeInBytes > 1024 * 1024) {
-              page.file_size = `${fileSizeInMB} MB`;
+              page.file_size = `${(fileSizeInBytes / (1024 * 1024)).toFixed(2)} MB`;
             } else {
-              page.file_size = `${fileSizeInKB} KB`;
+              page.file_size = `${(fileSizeInBytes / 1024).toFixed(2)} KB`;
+            }
+            const timestamp = stats.mtime.getTime();
+            page.image_url_with_cache_bust = `${page.image_url}?t=${timestamp}`;
+            // Cache bust thumb_url too
+            if (page.thumb_url) {
+              const thumbFilePath = path.join(process.cwd(), 'public', page.thumb_url);
+              if (fs.existsSync(thumbFilePath)) {
+                const thumbStats = fs.statSync(thumbFilePath);
+                page.thumb_url_with_cache_bust = `${page.thumb_url}?t=${thumbStats.mtime.getTime()}`;
+              }
             }
           } else {
             page.file_size = 'File Not Found';
-            page.image_url_error = 'File missing - may need re-extraction';
+            console.error(`[pages] File missing at canonical path: ${page.image_url}`);
           }
         } else if (page.image_url && page.image_url.startsWith('data:image')) {
           // Calculate size for base64 images

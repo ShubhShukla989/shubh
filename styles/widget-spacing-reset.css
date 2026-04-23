@@ -1,0 +1,244 @@
+/* Widget Spacing Reset - DBD EPAPER STYLE */
+
+/* Reset all epaper widget containers - ZERO SPACING */
+.epaper-pagination-widget,
+.epaper-zoom-widget,
+.epaper-clip-widget,
+.epaper-calendar-widget,
+.epaper-thumbnail-widget,
+.epaper-page-display-widget,
+.epaper-archive-widget,
+.epaper-featured-widget {
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+  text-align: inherit !important;
+  display: block;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  border-radius: 0 !important;
+  gap: 0 !important;
+}
+
+/* Sharp corners for all widget elements */
+.epaper-pagination-widget *,
+.epaper-zoom-widget *,
+.epaper-clip-widget *,
+.epaper-calendar-widget *,
+.epaper-thumbnail-widget *,
+.epaper-page-display-widget *,
+.epaper-archive-widget *,
+.epaper-featured-widget * {
+  border-radius: 0 !important; /* SHARP CORNERS FOR ALL */
+}
+
+/* Consistent button sizes for all epaper widgets - CENTERED CONTENT */
+.epaper-pagination-widget button,
+.epaper-zoom-widget button,
+.epaper-clip-widget button,
+.epaper-calendar-widget button,
+.epaper-thumbnail-widget button,
+.epaper-page-display-widget button,
+.epaper-archive-widget button,
+.epaper-featured-widget button {
+  height: 40px !important; /* PERFECT DBD HEIGHT */
+  min-height: 40px !important;
+  max-height: 40px !important;
+  padding: 0 16px !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+  text-align: center !important;
+  border-radius: 0 !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+  vertical-align: top !important;
+}
+
+/* Button content alignment */
+.epaper-pagination-widget button span,
+.epaper-zoom-widget button span,
+.epaper-clip-widget button span,
+.epaper-calendar-widget button span,
+.epaper-thumbnail-widget button span,
+.epaper-page-display-widget button span,
+.epaper-archive-widget button span,
+.epaper-featured-widget button span {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Icon alignment in buttons */
+.epaper-pagination-widget button svg,
+.epaper-zoom-widget button svg,
+.epaper-clip-widget button svg,
+.epaper-calendar-widget button svg,
+.epaper-thumbnail-widget button svg,
+.epaper-page-display-widget button svg,
+.epaper-archive-widget button svg,
+.epaper-featured-widget button svg {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Mobile button sizes - CENTERED CONTENT */
+@media (max-width: 768px) {
+  .epaper-pagination-widget button,
+  .epaper-zoom-widget button,
+  .epaper-clip-widget button,
+  .epaper-calendar-widget button,
+  .epaper-thumbnail-widget button,
+  .epaper-page-display-widget button,
+  .epaper-archive-widget button,
+  .epaper-featured-widget button {
+    height: 24px !important; /* SMALLER ON MOBILE */
+    padding: 0 12px !important;
+    font-size: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.25rem !important;
+  }
+}
+
+/* Allow internal content to have spacing but maintain left alignment */
+.epaper-pagination-widget > *,
+.epaper-zoom-widget > *,
+.epaper-clip-widget > *,
+.epaper-calendar-widget > *,
+.epaper-thumbnail-widget > *,
+.epaper-page-display-widget > *,
+.epaper-archive-widget > *,
+.epaper-featured-widget > * {
+  box-sizing: border-box;
+  text-align: left;
+}
+
+/* Reset button and control spacing within widgets */
+.epaper-pagination-widget button,
+.epaper-zoom-widget button,
+.epaper-clip-widget button,
+.epaper-calendar-widget button {
+  margin: 0;
+  padding: 0.5rem;
+  box-sizing: border-box;
+  text-align: center; /* Buttons can be centered internally */
+}
+
+/* Reset form elements within widgets */
+.epaper-pagination-widget input,
+.epaper-zoom-widget input,
+.epaper-calendar-widget input,
+.epaper-calendar-widget select {
+  margin: 0;
+  padding: 0.25rem;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+/* Reset list elements within widgets */
+.epaper-thumbnail-widget ul,
+.epaper-thumbnail-widget li,
+.epaper-archive-widget ul,
+.epaper-archive-widget li {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+/* Reset heading elements within widgets */
+.epaper-page-display-widget h1,
+.epaper-page-display-widget h2,
+.epaper-page-display-widget h3,
+.epaper-archive-widget h1,
+.epaper-archive-widget h2,
+.epaper-archive-widget h3 {
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+/* Reset div containers within widgets */
+.epaper-pagination-widget div,
+.epaper-zoom-widget div,
+.epaper-clip-widget div,
+.epaper-calendar-widget div,
+.epaper-thumbnail-widget div,
+.epaper-page-display-widget div,
+.epaper-archive-widget div,
+.epaper-featured-widget div {
+  box-sizing: border-box;
+  text-align: left;
+}
+
+/* Ensure widget content doesn't overflow and stays left-aligned */
+.epaper-pagination-widget,
+.epaper-zoom-widget,
+.epaper-clip-widget,
+.epaper-calendar-widget,
+.epaper-thumbnail-widget,
+.epaper-page-display-widget,
+.epaper-archive-widget,
+.epaper-featured-widget {
+  overflow: visible;
+  max-width: 100%;
+  text-align: left !important;
+}
+
+/* Reset flexbox properties that might interfere */
+.epaper-pagination-widget,
+.epaper-zoom-widget,
+.epaper-clip-widget,
+.epaper-calendar-widget,
+.epaper-thumbnail-widget,
+.epaper-page-display-widget,
+.epaper-archive-widget,
+.epaper-featured-widget {
+  display: block;
+  flex: none;
+  align-self: flex-start;
+  justify-self: flex-start;
+}
+
+/* Allow widgets to be inline when needed but maintain left alignment */
+.layout-column[class*="horizontal"] .epaper-pagination-widget,
+.layout-column[class*="horizontal"] .epaper-zoom-widget,
+.layout-column[class*="horizontal"] .epaper-clip-widget,
+.layout-column[class*="horizontal"] .epaper-calendar-widget {
+  display: inline-block;
+  vertical-align: top;
+  text-align: left !important;
+}
+
+/* Override any centering CSS from Tailwind or other frameworks */
+.widget .text-center,
+.widget .mx-auto,
+.widget .justify-center,
+.widget .items-center {
+  text-align: inherit !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  justify-content: inherit !important;
+  align-items: inherit !important;
+}
+
+/* Allow user-defined centering when explicitly set */
+.widget[style*="text-align: center"],
+.widget.center,
+.widget.text-center {
+  text-align: center !important;
+}
+
+.widget[style*="text-align: right"],
+.widget.right,
+.widget.text-right {
+  text-align: right !important;
+}

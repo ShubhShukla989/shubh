@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { area_maps } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { invalidateCompleteEditionCache } from '@/lib/services/editionService';
 
 // Disable Next.js caching for area maps
 export const dynamic = 'force-dynamic';
@@ -166,6 +168,16 @@ export async function PUT(
     };
 
     console.log('✅ PUT area-maps: Successfully updated with bidirectional links:', parsedUpdated);
+    
+    // Revalidate edition view page cache after area map update
+    try {
+      revalidatePath(`/epaper/view/${params.id}`, 'page');
+      await invalidateCompleteEditionCache(parseInt(params.id));
+      console.log(`✅ Cache revalidated for edition ${params.id} after area map update`);
+    } catch (e) {
+      console.error('❌ Failed to revalidate cache:', e);
+    }
+    
     return NextResponse.json({ success: true, data: parsedUpdated }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
@@ -194,6 +206,15 @@ export async function DELETE(
     await db
       .delete(area_maps)
       .where(eq(area_maps.id, parseInt(params.areaId)));
+
+    // Revalidate edition view page cache after area map deletion
+    try {
+      revalidatePath(`/epaper/view/${params.id}`, 'page');
+      await invalidateCompleteEditionCache(parseInt(params.id));
+      console.log(`✅ Cache revalidated for edition ${params.id} after area map deletion`);
+    } catch (e) {
+      console.error('❌ Failed to revalidate cache:', e);
+    }
 
     return NextResponse.json({
       success: true,

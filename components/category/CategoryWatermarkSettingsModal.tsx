@@ -53,7 +53,7 @@ export default function CategoryWatermarkSettingsModal({
         setSettings(result.data);
       }
     } catch (error) {
-      console.error('Error fetching settings:', error);
+      // Failed to fetch settings, use defaults
     } finally {
       setLoading(false);
     }
@@ -76,7 +76,6 @@ export default function CategoryWatermarkSettingsModal({
         alert('Failed to save settings');
       }
     } catch (error) {
-      console.error('Error saving settings:', error);
       alert('Error saving settings');
     } finally {
       setSaving(false);
@@ -304,7 +303,7 @@ export default function CategoryWatermarkSettingsModal({
                         placeholder="Garvi Gujarat English Ahemdabad Edition{newline}{date}"
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Templates: {'{edition_title}'} {'{page_title}'} {'{date}'} {'{url}'}{' '}
+                        Templates: {'{edition_title}'} {'{page_title}'} {'{date}'} {'{url}'} {'{page_number}'} {'{total_pages}'}{' '}
                         {'{newline}'}
                       </p>
                     </div>

@@ -93,8 +93,8 @@ export async function applyWatermark(
     // SIMPLIFIED APPROACH: Only add category logo (REPLACE Aadhaar logo position - top center)
     if (settings.logo_url) {
       try {
-        // Make logo bigger - 60% of image width (150% increase from 40%)
-        const logoMaxWidth = Math.floor(imageWidth * 0.6);
+        // Make logo bigger - 50% of image width, min 120px, max 600px
+        const logoMaxWidth = Math.min(600, Math.max(120, Math.floor(imageWidth * 0.5)));
         const categoryLogo = await sharp(settings.logo_url)
           .resize({ width: logoMaxWidth, fit: 'inside' })
           .toBuffer();
@@ -123,11 +123,97 @@ export async function applyWatermark(
           left: logoX
         });
       } catch (error) {
-        // Handle error silently
+        console.error('[watermark] Failed to load or apply logo:', error);
+        throw error;
       }
     }
 
-    // Add center watermark if enabled (optional)
+    // Add text watermark if info_text is provided and mode is in_outerside
+    if (settings.info_text && settings.mode === 'in_outerside') {
+      try {
+        // Process template placeholders in info text
+        const processedInfoText = replaceTemplatePlaceholders(settings.info_text, context);
+        
+        // Create text overlay using SVG
+        const textLines = processedInfoText.split('\n');
+        const maxLineChars = Math.max(...textLines.map(line => line.length), 1);
+        // Fixed size: default 18px, clamped 12-22px, only shrinks if text too long
+        const fontSize = Math.min(22, Math.max(12, Math.min(18, Math.floor((imageWidth * 0.9) / (maxLineChars * 0.55)))));
+        const lineHeight = fontSize * 1.4;
+        const textHeight = textLines.length * lineHeight + fontSize;
+        const textWidth = Math.min(imageWidth - 20, Math.max(...textLines.map(line => line.length * fontSize * 0.55)) + 20);
+        
+        // Calculate position based on settings.position
+        let textX = 10;
+        let textY = 10;
+        
+        switch (settings.position) {
+          case 'top_left':
+            textX = 10;
+            textY = 10;
+            break;
+          case 'top_center':
+            textX = Math.floor((imageWidth - textWidth) / 2);
+            textY = 10;
+            break;
+          case 'top_right':
+            textX = imageWidth - textWidth - 10;
+            textY = 10;
+            break;
+          case 'bottom_left':
+            textX = 10;
+            textY = imageHeight - textHeight - 10;
+            break;
+          case 'bottom_center':
+            textX = Math.floor((imageWidth - textWidth) / 2);
+            textY = imageHeight - textHeight - 10;
+            break;
+          case 'bottom_right':
+          default:
+            textX = imageWidth - textWidth - 10;
+            textY = imageHeight - textHeight - 10;
+            break;
+        }
+
+        // Create SVG text overlay
+        const svgWidth = textWidth + 20;
+        const svgHeight = textHeight + 20;
+        const svgText = `
+          <svg width="${svgWidth}" height="${svgHeight}" xmlns="http://www.w3.org/2000/svg">
+            ${settings.enable_border ? `
+              <rect x="2" y="2" width="${svgWidth - 4}" height="${svgHeight - 4}" 
+                    fill="${settings.background_color}" 
+                    stroke="${settings.border_color}" 
+                    stroke-width="${settings.border_width}" />
+            ` : `
+              <rect x="0" y="0" width="${svgWidth}" height="${svgHeight}" 
+                    fill="${settings.background_color}" />
+            `}
+            ${textLines.map((line, index) => `
+              <text x="${svgWidth / 2}" y="${fontSize + index * lineHeight}" 
+                    text-anchor="middle" 
+                    font-family="Arial, sans-serif" 
+                    font-size="${fontSize}" 
+                    fill="${settings.foreground_color}">
+                ${line}
+              </text>
+            `).join('')}
+          </svg>
+        `;
+
+        const textBuffer = Buffer.from(svgText);
+        
+        composites.push({
+          input: textBuffer,
+          top: Math.max(0, Math.min(textY, imageHeight - svgHeight)),
+          left: Math.max(0, Math.min(textX, imageWidth - svgWidth)),
+          blend: 'over'
+        });
+      } catch (error) {
+        console.error('[watermark] Failed to apply text watermark:', error);
+        throw error;
+      }
+    }
     if (settings.enable_center_watermark && settings.center_watermark_url) {
       try {
         const centerWatermark = await sharp(settings.center_watermark_url)
@@ -151,7 +237,8 @@ export async function applyWatermark(
           left: centerX
         });
       } catch (error) {
-        // Handle error silently
+        console.error('[watermark] Failed to apply center watermark:', error);
+        throw error;
       }
     }
 
@@ -163,7 +250,8 @@ export async function applyWatermark(
 
     return processedBuffer;
   } catch (error) {
-    return imageBuffer; // Return original image on error
+    console.error('[watermark] applyWatermark failed:', error);
+    throw error;
   }
 }
 
@@ -187,6 +275,7 @@ export async function applyWatermarkToBase64(
     // Convert back to base64
     return `data:image/png;base64,${watermarkedBuffer.toString('base64')}`;
   } catch (error) {
-    return base64Image; // Return original on error
+    console.error('[watermark] applyWatermarkToBase64 failed:', error);
+    throw error;
   }
 }

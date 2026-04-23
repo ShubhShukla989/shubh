@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, FolderOpen, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 
 interface Menu {
   id: number;
@@ -28,7 +28,7 @@ export default function MenuManager() {
       const data = await response.json();
       setMenus(data);
     } catch (error) {
-      console.error('Failed to fetch menus:', error);
+      // Error handled by UI
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,6 @@ export default function MenuManager() {
         alert('Failed to create menu');
       }
     } catch (error) {
-      console.error('Error creating menu:', error);
       alert('Failed to create menu');
     } finally {
       setCreating(false);
@@ -77,7 +76,6 @@ export default function MenuManager() {
         alert('Failed to delete menu');
       }
     } catch (error) {
-      console.error('Error deleting menu:', error);
       alert('Failed to delete menu');
     }
   };
@@ -130,15 +128,8 @@ export default function MenuManager() {
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/admin/menus/${menu.id}/items`}
-                          className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                          title="Manage Items"
-                        >
-                          <FolderOpen className="w-4 h-4" />
-                        </Link>
-                        <Link
-                          href={`/admin/menus/${menu.id}/edit`}
                           className="p-2 bg-green-500 text-white rounded hover:bg-green-600"
-                          title="Edit"
+                          title="Edit Menu Items"
                         >
                           <Edit className="w-4 h-4" />
                         </Link>

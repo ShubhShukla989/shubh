@@ -1,9 +1,9 @@
-import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
+import { pgTable, serial, text } from 'drizzle-orm/pg-core';
 
-export const layouts = sqliteTable('layouts', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const layouts = pgTable('layouts', {
+  id: serial('id').primaryKey(),
   name: text('name').notNull().unique(),
-  structure: text('structure').notNull().default('{"rows": []}'), // jsonb stored as text
+  structure: text('structure').notNull().default('{"rows": []}'),
   status: text('status').default('draft'),
   created_at: text('created_at').default('CURRENT_TIMESTAMP'),
   updated_at: text('updated_at').default('CURRENT_TIMESTAMP'),
@@ -11,9 +11,9 @@ export const layouts = sqliteTable('layouts', {
   custom_js: text('custom_js').default(''),
 });
 
-export const layout_backups = sqliteTable('layout_backups', {
+export const layout_backups = pgTable('layout_backups', {
   id: text('id').primaryKey(),
   layout_name: text('layout_name').notNull(),
-  structure: text('structure').notNull(), // jsonb stored as text
+  structure: text('structure').notNull(),
   timestamp: text('timestamp').notNull().default('CURRENT_TIMESTAMP'),
 });

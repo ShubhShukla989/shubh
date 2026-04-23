@@ -63,12 +63,8 @@ export default function CreateCategoryPage() {
         router.push('/admin/epaper/categories');
       } else {
         alert('Error: ' + (result.error || 'Unknown error'));
-        if (result.details) {
-          console.error('Validation errors:', result.details);
-        }
       }
     } catch (error) {
-      console.error('Submit error:', error);
       alert('Failed to create category');
     } finally {
       setLoading(false);

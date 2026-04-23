@@ -15,21 +15,22 @@ export default function QueryProvider({
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        // EXTREME performance for 1000+ users - cache for 30 minutes
-        staleTime: 30 * 60 * 1000,
-        gcTime: 60 * 60 * 1000, // Keep in memory for 1 hour
-        // Retry failed requests for better UX
-        retry: 3,
-        // Don't refetch on window focus to reduce server load
+        // Elite: Data stays fresh for 60 seconds (balance between freshness and speed)
+        staleTime: 60 * 1000,
+        // Keep unused data in cache for 5 minutes
+        gcTime: 5 * 60 * 1000,
+        // Retry failed requests once
+        retry: 1,
+        // Don't refetch on window focus (admin dashboard behavior)
         refetchOnWindowFocus: false,
-        // Don't refetch on reconnect to reduce server load
+        // Don't refetch on reconnect
         refetchOnReconnect: false,
-        // Only refetch on mount if data is very stale
-        refetchOnMount: 'always',
+        // Refetch on mount only if stale
+        refetchOnMount: false,
       },
       mutations: {
-        // Retry mutations for better UX
-        retry: 2,
+        // Retry mutations once for better UX
+        retry: 1,
       },
     },
   }));

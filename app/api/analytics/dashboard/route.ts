@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { page_views, active_sessions, daily_stats } from '@/lib/schema/analytics';
-import { sql, gte, eq, desc } from 'drizzle-orm';
+import { sql, gte, eq, desc, and } from 'drizzle-orm';
 
-// Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
 
-/**
- * GET /api/analytics/dashboard
- * Get analytics data for dashboard
- */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const period = searchParams.get('period') || '7'; // days
+    const period = searchParams.get('period') || '7';
 
     const now = new Date();
     const startDate = new Date(now.getTime() - parseInt(period) * 24 * 60 * 60 * 1000);
@@ -34,6 +29,18 @@ export async function GET(request: NextRequest) {
       .where(eq(daily_stats.date, todayStr))
       .limit(1);
 
+    // ✅ FIX #3: Calculate actual unique visitors from source (COUNT DISTINCT)
+    const todayUniqueVisitors = await db
+      .select({ 
+        count: sql<number>`COUNT(DISTINCT user_id)` 
+      })
+      .from(page_views)
+      .where(gte(page_views.created_at, todayStr + 'T00:00:00.000Z'));
+
+    // Override with correct value
+    const todayViews = todayStats[0]?.total_views || 0;
+    const todayVisitors = todayUniqueVisitors[0]?.count || 0;
+
     // Get daily stats for the period
     const dailyData = await db
       .select()
@@ -47,27 +54,59 @@ export async function GET(request: NextRequest) {
     const weekStats = await db
       .select({ 
         total: sql<number>`sum(total_views)`,
-        visitors: sql<number>`sum(unique_visitors)`
       })
       .from(daily_stats)
       .where(gte(daily_stats.date, weekStart));
+
+    // Calculate week unique visitors from source
+    const weekUniqueVisitors = await db
+      .select({ 
+        count: sql<number>`COUNT(DISTINCT user_id)` 
+      })
+      .from(page_views)
+      .where(gte(page_views.created_at, weekStart + 'T00:00:00.000Z'));
 
     // Get this month's total
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const monthStats = await db
       .select({ 
         total: sql<number>`sum(total_views)`,
-        visitors: sql<number>`sum(unique_visitors)`
       })
       .from(daily_stats)
       .where(gte(daily_stats.date, monthStart));
 
-    // Prepare chart data
-    const chartData = dailyData.reverse().map(day => ({
-      date: day.date,
-      views: day.total_views,
-      visitors: day.unique_visitors,
-    }));
+    // Calculate month unique visitors from source
+    const monthUniqueVisitors = await db
+      .select({ 
+        count: sql<number>`COUNT(DISTINCT user_id)` 
+      })
+      .from(page_views)
+      .where(gte(page_views.created_at, monthStart + 'T00:00:00.000Z'));
+
+    // Prepare chart data (calculate unique visitors for each day from source)
+    const chartData = [];
+    for (const day of dailyData.reverse()) {
+      // Calculate unique visitors for this day from source
+      const nextDay = new Date(day.date + 'T00:00:00.000Z');
+      nextDay.setDate(nextDay.getDate() + 1);
+      const nextDayStr = nextDay.toISOString().split('T')[0] + 'T00:00:00.000Z';
+
+      const dayUniqueVisitors = await db
+        .select({ 
+          count: sql<number>`COUNT(DISTINCT user_id)` 
+        })
+        .from(page_views)
+        .where(and(
+          gte(page_views.created_at, day.date + 'T00:00:00.000Z'),
+          sql`${page_views.created_at} < ${nextDayStr}`
+        ));
+
+      chartData.push({
+        date: day.date,
+        views: day.total_views,
+        visitors: dayUniqueVisitors[0]?.count || 0,
+      });
+    }
 
     // Fill missing days with 0 values
     const filledData = [];
@@ -89,9 +128,9 @@ export async function GET(request: NextRequest) {
       data: {
         realtime: {
           activeNow: activeSessions[0]?.count || 0,
-          todayViews: todayStats[0]?.total_views || 0,
-          weekViews: weekStats[0]?.total || 0,
-          monthViews: monthStats[0]?.total || 0,
+          todayViews: todayVisitors, // 🔥 CHANGED: Show unique visitors instead of total views
+          weekViews: weekUniqueVisitors[0]?.count || 0, // 🔥 CHANGED: Show unique visitors instead of total views
+          monthViews: monthUniqueVisitors[0]?.count || 0, // 🔥 CHANGED: Show unique visitors instead of total views
         },
         chart: filledData,
         period: parseInt(period),
@@ -101,7 +140,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response);
 
   } catch (error) {
-    console.error('Dashboard analytics error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch analytics' },
       { status: 500 }

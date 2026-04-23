@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Filter,
   FileText,
+  Plus,
 } from 'lucide-react';
 import { Edition, User } from '@/lib/types';
 import ActionIcons from '@/components/ActionIcons';
@@ -69,7 +70,7 @@ function EditionsPageContent() {
       try {
         setCols(JSON.parse(saved));
       } catch (error) {
-        console.error('Error loading column visibility:', error);
+        // Failed to load column visibility
       }
     }
     
@@ -83,7 +84,7 @@ function EditionsPageContent() {
     try {
       await fetch('/api/editions/auto-publish', { method: 'POST' });
     } catch (error) {
-      console.error('Auto-publish check failed:', error);
+      // Auto-publish check failed, continue
     }
   };
 
@@ -95,7 +96,7 @@ function EditionsPageContent() {
         setCategories(result.data || []);
       }
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      // Failed to fetch categories
     }
   };
 
@@ -107,7 +108,7 @@ function EditionsPageContent() {
         setUsers(result.data || []);
       }
     } catch (error) {
-      console.error('Failed to fetch users:', error);
+      // Failed to fetch users
     }
   };
 
@@ -140,7 +141,7 @@ function EditionsPageContent() {
         setEditions(data.data);
       }
     } catch (error) {
-      console.error('Failed to fetch editions:', error);
+      // Failed to fetch editions
     } finally {
       setLoading(false);
     }
@@ -161,7 +162,6 @@ function EditionsPageContent() {
         alert('Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Failed to delete edition:', error);
       alert('Failed to delete edition');
     }
   };
@@ -201,7 +201,6 @@ function EditionsPageContent() {
         alert('Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Failed to toggle featured:', error);
       alert('Failed to toggle featured status');
     }
   };
@@ -302,7 +301,6 @@ function EditionsPageContent() {
         alert(`Failed to ${bulkAction} any editions.`);
       }
     } catch (error) {
-      console.error('Bulk action error:', error);
       alert(`Failed to perform bulk action: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
@@ -349,7 +347,7 @@ function EditionsPageContent() {
                 onClick={() => setShowNewEditionModal(true)}
                 className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded hover:bg-blue-600 transition-colors flex items-center gap-2"
               >
-                <ActionIcons.Add className="!p-0 !bg-transparent !text-white" /> New Edition
+                <Plus className="w-4 h-4" /> New Edition
               </button>
             )}
 

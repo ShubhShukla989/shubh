@@ -6,16 +6,6 @@ import { SkeletonLoader, CardSkeleton } from '@/components/ui/SkeletonLoader';
 import { OptimizedWidget as PerformanceWidget } from '@/components/ui/PerformanceOptimizer';
 
 // Dynamic imports for components
-const LazyEpaperPageDisplayWidget = dynamic(() => import('../epaper/EpaperPageDisplayWidget').then(mod => ({ default: mod.EpaperPageDisplayWidget })), {
-  loading: () => <WidgetSkeleton type="epaper-page-display" />,
-  ssr: false
-});
-
-const LazyEpaperPaginationWidget = dynamic(() => import('../epaper/EpaperPaginationWidget').then(mod => ({ default: mod.EpaperPaginationWidget })), {
-  loading: () => <WidgetSkeleton type="epaper-pagination" />,
-  ssr: false
-});
-
 const LazyEpaperCalendarWidget = dynamic(() => import('../epaper/EpaperCalendarWidget').then(mod => ({ default: mod.EpaperCalendarWidget })), {
   loading: () => <WidgetSkeleton type="epaper-calendar" />,
   ssr: false
@@ -28,16 +18,6 @@ const LazyNavigationWidget = dynamic(() => import('../navigation/NavigationWidge
 
 const LazyMenuWidget = dynamic(() => import('../MenuWidget').then(mod => ({ default: mod.MenuWidget })), {
   loading: () => <WidgetSkeleton type="menu" />,
-  ssr: false
-});
-
-const LazyEpaperAreaMapDisplayWidget = dynamic(() => import('../epaper/EpaperAreaMapDisplayWidget').then(mod => ({ default: mod.EpaperAreaMapDisplayWidget })), {
-  loading: () => <WidgetSkeleton type="area-map-display" />,
-  ssr: false
-});
-
-const LazyEpaperClipDisplayWidget = dynamic(() => import('../epaper/EpaperClipDisplayWidget').then(mod => ({ default: mod.EpaperClipDisplayWidget })), {
-  loading: () => <WidgetSkeleton type="clip-display" />,
   ssr: false
 });
 
@@ -278,18 +258,14 @@ function WidgetRenderer({ widget, context, isUserFacing }: any) {
 
   // Lightweight widget mapping for user pages
   const userWidgets = {
-    'epaper-page-display': LazyEpaperPageDisplayWidget,
-    'epaper-pagination': LazyEpaperPaginationWidget,
     'epaper-calendar': LazyEpaperCalendarWidget,
     'epaper-featured': LazyEpaperFeaturedWidget,
     'navigation': LazyNavigationWidget,
     'menu': LazyMenuWidget,
   };
 
-  // Admin widgets (heavier components)
+  // Admin widgets (heavier components) - removed epaper display widgets
   const adminWidgets = {
-    'area-map-display': LazyEpaperAreaMapDisplayWidget,
-    'clip-display': LazyEpaperClipDisplayWidget,
     // Add more admin widgets as needed
   };
 
@@ -324,19 +300,6 @@ function WidgetRenderer({ widget, context, isUserFacing }: any) {
 
 function WidgetSkeleton({ type }: { type: string }) {
   const skeletonMap = {
-    'epaper-page-display': () => (
-      <div className="space-y-4">
-        <SkeletonLoader variant="text" width="40%" height="32px" />
-        <SkeletonLoader variant="image" height="600px" />
-      </div>
-    ),
-    'epaper-pagination': () => (
-      <div className="flex justify-center space-x-2 py-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <SkeletonLoader key={i} variant="button" width="40px" height="40px" />
-        ))}
-      </div>
-    ),
     'epaper-calendar': () => <CardSkeleton />,
     'navigation': () => (
       <div className="flex space-x-4 p-4">

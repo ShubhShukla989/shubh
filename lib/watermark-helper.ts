@@ -6,10 +6,10 @@ import { WatermarkSettings } from '@/lib/watermark';
 /**
  * Fetch watermark settings for a specific category
  * Falls back to global settings if category doesn't have override
+ * Always returns watermark_version so callers can detect stale caches
  */
 export async function getWatermarkSettings(categoryId?: string | number): Promise<WatermarkSettings | null> {
   try {
-    // If category ID provided, try to fetch category-specific settings
     if (categoryId) {
       const [categorySettings] = await db
         .select()
@@ -17,13 +17,11 @@ export async function getWatermarkSettings(categoryId?: string | number): Promis
         .where(eq(category_watermark_settings.category_id, Number(categoryId)))
         .limit(1);
 
-      // If category has override settings, return them
       if (categorySettings && categorySettings.override_global_settings) {
         return categorySettings as WatermarkSettings;
       }
     }
 
-    // Fetch global settings
     const [globalSettings] = await db
       .select()
       .from(area_map_watermark_settings)
@@ -32,7 +30,6 @@ export async function getWatermarkSettings(categoryId?: string | number): Promis
 
     return globalSettings as WatermarkSettings;
   } catch (error) {
-    console.error('Error fetching watermark settings:', error);
     return null;
   }
 }

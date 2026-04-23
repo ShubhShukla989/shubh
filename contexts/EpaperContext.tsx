@@ -67,10 +67,9 @@ export function EpaperProvider({
       const data = await response.json();
       if (data.success && data.data?.category_id) {
         setCategoryId(data.data.category_id);
-        console.log('📰 Edition category_id:', data.data.category_id);
       }
     } catch (error) {
-      console.error('Failed to fetch edition details:', error);
+      // Silent fail - category ID not critical
     }
   };
 
@@ -88,21 +87,14 @@ export function EpaperProvider({
       const timestamp = Date.now();
       const url = `/api/editions/${editionId}/pages?_t=${timestamp}`;
       
-      console.log('🚀 EpaperContext - Fetching pages from:', url);
-      
       const response = await fetch(url);
       const data = await response.json();
       
-      console.log('📡 EpaperContext - API Response:', data);
-      
       if (data.success) {
-        console.log('📄 EpaperContext - Pages fetched:', data.data?.length);
         setPages(data.data || []);
-      } else {
-        console.error('❌ EpaperContext - API Error:', data.error);
       }
     } catch (error) {
-      console.error('💥 EpaperContext - Network Error:', error);
+      // Silent fail - pages will remain empty
     } finally {
       setLoading(false);
     }

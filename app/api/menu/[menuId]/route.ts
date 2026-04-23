@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { menus } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { invalidateWidgetCachesAsync } from '@/lib/cache/universal';
 
 /**
  * GET /api/menu/:menuId - Get a specific menu with items
@@ -25,7 +26,6 @@ export async function GET(
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -58,9 +58,11 @@ export async function PUT(
       .where(eq(menus.id, parseInt(menuId)))
       .returning();
 
+    // 🚀 UNIVERSAL CACHE INVALIDATION (Production Safe - Async)
+    invalidateWidgetCachesAsync();
+
     return NextResponse.json(data);
   } catch (error) {
-    console.error('API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -80,9 +82,11 @@ export async function DELETE(
 
     await db.delete(menus).where(eq(menus.id, parseInt(menuId)));
 
+    // 🚀 UNIVERSAL CACHE INVALIDATION (Production Safe - Async)
+    invalidateWidgetCachesAsync();
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -1,11 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { area_maps } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { area_maps, edition_pages } from '@/lib/schema';
+import { eq, inArray } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { invalidateCompleteEditionCache } from '@/lib/services/editionService';
+import fs from 'fs/promises';
+import path from 'path';
+import sharp from 'sharp';
 
 // Disable Next.js caching for area maps
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+/**
+ * Generate cropped image for area map
+ */
+async function generateCroppedImage(areaMapId: number, areaMap: any, pageId: number) {
+  try {
+    // Fetch page data
+    const [page] = await db
+      .select()
+      .from(edition_pages)
+      .where(eq(edition_pages.id, pageId))
+      .limit(1);
+
+    if (!page) {
+      console.warn(`Page ${pageId} not found for area map ${areaMapId}`);
+      return;
+    }
+
+    const publicPath = path.join(process.cwd(), 'public');
+    const croppedDir = path.join(publicPath, 'uploads', 'area-maps', 'cropped');
+    
+    // Create directory if it doesn't exist
+    await fs.mkdir(croppedDir, { recursive: true });
+
+    const croppedFilename = `area-${areaMapId}.png`;
+    const croppedPath = path.join(croppedDir, croppedFilename);
+
+    // Load page image
+    const imagePath = page.image_url.startsWith('/') 
+      ? path.join(publicPath, page.image_url)
+      : path.join(publicPath, '/', page.image_url);
+
+    const imageBuffer = await fs.readFile(imagePath);
+
+    // Crop the area
+    await sharp(imageBuffer)
+      .extract({
+        left: Math.round(areaMap.x),
+        top: Math.round(areaMap.y),
+        width: Math.round(areaMap.width),
+        height: Math.round(areaMap.height)
+      })
+      .png()
+      .toFile(croppedPath);
+
+    console.log(`✅ Generated cropped image for area map ${areaMapId}`);
+  } catch (error) {
+    console.error(`❌ Failed to generate cropped image for area map ${areaMapId}:`, error);
+    // Don't throw - continue even if cropping fails
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -61,9 +117,12 @@ export async function POST(
         .where(eq(area_maps.page_id, parseInt(params.pageId)));
       
       const existingIds = existingAreas.map(area => area.id);
-      const updatedAreas = [];
-      
-      // Process each area map from the request
+      const updatedAreas: Array<any> = [];
+
+      // Separate areas into inserts and updates
+      const toInsert: Array<any> = [];
+      const toUpdate: Array<{ id: number; cleanArea: any }> = [];
+
       for (const area of areaMaps) {
         const cleanArea = {
           x: Number(area.x),
@@ -72,47 +131,59 @@ export async function POST(
           height: Number(area.height),
           title: area.title || null,
           url: area.url || null,
-          linked_area_ids: Array.isArray(area.linked_area_ids) 
-            ? JSON.stringify(area.linked_area_ids) 
+          linked_area_ids: Array.isArray(area.linked_area_ids)
+            ? JSON.stringify(area.linked_area_ids)
             : (area.linked_area_ids && area.linked_area_ids !== '[]') ? area.linked_area_ids : '[]',
           linked_page_number: area.linked_page_number ? Number(area.linked_page_number) : null,
           page_id: parseInt(params.pageId),
           edition_id: parseInt(params.id),
           updated_at: new Date().toISOString()
         };
-        
+
         if (area.id && existingIds.includes(area.id)) {
-          // UPDATE existing area (preserve ID)
           console.log('🔄 Updating existing area:', area.id, cleanArea);
-          const [updated] = await db
-            .update(area_maps)
-            .set(cleanArea)
-            .where(eq(area_maps.id, area.id))
-            .returning();
-          
+          toUpdate.push({ id: area.id, cleanArea });
+        } else {
+          console.log('➕ Inserting new area:', cleanArea);
+          toInsert.push(cleanArea);
+        }
+      }
+
+      // Batch INSERT all new areas in one query
+      if (toInsert.length > 0) {
+        const inserted = await db
+          .insert(area_maps)
+          .values(toInsert)
+          .returning();
+
+        for (const ins of inserted) {
+          updatedAreas.push({
+            ...ins,
+            linked_area_ids: ins.linked_area_ids ? JSON.parse(ins.linked_area_ids) : []
+          });
+          generateCroppedImage(ins.id, ins, parseInt(params.pageId)).catch(err =>
+            console.error(`Failed to generate cropped image for area ${ins.id}:`, err)
+          );
+        }
+      }
+
+      // Run all UPDATEs in parallel
+      if (toUpdate.length > 0) {
+        const updateResults = await Promise.all(
+          toUpdate.map(({ id, cleanArea }) =>
+            db.update(area_maps).set(cleanArea).where(eq(area_maps.id, id)).returning()
+          )
+        );
+
+        for (const [updated] of updateResults) {
           if (updated) {
             updatedAreas.push({
               ...updated,
-              linked_area_ids: updated.linked_area_ids 
-                ? JSON.parse(updated.linked_area_ids) 
-                : []
+              linked_area_ids: updated.linked_area_ids ? JSON.parse(updated.linked_area_ids) : []
             });
-          }
-        } else {
-          // INSERT new area (will get new ID)
-          console.log('➕ Inserting new area:', cleanArea);
-          const [inserted] = await db
-            .insert(area_maps)
-            .values(cleanArea)
-            .returning();
-          
-          if (inserted) {
-            updatedAreas.push({
-              ...inserted,
-              linked_area_ids: inserted.linked_area_ids 
-                ? JSON.parse(inserted.linked_area_ids) 
-                : []
-            });
+            generateCroppedImage(updated.id, updated, parseInt(params.pageId)).catch(err =>
+              console.error(`Failed to generate cropped image for area ${updated.id}:`, err)
+            );
           }
         }
       }
@@ -123,11 +194,23 @@ export async function POST(
       
       if (areasToDelete.length > 0) {
         console.log('🗑️ Deleting removed areas:', areasToDelete);
-        for (const idToDelete of areasToDelete) {
-          await db
-            .delete(area_maps)
-            .where(eq(area_maps.id, idToDelete));
-        }
+
+        // Single batched delete
+        await db.delete(area_maps).where(inArray(area_maps.id, areasToDelete));
+
+        // Delete cropped image files in parallel
+        await Promise.all(
+          areasToDelete.map(async (idToDelete) => {
+            try {
+              const publicPath = path.join(process.cwd(), 'public');
+              const croppedPath = path.join(publicPath, 'uploads', 'area-maps', 'cropped', `area-${idToDelete}.png`);
+              await fs.unlink(croppedPath);
+              console.log(`🗑️ Deleted cropped image for area ${idToDelete}`);
+            } catch (err) {
+              console.log(`⏭️ Cropped image for area ${idToDelete} not found, skipping`);
+            }
+          })
+        );
       }
       
       // **BIDIRECTIONAL LINKING FOR BULK SAVE**
@@ -144,66 +227,76 @@ export async function POST(
       
       console.log('📊 Total area maps in edition after save:', allAreaMapsAfterSave.length);
       
+      // Build a Map<linkedAreaId, Set<areaIds that link to it>> for all bidirectional updates
+      const reverseLinks = new Map<number, Set<number>>();
+
       for (const savedArea of updatedAreas) {
         console.log(`🔍 Checking Area ${savedArea.id}:`, {
           id: savedArea.id,
           title: savedArea.title,
           linked_area_ids: savedArea.linked_area_ids
         });
-        
+
         if (savedArea.linked_area_ids && savedArea.linked_area_ids.length > 0) {
           console.log(`🔗 Area ${savedArea.id} has ${savedArea.linked_area_ids.length} links:`, savedArea.linked_area_ids);
-          
+
           for (const linkedAreaId of savedArea.linked_area_ids) {
             console.log(`  ➡️ Processing link to Area ${linkedAreaId}...`);
-            
-            try {
-              // Get the linked area's current linked_area_ids from the fresh data
-              const linkedArea = allAreaMapsAfterSave.find(a => a.id === linkedAreaId);
-
-              if (linkedArea) {
-                console.log(`  ✅ Found linked Area ${linkedAreaId}:`, {
-                  id: linkedArea.id,
-                  title: linkedArea.title,
-                  current_links: linkedArea.linked_area_ids
-                });
-                
-                const linkedAreaIds = linkedArea.linked_area_ids 
-                  ? JSON.parse(linkedArea.linked_area_ids).map((id: any) => Number(id))
-                  : [];
-
-                console.log(`  📋 Current links for Area ${linkedAreaId}:`, linkedAreaIds);
-                
-                // Add current area to linked area's list (if not already there)
-                if (!linkedAreaIds.includes(savedArea.id)) {
-                  const updatedLinkedAreaIds = [...linkedAreaIds, savedArea.id];
-                  
-                  console.log(`  ➕ Adding bidirectional link: ${linkedAreaId} → ${savedArea.id}`);
-                  console.log(`  📝 New links for Area ${linkedAreaId}:`, updatedLinkedAreaIds);
-                  
-                  await db
-                    .update(area_maps)
-                    .set({
-                      linked_area_ids: JSON.stringify(updatedLinkedAreaIds),
-                      updated_at: new Date().toISOString()
-                    })
-                    .where(eq(area_maps.id, linkedAreaId));
-
-                  console.log(`  ✅ Successfully added bidirectional link: Area ${linkedAreaId} now links back to Area ${savedArea.id}`);
-                } else {
-                  console.log(`  ⏭️ Area ${linkedAreaId} already links to Area ${savedArea.id}, skipping`);
-                }
-              } else {
-                console.warn(`  ⚠️ Linked Area ${linkedAreaId} not found in database`);
-              }
-            } catch (error) {
-              console.error(`  ❌ Failed to add bidirectional link for area ${linkedAreaId}:`, error);
+            if (!reverseLinks.has(linkedAreaId)) {
+              reverseLinks.set(linkedAreaId, new Set());
             }
+            reverseLinks.get(linkedAreaId)!.add(savedArea.id);
           }
         } else {
           console.log(`  ⏭️ Area ${savedArea.id} has no links, skipping`);
         }
       }
+
+      // Run all bidirectional updates in parallel
+      await Promise.all(
+        Array.from(reverseLinks.entries()).map(async ([linkedAreaId, sourceIds]) => {
+          try {
+            const linkedArea = allAreaMapsAfterSave.find(a => a.id === linkedAreaId);
+
+            if (linkedArea) {
+              console.log(`  ✅ Found linked Area ${linkedAreaId}:`, {
+                id: linkedArea.id,
+                title: linkedArea.title,
+                current_links: linkedArea.linked_area_ids
+              });
+
+              const existingLinkedIds = linkedArea.linked_area_ids
+                ? JSON.parse(linkedArea.linked_area_ids).map((id: any) => Number(id))
+                : [];
+
+              console.log(`  📋 Current links for Area ${linkedAreaId}:`, existingLinkedIds);
+
+              const newIds = Array.from(sourceIds).filter(id => !existingLinkedIds.includes(id));
+              if (newIds.length > 0) {
+                const updatedLinkedAreaIds = [...existingLinkedIds, ...newIds];
+                console.log(`  ➕ Adding bidirectional links: ${linkedAreaId} → ${newIds.join(', ')}`);
+                console.log(`  📝 New links for Area ${linkedAreaId}:`, updatedLinkedAreaIds);
+
+                await db
+                  .update(area_maps)
+                  .set({
+                    linked_area_ids: JSON.stringify(updatedLinkedAreaIds),
+                    updated_at: new Date().toISOString()
+                  })
+                  .where(eq(area_maps.id, linkedAreaId));
+
+                console.log(`  ✅ Successfully added bidirectional links for Area ${linkedAreaId}`);
+              } else {
+                console.log(`  ⏭️ Area ${linkedAreaId} already has all back-links, skipping`);
+              }
+            } else {
+              console.warn(`  ⚠️ Linked Area ${linkedAreaId} not found in database`);
+            }
+          } catch (error) {
+            console.error(`  ❌ Failed to add bidirectional link for area ${linkedAreaId}:`, error);
+          }
+        })
+      );
       
       // Fetch the final state after bidirectional linking
       const finalAreaMaps = await db
@@ -222,6 +315,16 @@ export async function POST(
       console.log('🔗 ========== BIDIRECTIONAL LINKING END ==========');
       console.log('✅ Bulk save completed:', finalParsedData.length, 'areas processed');
       console.log('📊 Final area maps with bidirectional links:', finalParsedData);
+      
+      // Revalidate edition view page cache after area maps are updated
+      try {
+        revalidatePath(`/epaper/view/${params.id}`, 'page');
+        await invalidateCompleteEditionCache(parseInt(params.id));
+        console.log(`✅ Cache revalidated for edition ${params.id} after area map update`);
+      } catch (e) {
+        console.error('❌ Failed to revalidate cache:', e);
+      }
+      
       return NextResponse.json({ success: true, data: finalParsedData }, { 
         status: 200,
         headers: {
@@ -287,6 +390,22 @@ export async function POST(
         .insert(area_maps)
         .values(cleanData)
         .returning();
+
+      // Generate cropped image for new area map
+      if (newAreaMap) {
+        generateCroppedImage(newAreaMap.id, cleanData, parseInt(params.pageId)).catch(err => 
+          console.error(`Failed to generate cropped image for area ${newAreaMap.id}:`, err)
+        );
+      }
+
+      // Revalidate edition view page cache after area map is created
+      try {
+        revalidatePath(`/epaper/view/${params.id}`, 'page');
+        await invalidateCompleteEditionCache(parseInt(params.id));
+        console.log(`✅ Cache revalidated for edition ${params.id} after area map creation`);
+      } catch (e) {
+        console.error('❌ Failed to revalidate cache:', e);
+      }
 
       return NextResponse.json({ success: true, data: newAreaMap }, { 
         status: 201,

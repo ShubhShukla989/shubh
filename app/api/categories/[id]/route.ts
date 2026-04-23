@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { categories } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { invalidateWidgetCachesAsync } from '@/lib/cache/universal';
 
 // GET /api/categories/[id] - Get category by ID
 export async function GET(
@@ -35,7 +37,6 @@ export async function GET(
       data: category
     });
   } catch (error) {
-    console.error('Error fetching category:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch category' },
       { status: 500 }
@@ -81,12 +82,37 @@ export async function PUT(
       );
     }
 
+    // 🔥 UNIVERSAL CACHE INVALIDATION (Production Safe - Async)
+    invalidateWidgetCachesAsync();
+    
+    // Revalidate Next.js routes
+    try {
+      revalidatePath('/', 'page'); // Homepage
+      revalidatePath('/epaper', 'page'); // EPaper section
+      revalidatePath('/epaper/display', 'page'); // Display page
+      revalidatePath('/epaper/archive', 'page'); // Archive page
+      
+      // Revalidate specific category page (old and new alias)
+      if (updatedCategory.alias) {
+        revalidatePath(`/epaper/category/${updatedCategory.alias}`, 'page');
+      }
+      
+      // If alias changed, also revalidate old alias page
+      if (body.alias && body.alias !== updatedCategory.alias) {
+        revalidatePath(`/epaper/category/${body.alias}`, 'page');
+      }
+      
+      console.log('✅ Universal cache revalidated for category update');
+    } catch (cacheError) {
+      console.error('❌ Failed to revalidate cache:', cacheError);
+      // Don't fail the request if cache clear fails
+    }
+
     return NextResponse.json({
       success: true,
       data: updatedCategory
     });
   } catch (error) {
-    console.error('Error updating category:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update category' },
       { status: 500 }
@@ -121,12 +147,32 @@ export async function DELETE(
       );
     }
 
+    // 🔥 UNIVERSAL CACHE INVALIDATION (Production Safe - Async)
+    invalidateWidgetCachesAsync();
+    
+    // Revalidate Next.js routes
+    try {
+      revalidatePath('/', 'page'); // Homepage
+      revalidatePath('/epaper', 'page'); // EPaper section
+      revalidatePath('/epaper/display', 'page'); // Display page
+      revalidatePath('/epaper/archive', 'page'); // Archive page
+      
+      // Revalidate the deleted category page (will show 404)
+      if (deletedCategory.alias) {
+        revalidatePath(`/epaper/category/${deletedCategory.alias}`, 'page');
+      }
+      
+      console.log('✅ Universal cache revalidated for category delete');
+    } catch (cacheError) {
+      console.error('❌ Failed to revalidate cache:', cacheError);
+      // Don't fail the request if cache clear fails
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Category deleted successfully'
     });
   } catch (error) {
-    console.error('Error deleting category:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete category' },
       { status: 500 }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { pages } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { invalidateCacheKeysAsync } from '@/lib/cache/universal';
 
 /**
  * GET /api/pages/[id] - Get single page
@@ -26,7 +28,6 @@ export async function GET(
 
     return NextResponse.json({ success: true, data: page });
   } catch (error) {
-    console.error('Get page error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch page' },
       { status: 500 }
@@ -57,9 +58,10 @@ export async function PUT(
       );
     }
 
+    invalidateCacheKeysAsync(['pages:*', `layout:page:${updated.alias}`]);
+    if (updated.alias) revalidatePath(`/${updated.alias}`, 'page');
     return NextResponse.json({ success: true, data: updated });
   } catch (error: any) {
-    console.error('Update page error:', error);
     return NextResponse.json(
       { success: false, error: error.message || 'Failed to update page' },
       { status: 500 }
@@ -75,13 +77,18 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const [existing] = await db.select({ alias: pages.alias }).from(pages)
+      .where(eq(pages.id, parseInt(params.id))).limit(1);
+
     await db
       .delete(pages)
       .where(eq(pages.id, parseInt(params.id)));
 
+    invalidateCacheKeysAsync(['pages:*', 'menu:*', 'layout:menu:*', ...(existing?.alias ? [`layout:page:${existing.alias}`] : [])]);
+    if (existing?.alias) revalidatePath(`/${existing.alias}`, 'page');
+
     return NextResponse.json({ success: true, message: 'Page deleted' });
   } catch (error) {
-    console.error('Delete page error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete page' },
       { status: 500 }

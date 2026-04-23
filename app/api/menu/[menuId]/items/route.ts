@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { menu_items, pages } from '@/lib/schema';
 import { eq, asc } from 'drizzle-orm';
+import { invalidateWidgetCachesAsync } from '@/lib/cache/universal';
 
 /**
  * GET /api/menu/:menuId/items - Get all menu items
@@ -35,7 +36,6 @@ export async function GET(
 
     return NextResponse.json(data || []);
   } catch (error) {
-    console.error('API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -80,9 +80,11 @@ export async function POST(
 
     const [data] = await db.insert(menu_items).values(itemData).returning();
 
+    // 🚀 UNIVERSAL CACHE INVALIDATION (Production Safe - Async)
+    invalidateWidgetCachesAsync();
+
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
-    console.error('API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

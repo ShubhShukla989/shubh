@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [authLoaded, setAuthLoaded] = useState(false); // Track if auth was loaded
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -42,42 +43,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (session?.user) {
+    // Only load auth once per session
+    if (session?.user && !authLoaded) {
       loadUserFromSession();
-    } else {
+    } else if (authLoaded) {
       setLoading(false);
     }
-  }, [session, status, router]);
+  }, [session, status, authLoaded]);
 
   const loadUserFromSession = async () => {
+    const startTime = performance.now();
+    console.log('🔄 Auth: Loading (once per session)');
+    
     try {
       if (!session?.user?.email) {
         setLoading(false);
         return;
       }
       
-      // First, ensure admin user exists
-      try {
-        await fetch('/api/admin/ensure-user', { method: 'POST' });
-      } catch (error) {
-        console.warn('Could not ensure admin user exists:', error);
+      // Parallelize all auth operations
+      console.time('⏱️ Auth: Total (Parallel)');
+      
+      const [ensureResult, userResponse] = await Promise.all([
+        // Ensure user exists (can fail silently)
+        fetch('/api/admin/ensure-user', { method: 'POST' }).catch(() => null),
+        // Fetch user details
+        fetch(`/api/users/by-email?email=${encodeURIComponent(session.user.email)}`)
+      ]);
+      
+      if (!userResponse.ok) {
+        throw new Error(`HTTP error! status: ${userResponse.status}`);
       }
       
-      // Fetch user details from database using session email
-      const response = await fetch(`/api/users/by-email?email=${encodeURIComponent(session.user.email)}`);
+      const userData = await userResponse.json();
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success && data.user) {
-        setUser(data.user);
-        // Load permissions
-        await loadPermissions(data.user.role_id);
+      if (userData.success && userData.user) {
+        setUser(userData.user);
+        
+        // Load permissions for this role
+        const permResponse = await fetch(`/api/permissions/role/${userData.user.role_id}`);
+        
+        if (permResponse.ok) {
+          const permData = await permResponse.json();
+          if (permData.success) {
+            const permSet = new Set<string>(permData.data.map((p: any) => p.permission_key as string));
+            setPermissions(permSet);
+          }
+        }
       } else {
-        console.warn('User not found in database:', data.error);
         // Set a default user to prevent errors
         setUser({
           id: 1,
@@ -86,10 +99,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role_id: 1,
           role_name: 'Super Admin'
         });
-        setPermissions(new Set(['*'])); // Grant all permissions as fallback
+        setPermissions(new Set(['*']));
       }
+      
+      console.timeEnd('⏱️ Auth: Total (Parallel)');
+      const totalTime = performance.now() - startTime;
+      console.log(`✅ Auth: Loaded in ${totalTime.toFixed(2)}ms (cached for session)`);
+      
     } catch (error) {
-      console.error('Failed to load user session:', error);
+      console.error('❌ Auth: Load failed', error);
       // Set a fallback user to prevent crashes
       if (session?.user?.email) {
         setUser({
@@ -99,38 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role_id: 1,
           role_name: 'Super Admin'
         });
-        setPermissions(new Set(['*'])); // Grant all permissions as fallback
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadPermissions = async (roleId: number) => {
-    try {
-      const response = await fetch(`/api/permissions/role/${roleId}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        const permSet = new Set<string>(data.data.map((p: any) => p.permission_key as string));
-        setPermissions(permSet);
-      } else {
-        // Fallback permissions for super admin
-        if (roleId === 1) {
-          setPermissions(new Set(['*']));
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load permissions:', error);
-      // Fallback permissions for super admin
-      if (roleId === 1) {
         setPermissions(new Set(['*']));
       }
+    } finally {
+      setAuthLoaded(true); // Mark as loaded
+      setLoading(false);
     }
   };
 

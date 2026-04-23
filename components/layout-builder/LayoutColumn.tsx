@@ -220,7 +220,7 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
 
   return (
     <div 
-      className="rounded bg-gray-50 relative transition-all duration-300"
+      className="rounded bg-white relative transition-all duration-300"
       style={{
         flex: `0 0 ${widthPercentage}%`,
         maxWidth: `${widthPercentage}%`,
@@ -238,7 +238,7 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
         <div className="relative">
           <button
             onClick={() => setShowWidgetDropdown(!showWidgetDropdown)}
-            className="px-2 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 flex items-center gap-1 text-xs shadow-sm transition-all"
+            className="px-2 py-1 bg-gray-500 text-white hover:bg-gray-600 flex items-center gap-1 text-xs shadow-sm transition-all"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -249,10 +249,10 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
           {showWidgetDropdown && (
             <>
               <div 
-                className="fixed inset-0 z-10" 
+                className="fixed inset-0 z-[110]" 
                 onClick={() => setShowWidgetDropdown(false)}
               />
-              <div className="absolute left-0 mt-1 w-64 bg-white border border-gray-300 rounded shadow-lg z-20 max-h-96 overflow-y-auto">
+              <div className="absolute left-0 mt-1 w-64 bg-white border border-gray-300 rounded shadow-lg z-[120] max-h-96 overflow-y-auto">
                 {widgetCategories.map((category, idx) => (
                   <div key={idx}>
                     <div className="px-4 py-2 bg-gray-100 text-gray-700 font-semibold text-sm border-b">
@@ -274,21 +274,21 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
           )}
         </div>
         
-        {/* Settings Button (Three Dots) */}
+        {/* Settings Button (Three Lines) */}
         <button
           onClick={() => setShowColumnProperties(true)}
-          className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600 shadow-sm transition-all"
+          className="w-6 h-6 bg-blue-500 text-white hover:bg-blue-600 shadow-sm transition-all flex items-center justify-center"
           title="Column Settings"
         >
-          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
 
         {/* Delete Button */}
         <button
           onClick={onDelete}
-          className="p-1 bg-red-500 text-white rounded hover:bg-red-600 shadow-sm transition-all"
+          className="w-6 h-6 bg-red-500 text-white hover:bg-red-600 shadow-sm transition-all flex items-center justify-center"
           title="Delete Column"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -303,7 +303,7 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
             const newWidth = Math.min(12, currentWidth + 1);
             onUpdate({ ...column, width: newWidth });
           }}
-          className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600 shadow-sm transition-all"
+          className="w-6 h-6 bg-blue-500 text-white hover:bg-blue-600 shadow-sm transition-all flex items-center justify-center"
           title="Increase Width"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -318,7 +318,7 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
             const newWidth = Math.max(1, currentWidth - 1);
             onUpdate({ ...column, width: newWidth });
           }}
-          className="p-1 bg-blue-500 text-white rounded hover:bg-blue-600 shadow-sm transition-all"
+          className="w-6 h-6 bg-blue-500 text-white hover:bg-blue-600 shadow-sm transition-all flex items-center justify-center"
           title="Decrease Width"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -329,16 +329,16 @@ export function LayoutColumn({ column, onUpdate, onDelete }: LayoutColumnProps) 
         {/* Add Nested Row Button */}
         <button
           onClick={addNestedRow}
-          className="px-2 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 flex items-center gap-1 text-xs shadow-sm transition-all"
+          className="w-6 h-6 bg-gray-500 text-white hover:bg-gray-600 flex items-center justify-center text-xs shadow-sm transition-all"
+          title="Add Nested Row"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
           </svg>
-          Add Nested Row
         </button>
       </div>
 
-      <div className="space-y-2">
+      <div className="">
         {column.widgets.map((widget, index) => (
           <div
             key={widget.id}
@@ -456,13 +456,13 @@ function NestedLayoutRow({ row, onUpdate, onDelete }: { row: Row; onUpdate: (row
   };
 
   return (
-    <div className="rounded bg-purple-50 p-2 border border-purple-300 w-full">
+    <div className="rounded bg-gray-50 p-2 border border-gray-300 w-full">
       {/* Nested Row Header */}
-      <div className="bg-purple-500 -mx-2 -mt-2 mb-2 px-2 py-1 rounded-t flex items-center justify-between">
+      <div className="bg-gray-500 -mx-2 -mt-2 mb-2 px-2 py-1 rounded-t flex items-center justify-between">
         <span className="text-white text-[10px] font-bold">NESTED ROW</span>
         <button
           onClick={onDelete}
-          className="p-0.5 bg-red-500 text-white rounded hover:bg-red-600 shadow-sm transition-all"
+          className="w-6 h-6 bg-red-500 text-white hover:bg-red-600 shadow-sm transition-all flex items-center justify-center"
           title="Delete Nested Row"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -475,7 +475,7 @@ function NestedLayoutRow({ row, onUpdate, onDelete }: { row: Row; onUpdate: (row
       <div className="mb-2">
         <button
           onClick={addColumn}
-          className="px-2 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 flex items-center gap-1 shadow-sm transition-all"
+          className="px-2 py-1 bg-gray-500 text-white text-xs hover:bg-gray-600 flex items-center gap-1 shadow-sm transition-all"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -486,7 +486,7 @@ function NestedLayoutRow({ row, onUpdate, onDelete }: { row: Row; onUpdate: (row
 
       {/* Columns */}
       {row.columns.length === 0 ? (
-        <div className="text-center py-4 text-purple-400 text-xs border border-dashed border-purple-300 rounded">
+        <div className="text-center py-4 text-gray-400 text-xs border border-dashed border-gray-300 rounded">
           Click "Add Column" to add columns
         </div>
       ) : (
@@ -603,6 +603,7 @@ function getDefaultConfig(type: Widget['type']) {
       };
     case 'epaper-pagination':
       return {
+        pagerFormat: 'smart-pagination',
         showPageNumbers: true,
         showNavButtons: true
       };

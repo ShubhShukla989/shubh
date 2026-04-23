@@ -67,7 +67,7 @@ export default function MenuItemsManager() {
         setMenu(data);
       }
     } catch (error) {
-      console.error('Failed to fetch menu:', error);
+      // Error handled by UI
     }
   };
 
@@ -80,7 +80,7 @@ export default function MenuItemsManager() {
         setItems(data || []);
       }
     } catch (error) {
-      console.error('Failed to fetch menu items:', error);
+      // Error handled by UI
     } finally {
       setLoading(false);
     }
@@ -98,7 +98,6 @@ export default function MenuItemsManager() {
         setPages([]);
       }
     } catch (error) {
-      console.error('Failed to fetch pages:', error);
       setPages([]);
     }
   };
@@ -178,7 +177,6 @@ export default function MenuItemsManager() {
         alert(`Failed to create menu item: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Error creating menu item:', error);
       alert('Failed to create menu item');
     }
   };
@@ -228,7 +226,6 @@ export default function MenuItemsManager() {
         alert('Failed to update menu item');
       }
     } catch (error) {
-      console.error('Error updating menu item:', error);
       alert('Failed to update menu item');
     }
   };
@@ -247,7 +244,6 @@ export default function MenuItemsManager() {
         alert('Failed to delete menu item');
       }
     } catch (error) {
-      console.error('Error deleting menu item:', error);
       alert('Failed to delete menu item');
     }
   };

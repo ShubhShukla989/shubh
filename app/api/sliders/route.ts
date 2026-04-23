@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sliders, slides } from '@/lib/schema';
-import { eq, ilike, desc, sql } from 'drizzle-orm';
+import { eq, ilike, desc, sql, inArray } from 'drizzle-orm';
+import { invalidateWidgetCachesAsync } from '@/lib/cache/universal';
 
 /**
  * GET /api/sliders
@@ -51,13 +52,21 @@ export async function GET(request: NextRequest) {
         .offset(offset);
     }
 
-    // Get slides for each slider
-    const slidersWithSlides = await Promise.all(
-      data.map(async (slider) => {
-        const sliderSlides = await db.select().from(slides).where(eq(slides.slider_id, slider.id));
-        return { ...slider, slides: sliderSlides };
-      })
-    );
+    // Get slides for all sliders in a single query
+    const sliderIds = data.map(s => s.id);
+    const allSlides = sliderIds.length > 0
+      ? await db.select().from(slides).where(inArray(slides.slider_id, sliderIds))
+      : [];
+    const slidesBySlider = new Map<number, typeof allSlides>();
+    for (const slide of allSlides) {
+      const arr = slidesBySlider.get(slide.slider_id) ?? [];
+      arr.push(slide);
+      slidesBySlider.set(slide.slider_id, arr);
+    }
+    const slidersWithSlides = data.map(slider => ({
+      ...slider,
+      slides: slidesBySlider.get(slider.id) ?? []
+    }));
 
     return NextResponse.json({
       sliders: slidersWithSlides,
@@ -116,6 +125,9 @@ export async function POST(request: NextRequest) {
         config: config ? JSON.stringify(config) : '{}',
       })
       .returning();
+
+    // 🚀 UNIVERSAL CACHE INVALIDATION (Production Safe - Async)
+    invalidateWidgetCachesAsync();
 
     return NextResponse.json(data, { status: 201 });
   } catch (error) {

@@ -36,7 +36,7 @@ export default function EditionModal({ isOpen, onClose, onSave }: EditionModalPr
         setCategories(result.data || []);
       }
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      // Failed to fetch categories
     }
   };
 
@@ -89,7 +89,6 @@ export default function EditionModal({ isOpen, onClose, onSave }: EditionModalPr
         alert('Error: ' + result.error);
       }
     } catch (error) {
-      console.error('Schedule error:', error);
       alert('Failed to schedule edition');
     } finally {
       setSaving(false);
@@ -121,7 +120,6 @@ export default function EditionModal({ isOpen, onClose, onSave }: EditionModalPr
         alert('Error: ' + result.error);
       }
     } catch (error) {
-      console.error('Save error:', error);
       alert('Failed to save edition');
     } finally {
       setSaving(false);

@@ -11,14 +11,13 @@ const nextConfig = {
   // Build configuration for Hostinger VPS
   output: 'standalone',
   
-  // Skip build-time database calls
+  // Skip build-time database calls (only during next build, NOT at runtime)
   env: {
-    SKIP_BUILD_STATIC_GENERATION: process.env.NODE_ENV === 'production' ? 'true' : 'false',
+    SKIP_BUILD_STATIC_GENERATION: process.env.NEXT_PHASE === 'phase-production-build' ? 'true' : 'false',
   },
   
   // Image optimization
   images: {
-    domains: ['localhost'],
     remotePatterns: [
       {
         protocol: 'http',
@@ -43,14 +42,20 @@ const nextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     
     // Cache settings - EXTREME optimization for 1000+ users
-    minimumCacheTTL: 604800, // 1 week for images
+    minimumCacheTTL: 2592000, // 30 days for images (increased from 1 week)
     
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    
+    // Disable image optimization on low-CPU VPS (images already optimized)
+    unoptimized: true,
   },
 
   // Experimental features
   experimental: {
+    serverActions: {
+      bodySizeLimit: '20mb',
+    },
     optimizePackageImports: [
       '@heroicons/react', 
       'lucide-react',
@@ -91,7 +96,7 @@ const nextConfig = {
         headers: [
           {
             key: 'X-Frame-Options',
-            value: 'SAMEORIGIN', // Allow iframe from same origin
+            value: 'SAMEORIGIN',
           },
           {
             key: 'X-Content-Type-Options',
@@ -104,6 +109,10 @@ const nextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https:; frame-src 'self'; object-src 'self';",
           },
         ],
       },
@@ -143,13 +152,13 @@ const nextConfig = {
           },
         ],
       },
-      // User API routes - AGGRESSIVE CACHE for 1000+ users
+      // User API routes - BALANCED CACHE (fresh data + server protection)
       {
         source: '/api/(editions|categories|epaper)/(.*)',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=300, s-maxage=1800, stale-while-revalidate=3600', // 5min browser, 30min CDN, 1hr stale
+            value: 'public, max-age=0, s-maxage=60, stale-while-revalidate=300', // No browser cache, 1min CDN, 5min stale cushion
           },
           {
             key: 'Vary',
@@ -177,7 +186,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=604800, s-maxage=2592000, stale-while-revalidate=7776000', // 1week browser, 1month CDN, 3month stale
+            value: 'public, max-age=31536000, immutable', // 1 year cache - images don't change
           },
           {
             key: 'Vary',
@@ -185,29 +194,31 @@ const nextConfig = {
           },
           {
             key: 'X-Accel-Expires',
-            value: '2592000', // Nginx cache for 1 month
+            value: '31536000', // Nginx cache for 1 year
           },
           {
             key: 'X-Frame-Options',
-            value: 'SAMEORIGIN', // Allow iframe from same origin
+            value: 'SAMEORIGIN',
           },
           {
             key: 'Content-Security-Policy',
-            value: 'frame-ancestors \'self\'', // Allow embedding in same origin
+            value: 'frame-ancestors \'self\'',
           },
         ],
       },
       // User pages - OPTIMIZED CACHE
+      // Vary: User-Agent removed — it was fragmenting CDN cache per browser version,
+      // effectively making CDN cache useless (every Chrome version = different cache entry).
       {
         source: '/(epaper|page)/(.*)',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=600, s-maxage=1800, stale-while-revalidate=3600', // 10min browser, 30min CDN, 1hr stale
+            value: 'public, max-age=1800, s-maxage=3600, stale-while-revalidate=7200',
           },
           {
             key: 'Vary',
-            value: 'Accept-Encoding, User-Agent',
+            value: 'Accept-Encoding',
           },
         ],
       },
@@ -238,6 +249,16 @@ const nextConfig = {
             value: 'Accept-Encoding',
           },
         ],
+      },
+    ];
+  },
+
+  // URL Rewrites - Homepage shows clean URL (reads from .env)
+  async rewrites() {
+    return [
+      {
+        source: '/',
+        destination: process.env.NEXT_PUBLIC_HOMEPAGE || '/epaper/display',
       },
     ];
   },

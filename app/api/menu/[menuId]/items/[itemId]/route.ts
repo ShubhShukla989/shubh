@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { menu_items } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
+import { invalidateCacheKeysAsync } from '@/lib/cache/universal';
 
 /**
  * PUT /api/menu/:menuId/items/:itemId - Update a menu item
@@ -53,9 +54,9 @@ export async function PUT(
       .where(eq(menu_items.id, parseInt(itemId)))
       .returning();
 
+    invalidateCacheKeysAsync(['menu:*', 'layout:menu:*']);
     return NextResponse.json(data);
   } catch (error) {
-    console.error('API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -75,9 +76,9 @@ export async function DELETE(
 
     await db.delete(menu_items).where(eq(menu_items.id, parseInt(itemId)));
 
+    invalidateCacheKeysAsync(['menu:*', 'layout:menu:*']);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

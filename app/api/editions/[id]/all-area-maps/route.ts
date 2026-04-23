@@ -32,7 +32,17 @@ export async function GET(
       .innerJoin(edition_pages, eq(area_maps.page_id, edition_pages.id))
       .where(eq(edition_pages.edition_id, editionId));
 
-    return NextResponse.json({ success: true, data: areaMaps }, {
+    // Parse linked_area_ids from JSON string to array for each area map
+    const parsedAreaMaps = areaMaps.map(areaMap => ({
+      ...areaMap,
+      linked_area_ids: areaMap.linked_area_ids 
+        ? JSON.parse(areaMap.linked_area_ids as string)
+        : []
+    }));
+
+    console.log('📦 Fetched area maps with parsed linked_area_ids:', parsedAreaMaps);
+
+    return NextResponse.json({ success: true, data: parsedAreaMaps }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
         'Pragma': 'no-cache',

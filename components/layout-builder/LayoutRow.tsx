@@ -86,7 +86,7 @@ export function LayoutRow({ row, onUpdate, onDelete, onDuplicate, onMoveUp, onMo
 
   return (
     <div 
-      className="rounded bg-white p-3 mb-4 transition-shadow shadow-md hover:shadow-lg w-full"
+      className="rounded bg-gray-100 p-3 transition-shadow shadow-md hover:shadow-lg w-full"
       draggable
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = 'move';
@@ -96,68 +96,11 @@ export function LayoutRow({ row, onUpdate, onDelete, onDuplicate, onMoveUp, onMo
         if (onDragEnd) onDragEnd();
       }}
     >
-      {/* Drag Handle - Top Bar */}
-      <div 
-        className="bg-blue-500 hover:bg-blue-600 cursor-move -mx-3 -mt-3 mb-3 px-3 py-2 rounded-t flex items-center justify-between transition-all"
-        title="Drag to reorder"
-      >
-        <div className="flex items-center gap-1">
-          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-          </svg>
-          <span className="text-white text-[10px] font-bold">DRAG TO REORDER</span>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-0.5">
-          {onMoveUp && (
-            <button
-              onClick={onMoveUp}
-              className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-sm transition-all"
-              title="Move Up"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-              </svg>
-            </button>
-          )}
-          {onMoveDown && (
-            <button
-              onClick={onMoveDown}
-              className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-sm transition-all"
-              title="Move Down"
-            >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          )}
-          <button
-            onClick={onDuplicate}
-            className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700 shadow-sm transition-all"
-            title="Duplicate"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-1 bg-red-500 text-white rounded hover:bg-red-600 shadow-sm transition-all"
-            title="Delete"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-      
       {/* Content Area */}
       <div className="flex gap-1 mb-2">
         <button
           onClick={addColumn}
-          className="px-2 py-1 bg-teal-500 text-white rounded text-xs hover:bg-teal-600 flex items-center gap-1 shadow-sm transition-all"
+          className="px-2 py-1 bg-green-500 text-white text-xs hover:bg-green-600 flex items-center gap-1 shadow-sm transition-all"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -165,21 +108,21 @@ export function LayoutRow({ row, onUpdate, onDelete, onDuplicate, onMoveUp, onMo
           Add Column
         </button>
         
-        {/* Three Dots Button - Row Settings */}
+        {/* Three Lines Button - Row Settings */}
         <button
           onClick={() => setShowRowProperties(true)}
-          className="px-1.5 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 flex items-center shadow-sm transition-all"
+          className="w-6 h-6 bg-blue-500 text-white text-xs hover:bg-blue-600 flex items-center justify-center shadow-sm transition-all"
           title="Row Properties"
         >
-          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
         
         {/* Delete Row Button */}
         <button
           onClick={onDelete}
-          className="px-1.5 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 flex items-center shadow-sm transition-all"
+          className="w-6 h-6 bg-red-500 text-white text-xs hover:bg-red-600 flex items-center justify-center shadow-sm transition-all"
           title="Delete Row"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -213,6 +156,11 @@ export function LayoutRow({ row, onUpdate, onDelete, onDuplicate, onMoveUp, onMo
             onUpdate({
               ...row,
               ...properties,
+              // Ensure properties are also saved in nested structure
+              properties: {
+                ...row.properties,
+                ...properties.properties,
+              }
             });
           }}
           onClose={() => setShowRowProperties(false)}
