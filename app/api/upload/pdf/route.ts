@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Increase body size limit for this route
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
-// Allow up to 50MB
 export const maxDuration = 60;
 
 const supabase = createClient(
